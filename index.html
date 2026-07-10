@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Gluer Shift Hand-Off</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
+<style>
+  :root{
+    /* Moquin brand palette (matches moquin_qa_checklists.html) — --navy /
+       --navy-light are kept as the variable names so nothing else in this
+       file needs to change, but now carry Moquin's black + hot-pink pairing
+       instead of the old navy-blue theme. */
+    --navy:#ff1f8f;
+    --navy-light:#d4006e;
+    --black:#0a0a0a;
+    --pink-soft:#fff0f7;
+    --accent:#c8393a;
+    --good:#2e7d4f;
+    --good-light:#3a9e65;
+    --warn:#e8a020;
+    --bg:#f5f5f3;
+    --card:#ffffff;
+    --border:#e0e0e0;
+    --text:#1c232b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding-bottom:40px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{background:var(--black);color:#fff;padding:16px;text-align:center;border-top:5px solid var(--navy);}
+  header h1{margin:0;font-size:1.4rem;}
+  .lang-toggle{
+    position:fixed; top:10px; right:10px; z-index:50;
+    background:#fff; border:3px solid var(--navy); border-radius:24px;
+    padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
+  }
+  .container{max-width:760px;margin:0 auto;padding:12px;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.08);
+  }
+  .card h2{margin:0 0 12px;font-size:1.1rem;color:var(--navy);border-bottom:2px solid var(--border);padding-bottom:8px;}
+  label{display:block;font-size:0.85rem;font-weight:700;margin:10px 0 4px;color:#333;}
+  input, select{
+    width:100%; padding:12px; font-size:1.1rem;
+    border:1px solid var(--border); border-radius:8px; background:#fff;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  /* Station buttons */
+  .station-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
+  .station-btn{
+    padding:18px 8px;font-size:1.1rem;font-weight:800;border-radius:10px;
+    border:3px solid var(--navy);background:#fff;color:var(--navy);
+  }
+  .station-btn.selected{background:var(--navy);color:#fff;}
+
+  .handoff-banner{
+    background:var(--black);
+    color:#fff;border-radius:14px;padding:20px 16px;text-align:center;margin-bottom:14px;
+  }
+  .handoff-banner .label{font-size:1rem;color:#c7d2e8;text-transform:uppercase;letter-spacing:1px;font-weight:700;}
+  .handoff-banner .count{font-size:4.2rem;font-weight:900;margin:6px 0;line-height:1;color:var(--navy);}
+  .banner-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  .banner-grid div{background:rgba(255,255,255,0.14);border-radius:10px;padding:10px;}
+  .banner-grid .n{font-size:1.8rem;font-weight:800;}
+  .banner-grid .l{font-size:0.8rem;color:#dde5f5;font-weight:600;}
+  .job-meta{font-size:1rem;color:#444;font-weight:600;margin-bottom:4px;text-align:center;}
+
+  .shift-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .shift-btn{padding:20px 10px;font-size:1.5rem;font-weight:800;border-radius:12px;border:3px solid var(--navy);background:#fff;color:var(--navy);}
+  .shift-btn.active{background:var(--navy);color:#fff;}
+
+  /* Manual numeric count fields */
+  .counter-block{margin-bottom:16px;}
+  .counter-title{font-size:1.15rem;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+  .counter-title.good{color:var(--good);}
+  .counter-title.reject{color:var(--accent);}
+  .count-input{
+    width:100%;padding:20px;font-size:2.4rem;font-weight:900;text-align:center;
+    border-radius:12px;border:2px solid var(--border);
+  }
+  .count-input.good{background:#e7f6ec;color:var(--good);border-color:var(--good-light);}
+  .count-input.reject{background:#fdeceb;color:var(--accent);border-color:var(--accent);}
+
+  .chip-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;}
+  .chip{padding:14px 8px;font-size:1rem;font-weight:700;border-radius:10px;border:2px solid var(--border);background:#fff;color:#444;text-align:center;}
+  .chip.selected{background:#fff3cd;border-color:var(--warn);color:#5c4400;}
+  .other-note{margin-top:6px;}
+
+  .btn-submit{width:100%;padding:20px;font-size:1.4rem;font-weight:900;border-radius:12px;border:none;background:var(--navy);color:#fff;margin-top:8px;}
+  .btn-submit:active{background:var(--navy-light);}
+  .btn-secondary{width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:none;background:var(--pink-soft);color:var(--navy);margin-top:8px;}
+  .btn-danger{background:#fdeceb;color:var(--accent);}
+  .btn-email{background:#e7f6ec;color:var(--good);}
+
+  .day-group{margin-bottom:16px;}
+  .day-header{
+    background:var(--black);color:#fff;border-radius:8px 8px 0 0;
+    padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;
+  }
+  .day-header .day-date{font-weight:800;font-size:1rem;}
+  .day-header .day-subtotal{font-size:0.85rem;font-weight:700;}
+  .day-header .day-subtotal .sg{color:#8fe0ab;}
+  .day-header .day-subtotal .sr{color:#ff9b9b;}
+  .day-entries{border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:10px;background:#f4f6fa;}
+  .day-entries .entry:last-child{margin-bottom:0;}
+
+  .entry{border-left:6px solid var(--navy);background:#f9fafc;border-radius:8px;padding:12px 14px;margin-bottom:8px;}
+  .entry.shift2{border-left-color:var(--accent);}
+  .entry-top{display:flex;justify-content:space-between;font-weight:800;color:var(--navy);font-size:1rem;margin-bottom:8px;}
+  .entry-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .ec-label{font-size:0.75rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
+  .ec-original{font-size:0.95rem;font-weight:700;color:#9aa2b1;text-decoration:line-through;margin-bottom:2px;}
+  .ec-value{font-size:1.6rem;font-weight:900;}
+  .ec-value.good{color:var(--good);}
+  .ec-value.reject{color:var(--accent);}
+  .entry-flags{margin-top:8px;font-size:0.9rem;color:#5c4400;background:#fff3cd;border-radius:6px;padding:6px 8px;}
+  .entry-flags:empty{display:none;}
+  .entry-edit-row{margin-top:8px;text-align:right;}
+  .edit-pencil-btn{
+    background:var(--pink-soft);color:var(--navy);border:1px solid var(--border);
+    border-radius:8px;padding:6px 12px;font-size:0.85rem;font-weight:700;
+  }
+  .edited-tag{font-size:0.7rem;font-weight:700;color:var(--warn);background:#fff3cd;border-radius:6px;padding:3px 8px;}
+  .edit-form{margin-top:10px;background:var(--bg);border-radius:8px;padding:10px;}
+  .edit-form label{margin:6px 0 2px;}
+  .edit-form input{padding:10px;font-size:1.2rem;font-weight:800;text-align:center;}
+  .edit-form-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+  .edit-save-btn{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:12px;font-weight:800;}
+  .edit-cancel-btn{background:#fff;color:#666;border:1px solid var(--border);border-radius:8px;padding:12px;font-weight:800;}
+  .empty-state{text-align:center;color:#888;padding:30px 10px;font-size:1rem;}
+
+  select#jobSelect{font-weight:800;font-size:1.15rem;}
+
+  [data-es]{display:none;}
+  body.es [data-en]{display:none;}
+  body.es [data-es]{display:inline;}
+</style>
+</head>
+<body>
+
+<button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
+
+<header>
+  <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
+</header>
+
+<div class="container">
+
+  <!-- JOB SELECTOR -->
+  <div class="card">
+    <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span></h2>
+    <select id="jobSelect" onchange="loadJob()"></select>
+    <button class="btn-secondary" onclick="toggleNewJobForm()">
+      <span data-en>+ Start New Job</span><span data-es>+ Iniciar Nuevo Trabajo</span>
+    </button>
+    <div id="newJobForm" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+      <label><span data-en>Job / PO Number</span><span data-es>Número de Trabajo / OC</span></label>
+      <input id="njPO" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="48213">
+
+      <label><span data-en>Product Number</span><span data-es>Número de Producto</span></label>
+      <input id="njProduct" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="10234">
+
+      <label><span data-en>Station</span><span data-es>Estación</span></label>
+      <div class="station-grid">
+        <button type="button" class="station-btn selected" id="stLongBtn" onclick="selectStation('Long Gluer')">
+          <span data-en>Long Gluer</span><span data-es>Pegadora Larga</span>
+        </button>
+        <button type="button" class="station-btn" id="stShortBtn" onclick="selectStation('Short Gluer')">
+          <span data-en>Short Gluer</span><span data-es>Pegadora Corta</span>
+        </button>
+      </div>
+
+      <label><span data-en>Quantity to Produce</span><span data-es>Cantidad a Producir</span></label>
+      <input id="njTarget" type="text" inputmode="numeric" placeholder="50,000" oninput="formatThousands(this)">
+      <button class="btn-submit" onclick="createJob()"><span data-en>Create Job</span><span data-es>Crear Trabajo</span></button>
+    </div>
+  </div>
+
+  <!-- BANNER -->
+  <div id="bannerSection" style="display:none;">
+    <div class="job-meta" id="jobMetaLine"></div>
+    <div class="handoff-banner">
+      <div class="label"><span data-en>Current Good Count</span><span data-es>Conteo Bueno Actual</span></div>
+      <div class="count" id="bannerCount">0</div>
+      <div class="banner-grid">
+        <div><div class="n" id="bannerHold">0</div><div class="l"><span data-en>REJECT / HOLD</span><span data-es>RECHAZO</span></div></div>
+        <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFT TOGGLE -->
+  <div class="shift-toggle" id="shiftToggleSection" style="display:none;">
+    <button class="shift-btn active" id="shift1Btn" onclick="setShift('1')">1<span data-en>st Shift</span><span data-es>er Turno</span></button>
+    <button class="shift-btn" id="shift2Btn" onclick="setShift('2')">2<span data-en>nd Shift</span><span data-es>do Turno</span></button>
+  </div>
+
+  <!-- ENTRY CARD -->
+  <div class="card" id="logCard" style="display:none;">
+
+    <div class="counter-block">
+      <div class="counter-title good">✅ <span data-en>Good Count</span><span data-es>Conteo Bueno</span></div>
+      <input class="count-input good" id="entryGood" type="text" inputmode="numeric" placeholder="Type count here" data-ph-en="Type count here" data-ph-es="Escriba el conteo aquí" oninput="formatThousands(this)">
+    </div>
+
+    <div class="counter-block">
+      <div class="counter-title reject">⚠️ <span data-en>Reject / Hold Count</span><span data-es>Conteo de Rechazo</span></div>
+      <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Type count here" data-ph-en="Type count here" data-ph-es="Escriba el conteo aquí" oninput="formatThousands(this)">
+    </div>
+
+    <label><span data-en>Flag for Next Shift (optional — tap all that apply)</span><span data-es>Alerta para el Siguiente Turno (opcional)</span></label>
+    <div class="chip-grid" id="chipGrid">
+      <button class="chip" data-flag="overglue" onclick="toggleChip(this)"><span data-en>Over Glue</span><span data-es>Exceso de Pegamento</span></button>
+      <button class="chip" data-flag="noglue" onclick="toggleChip(this)"><span data-en>Insufficient / No Glue</span><span data-es>Pegamento Insuficiente</span></button>
+      <button class="chip" data-flag="misalign" onclick="toggleChip(this)"><span data-en>Glue Misalignment</span><span data-es>Desalineación de Pegamento</span></button>
+      <button class="chip" data-flag="fold" onclick="toggleChip(this)"><span data-en>Crooked Fold / Misfold</span><span data-es>Doblez Torcido / Mal Doblado</span></button>
+      <button class="chip" data-flag="scuff" onclick="toggleChip(this)"><span data-en>Scuffing</span><span data-es>Raspaduras</span></button>
+      <button class="chip" data-flag="kleenstick" onclick="toggleChip(this)"><span data-en>Kleenstick Issue</span><span data-es>Problema de Kleenstick</span></button>
+      <button class="chip" data-flag="tearstrip" onclick="toggleChip(this)"><span data-en>Tearstrip Issue</span><span data-es>Problema de Tira de Rasgado</span></button>
+      <button class="chip" data-flag="burst" onclick="toggleChip(this)"><span data-en>Bursting / Cracking</span><span data-es>Reventado / Agrietado</span></button>
+      <button class="chip" data-flag="other" onclick="toggleChip(this)"><span data-en>Other (see note)</span><span data-es>Otro (ver nota)</span></button>
+    </div>
+    <input class="other-note" id="otherNote" placeholder="Optional short note / Nota breve opcional" style="display:none;">
+
+    <button class="btn-submit" onclick="submitEntry()"><span data-en>Submit Shift Count</span><span data-es>Enviar Conteo de Turno</span></button>
+    <button class="btn-secondary" onclick="saveProgress()">💾 <span data-en>Save Progress (jumping to another job)</span><span data-es>Guardar Progreso (cambiar a otro trabajo)</span></button>
+    <div id="draftNotice" style="display:none;text-align:center;font-size:0.85rem;font-weight:700;color:var(--warn);margin-top:8px;"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="card" id="historyCard" style="display:none;">
+    <h2><span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></h2>
+    <div id="historyList"></div>
+    <button class="btn-secondary btn-email" id="reportBtn" onclick="sendReport()">📧 <span data-en>Finish, Send Report</span><span data-es>Terminar, Enviar Reporte</span></button>
+  </div>
+
+  <div class="card" id="deleteCard" style="display:none;">
+    <button class="btn-secondary btn-danger" onclick="startOver()"><span data-en>Start Over (Clear This Job)</span><span data-es>Empezar de Nuevo (Borrar Trabajo)</span></button>
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'shiftHandoffJobs_v3';
+const DRAFT_KEY = 'shiftHandoffDrafts_v1';
+const MANAGER_EMAIL = 'jayro@moquinpress.com';
+const QA_EMAIL = 'qualitygroup@moquinpress.com';
+
+// PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW (see setup instructions)
+const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.dev/';
+
+let jobs = {};
+let drafts = {};
+let currentJobId = null;
+let currentShift = '1';
+let newJobStation = 'Long Gluer';
+let selectedFlags = [];
+let editingEntryId = null;
+
+function formatThousands(el){
+  let raw = el.value.replace(/[^0-9]/g, '');
+  if(raw === ''){ el.value = ''; return; }
+  el.value = parseInt(raw, 10).toLocaleString('en-US');
+}
+
+function loadAll(){
+  try{ jobs = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ jobs = {}; }
+  try{ drafts = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {}; }
+  catch(e){ drafts = {}; }
+  // backfill ids/edit fields for entries created before edit feature existed
+  let needsSave = false;
+  Object.values(jobs).forEach(job=>{
+    (job.entries||[]).forEach(e=>{
+      if(!e.id){ e.id = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); needsSave = true; }
+      if(e.edited === undefined){ e.edited = false; needsSave = true; }
+      if(e.originalGood === undefined){ e.originalGood = null; needsSave = true; }
+      if(e.originalReject === undefined){ e.originalReject = null; needsSave = true; }
+    });
+  });
+  if(needsSave) saveAll();
+}
+function saveAll(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs)); }
+function saveDrafts(){ localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts)); }
+
+function toggleLang(){
+  document.body.classList.toggle('es');
+  const isEs = document.body.classList.contains('es');
+  document.getElementById('langLabel').textContent = isEs ? 'English' : 'Español';
+  document.querySelectorAll('[data-ph-en]').forEach(el=>{
+    el.placeholder = isEs ? el.dataset.phEs : el.dataset.phEn;
+  });
+}
+
+function selectStation(name){
+  newJobStation = name;
+  document.getElementById('stLongBtn').classList.toggle('selected', name==='Long Gluer');
+  document.getElementById('stShortBtn').classList.toggle('selected', name==='Short Gluer');
+}
+
+function refreshJobSelect(){
+  const sel = document.getElementById('jobSelect');
+  sel.innerHTML = '';
+  const ids = Object.keys(jobs);
+  if(ids.length === 0){
+    sel.innerHTML = '<option value="">-- No jobs yet --</option>';
+    currentJobId = null;
+    renderJob();
+    return;
+  }
+  ids.sort((a,b)=> jobs[b].createdAt - jobs[a].createdAt);
+  ids.forEach(id=>{
+    const j = jobs[id];
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = `${j.po}${j.product ? ' — '+j.product : ''} — ${j.machine}`;
+    sel.appendChild(opt);
+  });
+  if(!currentJobId || !jobs[currentJobId]) currentJobId = ids[0];
+  sel.value = currentJobId;
+  restoreDraft();
+  renderJob();
+}
+
+function toggleNewJobForm(){
+  const f = document.getElementById('newJobForm');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function createJob(){
+  const po = document.getElementById('njPO').value.trim();
+  const product = document.getElementById('njProduct').value.trim();
+  const target = document.getElementById('njTarget').value.replace(/,/g,'').trim();
+  if(!po){
+    alert(document.body.classList.contains('es') ? 'Ingrese el número de trabajo.' : 'Enter job/PO number.');
+    return;
+  }
+  const id = 'job_' + Date.now();
+  jobs[id] = { po, product, machine: newJobStation, target: target?parseInt(target):0, createdAt: Date.now(), entries: [] };
+  saveAll();
+  currentJobId = id;
+  document.getElementById('njPO').value='';
+  document.getElementById('njProduct').value='';
+  document.getElementById('njTarget').value='';
+  document.getElementById('newJobForm').style.display='none';
+  refreshJobSelect();
+}
+
+function loadJob(){
+  currentJobId = document.getElementById('jobSelect').value;
+  clearEntryForm();
+  restoreDraft();
+  renderJob();
+}
+
+function startOver(){
+  if(!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const msg1 = isEs
+    ? `¿Está seguro? Esto BORRARÁ TODO el historial de conteo para "${jobs[currentJobId].po}". Esta acción no se puede deshacer.`
+    : `Are you sure? This will DELETE ALL logged count history for "${jobs[currentJobId].po}". This cannot be undone.`;
+  if(!confirm(msg1)) return;
+  const msg2 = isEs ? '¿Confirmar borrado permanente?' : 'Confirm permanent delete?';
+  if(!confirm(msg2)) return;
+  delete jobs[currentJobId];
+  saveAll();
+  currentJobId = null;
+  refreshJobSelect();
+}
+
+function saveProgress(){
+  if(!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  drafts[currentJobId] = {
+    shift: currentShift,
+    good: document.getElementById('entryGood').value,
+    reject: document.getElementById('entryReject').value,
+    flags: [...selectedFlags],
+    otherNote: document.getElementById('otherNote').value,
+    savedAt: Date.now()
+  };
+  saveDrafts();
+  const notice = document.getElementById('draftNotice');
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  notice.textContent = (isEs ? '✅ Progreso guardado a las ' : '✅ Progress saved at ') + time + (isEs ? '. Seguro para cambiar de trabajo.' : '. Safe to jump to another job.');
+  notice.style.display = 'block';
+}
+
+function restoreDraft(){
+  const notice = document.getElementById('draftNotice');
+  notice.style.display = 'none';
+  const d = drafts[currentJobId];
+  if(!d) return;
+  setShift(d.shift || '1');
+  document.getElementById('entryGood').value = d.good || '';
+  document.getElementById('entryReject').value = d.reject || '';
+  formatThousands(document.getElementById('entryGood'));
+  formatThousands(document.getElementById('entryReject'));
+  (d.flags||[]).forEach(f=>{
+    const chip = document.querySelector(`.chip[data-flag="${f}"]`);
+    if(chip){
+      chip.classList.add('selected');
+      selectedFlags.push(f);
+    }
+  });
+  document.getElementById('otherNote').value = d.otherNote || '';
+  if(selectedFlags.includes('other')) document.getElementById('otherNote').style.display = 'block';
+
+  const isEs = document.body.classList.contains('es');
+  const time = new Date(d.savedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  notice.textContent = (isEs ? '↩︎ Progreso restaurado de las ' : '↩︎ Restored draft from ') + time;
+  notice.style.display = 'block';
+}
+
+function clearDraft(jobId){
+  if(drafts[jobId]){
+    delete drafts[jobId];
+    saveDrafts();
+  }
+}
+
+function setShift(s){
+  currentShift = s;
+  document.getElementById('shift1Btn').classList.toggle('active', s==='1');
+  document.getElementById('shift2Btn').classList.toggle('active', s==='2');
+}
+
+function toggleChip(el){
+  const flag = el.dataset.flag;
+  el.classList.toggle('selected');
+  if(el.classList.contains('selected')){
+    selectedFlags.push(flag);
+  } else {
+    selectedFlags = selectedFlags.filter(f=>f!==flag);
+  }
+  document.getElementById('otherNote').style.display = selectedFlags.includes('other') ? 'block' : 'none';
+}
+
+const flagLabels = {
+  en:{overglue:'Over Glue',noglue:'Insufficient / No Glue',misalign:'Glue Misalignment',fold:'Crooked Fold / Misfold',scuff:'Scuffing',kleenstick:'Kleenstick Issue',tearstrip:'Tearstrip Issue',burst:'Bursting / Cracking',other:'Other'},
+  es:{overglue:'Exceso de Pegamento',noglue:'Pegamento Insuficiente',misalign:'Desalineación de Pegamento',fold:'Doblez Torcido / Mal Doblado',scuff:'Raspaduras',kleenstick:'Problema de Kleenstick',tearstrip:'Problema de Tira de Rasgado',burst:'Reventado / Agrietado',other:'Otro'}
+};
+
+function clearEntryForm(){
+  document.getElementById('entryGood').value='';
+  document.getElementById('entryReject').value='';
+  selectedFlags = [];
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('otherNote').style.display='none';
+  document.getElementById('otherNote').value='';
+  document.getElementById('draftNotice').style.display='none';
+}
+
+function submitEntry(){
+  if(!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const good = parseInt(document.getElementById('entryGood').value.replace(/,/g,'')) || 0;
+  const reject = parseInt(document.getElementById('entryReject').value.replace(/,/g,'')) || 0;
+
+  if(good===0 && reject===0){
+    alert(isEs ? 'Ingrese al menos un conteo antes de enviar.' : 'Enter at least one count before submitting.');
+    return;
+  }
+
+  if(good > 0){
+    const goodMsg = isEs
+      ? `¿Confirmar Conteo Bueno?\n\n${good.toLocaleString()}`
+      : `Confirm Good Count?\n\n${good.toLocaleString()}`;
+    if(!confirm(goodMsg)) return;
+  }
+
+  if(reject > 0){
+    const rejectMsg = isEs
+      ? `¿Confirmar Conteo de Rechazo/Retenido?\n\n${reject.toLocaleString()}`
+      : `Confirm Reject/Hold Count?\n\n${reject.toLocaleString()}`;
+    if(!confirm(rejectMsg)) return;
+  }
+
+  const otherNote = document.getElementById('otherNote').value.trim();
+  const flagText = selectedFlags.map(f=>{
+    let lbl = isEs ? flagLabels.es[f] : flagLabels.en[f];
+    if(f==='other' && otherNote) lbl += ': ' + otherNote;
+    return lbl;
+  }).join(' • ');
+
+  jobs[currentJobId].entries.push({
+    id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    shift: currentShift,
+    date: new Date().toISOString().slice(0,10),
+    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+    good, reject, flags: flagText,
+    loggedAt: Date.now(),
+    edited: false,
+    originalGood: null,
+    originalReject: null
+  });
+  saveAll();
+  clearDraft(currentJobId);
+  clearEntryForm();
+  renderJob();
+}
+
+function sendReport(){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const isEs = document.body.classList.contains('es');
+
+  const confirmMsg = isEs
+    ? `¿Terminar este trabajo y enviar el reporte a Jayro?\n\nTrabajo: ${job.po}\nEstación: ${job.machine}`
+    : `Finish this job and send the report to Jayro?\n\nJob: ${job.po}\nStation: ${job.machine}`;
+  if(!confirm(confirmMsg)) return;
+
+  const totalGood = job.entries.reduce((s,e)=>s+e.good,0);
+  const totalReject = job.entries.reduce((s,e)=>s+e.reject,0);
+
+  const subject = `Shift Count Report — ${job.po} (${job.machine})`;
+  let fullLog = '';
+  const sorted = [...job.entries].sort((a,b)=>a.loggedAt-b.loggedAt);
+  sorted.forEach(e=>{
+    const shiftLabel = e.shift==='2' ? 'Shift 2' : 'Shift 1';
+    fullLog += `${e.date} ${e.time} | ${shiftLabel} | Good: ${e.good} | Reject: ${e.reject}`;
+    if(e.flags) fullLog += ` | Flags: ${e.flags}`;
+    fullLog += '\n';
+  });
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT REJECT/HOLD: ${totalReject.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
+
+  const payload = {
+    po: job.po,
+    product: job.product || '',
+    station: job.machine,
+    target: job.target || 0,
+    totalGood, totalReject,
+    subject, body,
+    fullLog
+  };
+
+  // If the Apps Script URL hasn't been configured yet, fall back to opening a draft email
+  if(!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE'){
+    alert(isEs
+      ? 'El envío automático aún no está configurado. Se abrirá un borrador de correo en su lugar.'
+      : 'Automatic sending isn\'t set up yet. Opening an email draft instead.');
+    window.location.href = `mailto:${MANAGER_EMAIL}?cc=${QA_EMAIL}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return;
+  }
+
+  const btn = document.getElementById('reportBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = isEs ? '⏳ Enviando...' : '⏳ Sending...';
+
+  fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(res => {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+    if(res.result === 'success'){
+      alert(isEs ? '✅ Reporte enviado a Jayro y guardado en la hoja de cálculo.' : '✅ Report sent to Jayro and saved to the spreadsheet.');
+    } else {
+      alert((isEs ? 'Error al enviar: ' : 'Error sending: ') + (res.message || 'unknown error'));
+    }
+  })
+  .catch(err => {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+    alert(isEs
+      ? 'No se pudo conectar. Verifique la conexión a internet e intente de nuevo.'
+      : 'Could not connect. Check internet connection and try again.');
+  });
+}
+
+function startEditEntry(entryId){
+  editingEntryId = entryId;
+  renderJob();
+}
+
+function cancelEditEntry(){
+  editingEntryId = null;
+  renderJob();
+}
+
+function saveEditEntry(jobId, entryId){
+  const job = jobs[jobId];
+  if(!job) return;
+  const entry = job.entries.find(e=>e.id===entryId);
+  if(!entry) return;
+
+  const isEs = document.body.classList.contains('es');
+  const newGood = parseInt(document.getElementById('editGood_'+entryId).value.replace(/,/g,'')) || 0;
+  const newReject = parseInt(document.getElementById('editReject_'+entryId).value.replace(/,/g,'')) || 0;
+
+  const confirmMsg = isEs
+    ? 'Esto solo se puede editar UNA vez. Después de guardar, este registro quedará bloqueado. ¿Continuar?'
+    : 'This can only be edited ONE time. After saving, this entry will be locked. Continue?';
+  if(!confirm(confirmMsg)) return;
+
+  entry.originalGood = entry.good;
+  entry.originalReject = entry.reject;
+  entry.good = newGood;
+  entry.reject = newReject;
+  entry.edited = true;
+
+  saveAll();
+  editingEntryId = null;
+  renderJob();
+}
+
+function renderJob(){
+  const banner = document.getElementById('bannerSection');
+  const shiftSec = document.getElementById('shiftToggleSection');
+  const logCard = document.getElementById('logCard');
+  const historyCard = document.getElementById('historyCard');
+  const deleteCard = document.getElementById('deleteCard');
+
+  if(!currentJobId || !jobs[currentJobId]){
+    banner.style.display='none';
+    shiftSec.style.display='none';
+    logCard.style.display='none';
+    historyCard.style.display='none';
+    deleteCard.style.display='none';
+    return;
+  }
+
+  const job = jobs[currentJobId];
+  banner.style.display='block';
+  shiftSec.style.display='grid';
+  logCard.style.display='block';
+  historyCard.style.display='block';
+  deleteCard.style.display='block';
+
+  const totalGood = job.entries.reduce((s,e)=>s+e.good,0);
+  const totalReject = job.entries.reduce((s,e)=>s+e.reject,0);
+
+  document.getElementById('bannerCount').textContent = totalGood.toLocaleString();
+  document.getElementById('bannerHold').textContent = totalReject.toLocaleString();
+  document.getElementById('bannerTarget').textContent = job.target ? job.target.toLocaleString() : '—';
+  document.getElementById('jobMetaLine').textContent = `${job.po}${job.product ? ' — '+job.product : ''} — ${job.machine}`;
+
+  const isEs = document.body.classList.contains('es');
+  const list = document.getElementById('historyList');
+  if(job.entries.length === 0){
+    list.innerHTML = `<div class="empty-state">${isEs?'Aún no hay registros.':'No entries yet.'}</div>`;
+  } else {
+    const sorted = [...job.entries].sort((a,b)=>b.loggedAt-a.loggedAt);
+    const goodLbl = isEs ? 'CONTEO BUENO' : 'GOOD COUNT';
+    const rejLbl = isEs ? 'RECHAZO/RETENIDO' : 'REJECT/HOLD';
+
+    // group by date, preserving most-recent-first order
+    const groups = [];
+    const groupIndex = {};
+    sorted.forEach(e=>{
+      if(!(e.date in groupIndex)){
+        groupIndex[e.date] = groups.length;
+        groups.push({date:e.date, entries:[]});
+      }
+      groups[groupIndex[e.date]].entries.push(e);
+    });
+
+    list.innerHTML = groups.map(g=>{
+      const dayGood = g.entries.reduce((s,e)=>s+e.good,0);
+      const dayReject = g.entries.reduce((s,e)=>s+e.reject,0);
+      const entriesHtml = g.entries.map(e=>{
+        const shiftClass = e.shift==='2' ? 'shift2' : '';
+        const shiftLabel = e.shift==='2' ? (isEs?'Turno 2':'Shift 2') : (isEs?'Turno 1':'Shift 1');
+
+        const goodOriginalHtml = e.edited ? `<div class="ec-original">${e.originalGood.toLocaleString()}</div>` : '';
+        const rejectOriginalHtml = e.edited ? `<div class="ec-original">${e.originalReject.toLocaleString()}</div>` : '';
+
+        let editRowHtml = '';
+        if(editingEntryId === e.id){
+          editRowHtml = `<div class="edit-form">
+            <label>${isEs?'Conteo Bueno':'Good Count'}</label>
+            <input type="text" inputmode="numeric" id="editGood_${e.id}" value="${e.good.toLocaleString()}" oninput="formatThousands(this)">
+            <label>${isEs?'Conteo de Rechazo':'Reject/Hold Count'}</label>
+            <input type="text" inputmode="numeric" id="editReject_${e.id}" value="${e.reject.toLocaleString()}" oninput="formatThousands(this)">
+            <div class="edit-form-btns">
+              <button class="edit-cancel-btn" onclick="cancelEditEntry()">${isEs?'Cancelar':'Cancel'}</button>
+              <button class="edit-save-btn" onclick="saveEditEntry('${currentJobId}','${e.id}')">${isEs?'Guardar (solo 1 vez)':'Save (one-time)'}</button>
+            </div>
+          </div>`;
+        } else if(!e.edited){
+          editRowHtml = `<div class="entry-edit-row"><button class="edit-pencil-btn" onclick="startEditEntry('${e.id}')">✏️ ${isEs?'Editar':'Edit'}</button></div>`;
+        } else {
+          editRowHtml = `<div class="entry-edit-row"><span class="edited-tag">${isEs?'✓ Editado':'✓ Edited'}</span></div>`;
+        }
+
+        return `<div class="entry ${shiftClass}">
+          <div class="entry-top"><span>${e.time}</span><span>${shiftLabel}</span></div>
+          <div class="entry-counts">
+            <div>
+              <div class="ec-label">${goodLbl}</div>
+              ${goodOriginalHtml}
+              <div class="ec-value good">${e.good.toLocaleString()}</div>
+            </div>
+            <div>
+              <div class="ec-label">${rejLbl}</div>
+              ${rejectOriginalHtml}
+              <div class="ec-value reject">${e.reject.toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="entry-flags">${e.flags||''}</div>
+          ${editRowHtml}
+        </div>`;
+      }).join('');
+      return `<div class="day-group">
+        <div class="day-header">
+          <span class="day-date">📅 ${g.date}</span>
+          <span class="day-subtotal"><span class="sg">${isEs?'Bueno':'Good'}: ${dayGood.toLocaleString()}</span> &nbsp;|&nbsp; <span class="sr">${isEs?'Rechazo':'Reject'}: ${dayReject.toLocaleString()}</span></span>
+        </div>
+        <div class="day-entries">${entriesHtml}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+loadAll();
+refreshJobSelect();
+</script>
+
+</body>
+</html>
