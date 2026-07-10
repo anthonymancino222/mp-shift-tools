@@ -163,6 +163,16 @@
   .global-sync-btn:active{background:var(--navy-light);}
   .entry-pending-tag{font-size:0.7rem;font-weight:700;color:var(--warn);background:#fff3cd;border-radius:6px;padding:3px 8px;display:inline-block;margin-top:6px;}
 
+  /* Sync gate — required tap before starting a new job, but never blocks
+     on the OUTCOME of the sync attempt (see requireSyncBeforeAction). */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;padding:16px;}
+  .modal-overlay.open{display:flex;}
+  .modal-box{background:#fff;border-radius:14px;padding:22px;max-width:420px;width:100%;}
+  .modal-box h3{margin:0 0 10px;font-size:1.05rem;color:var(--navy);}
+  .modal-box p{font-size:0.9rem;color:#444;margin-bottom:16px;line-height:1.4;}
+  .modal-box button{margin-bottom:8px;}
+  .modal-cancel-btn{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:1px solid var(--border);background:#fff;color:#666;cursor:pointer;}
+
   /* Dashboard overlay */
   .dash-overlay{display:none;position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;}
   .dash-overlay.open{display:block;}
@@ -309,6 +319,20 @@
 
 </div>
 
+<!-- SYNC GATE — required before starting a new job while the current one
+     has unsynced entries. Tapping "Sync Now" is mandatory; the RESULT is
+     not — if it fails, "Continue Anyway" still appears, and background
+     auto-retry keeps trying until nothing is left pending. -->
+<div class="modal-overlay" id="syncGateOverlay">
+  <div class="modal-box">
+    <h3><span data-en>Sync before starting a new job</span><span data-es>Sincronizar antes de iniciar un nuevo trabajo</span></h3>
+    <p id="syncGateMsg"></p>
+    <button class="global-sync-btn" id="syncGateSyncBtn" onclick="syncGateAttempt()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
+    <button class="btn-secondary" id="syncGateContinueBtn" style="display:none;" onclick="syncGateContinue()"><span data-en>Continue Anyway</span><span data-es>Continuar de Todos Modos</span></button>
+    <button class="modal-cancel-btn" onclick="syncGateCancel()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+  </div>
+</div>
+
 <!-- DASHBOARD — History (past sent reports), Live Jobs (active on any device), Data (charts) -->
 <div class="dash-overlay" id="dashOverlay">
   <div class="dash-header">
@@ -417,17 +441,67 @@ function refreshJobSelect(){
 function toggleNewJobForm(){
   const f = document.getElementById('newJobForm');
   const opening = f.style.display === 'none';
-  if (opening && currentJobId && jobs[currentJobId]){
-    const pending = (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length;
-    if (pending > 0){
-      const isEs = document.body.classList.contains('es');
-      const msg = isEs
-        ? `${pending} entrada(s) de "${jobs[currentJobId].po}" aún no se han sincronizado. Están guardadas en este dispositivo y no se perderán, pero otras tabletas no las verán hasta que se sincronicen. ¿Continuar de todos modos?`
-        : `${pending} entr${pending===1?'y':'ies'} from "${jobs[currentJobId].po}" ${pending===1?"hasn't":"haven't"} synced yet. They're saved on this device and won't be lost, but other tablets won't see them until they do. Continue anyway?`;
-      if (!confirm(msg)) return;
+  if (!opening){ f.style.display = 'none'; return; }
+  requireSyncBeforeAction(() => { f.style.display = 'block'; });
+}
+
+/* Requires a Sync attempt (the ACTION, not the outcome) before running
+   onProceed — e.g. before starting a new job while the current one has
+   entries that haven't reached the backend yet. If the sync succeeds,
+   proceeds automatically. If it fails (no connection), "Continue Anyway"
+   still appears — this never traps someone who's genuinely offline,
+   since background auto-retry (retryPendingSyncs, called on reconnect and
+   every 30s) keeps working on the leftover pending entries regardless. */
+let syncGatePendingCallback = null;
+function requireSyncBeforeAction(onProceed){
+  if (!currentJobId || !jobs[currentJobId]) { onProceed(); return; }
+  const pending = (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length;
+  if (pending === 0){ onProceed(); return; }
+  const isEs = document.body.classList.contains('es');
+  syncGatePendingCallback = onProceed;
+  document.getElementById('syncGateMsg').textContent = isEs
+    ? `${pending} entrada(s) de "${jobs[currentJobId].po}" aún no se han sincronizado. Toca "Sincronizar Ahora" para intentarlo.`
+    : `${pending} entr${pending===1?'y':'ies'} from "${jobs[currentJobId].po}" ${pending===1?"hasn't":"haven't"} synced yet. Tap "Sync Now" to try.`;
+  document.getElementById('syncGateContinueBtn').style.display = 'none';
+  document.getElementById('syncGateSyncBtn').disabled = false;
+  document.getElementById('syncGateSyncBtn').innerHTML = '🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span>';
+  document.getElementById('syncGateOverlay').classList.add('open');
+}
+
+function syncGateAttempt(){
+  const isEs = document.body.classList.contains('es');
+  const btn = document.getElementById('syncGateSyncBtn');
+  btn.disabled = true;
+  btn.textContent = isEs ? '⏳ Sincronizando…' : '⏳ Syncing…';
+  Promise.all([retryPendingSyncs(), syncActiveEntries(true)]).then(() => {
+    renderGlobalSyncStatus();
+    btn.disabled = false;
+    btn.innerHTML = '🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span>';
+    const pending = currentJobId && jobs[currentJobId]
+      ? (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length : 0;
+    const msgEl = document.getElementById('syncGateMsg');
+    if (pending === 0){
+      msgEl.textContent = isEs ? '✅ ¡Todo sincronizado!' : '✅ All synced!';
+      syncGateContinue(); // fully synced — no need to make them tap again
+    } else {
+      msgEl.textContent = isEs
+        ? `⚠ Aún ${pending} sin sincronizar (sin conexión). Puede continuar — se seguirá intentando automáticamente en segundo plano.`
+        : `⚠ Still ${pending} not synced (no connection). You can continue — it'll keep retrying automatically in the background.`;
+      document.getElementById('syncGateContinueBtn').style.display = 'block';
     }
-  }
-  f.style.display = opening ? 'block' : 'none';
+  });
+}
+
+function syncGateContinue(){
+  document.getElementById('syncGateOverlay').classList.remove('open');
+  const cb = syncGatePendingCallback;
+  syncGatePendingCallback = null;
+  if (cb) cb();
+}
+
+function syncGateCancel(){
+  document.getElementById('syncGateOverlay').classList.remove('open');
+  syncGatePendingCallback = null;
 }
 
 function createJob(){
