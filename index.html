@@ -148,8 +148,20 @@
     background:#fff; border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer; color:var(--navy);
   }
-  .sync-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:14px;font-size:0.8rem;color:#666;flex-wrap:wrap;}
-  .sync-btn{background:var(--pink-soft);color:var(--navy);border:none;border-radius:20px;padding:8px 16px;font-weight:700;font-size:0.85rem;cursor:pointer;flex-shrink:0;}
+  /* Global sync bar — always visible at the top, not tied to whichever job
+     happens to be open, so a weak-WiFi backlog is never out of sight. */
+  .global-sync-bar{
+    background:var(--card);border-bottom:3px solid var(--navy);padding:12px 16px;
+    display:flex;flex-direction:column;gap:8px;position:sticky;top:0;z-index:40;
+  }
+  .global-sync-status{font-size:0.95rem;font-weight:800;text-align:center;color:var(--good);}
+  .global-sync-status.pending{color:var(--warn);}
+  .global-sync-btn{
+    width:100%;padding:16px;font-size:1.2rem;font-weight:900;border-radius:12px;border:none;
+    background:var(--navy);color:#fff;cursor:pointer;
+  }
+  .global-sync-btn:active{background:var(--navy-light);}
+  .entry-pending-tag{font-size:0.7rem;font-weight:700;color:var(--warn);background:#fff3cd;border-radius:6px;padding:3px 8px;display:inline-block;margin-top:6px;}
 
   /* Dashboard overlay */
   .dash-overlay{display:none;position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;}
@@ -191,6 +203,15 @@
 <header>
   <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
 </header>
+
+<!-- GLOBAL SYNC BAR — always visible, independent of which job is open, so
+     a weak-WiFi backlog of unsynced entries is never out of sight. -->
+<div class="global-sync-bar">
+  <div class="global-sync-status" id="globalSyncStatus">
+    <span data-en>All synced</span><span data-es>Todo sincronizado</span>
+  </div>
+  <button class="global-sync-btn" onclick="manualGlobalSync()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
+</div>
 
 <div class="container">
 
@@ -235,12 +256,6 @@
         <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span></div></div>
       </div>
     </div>
-  </div>
-
-  <!-- LIVE SYNC — pulls in shift counts logged on other tablets for this same PO -->
-  <div class="sync-row" id="syncRow" style="display:none;">
-    <span id="syncStatus"><span data-en>Not synced yet</span><span data-es>Aún no sincronizado</span></span>
-    <button class="sync-btn" onclick="syncActiveEntries(true)">🔄 <span data-en>Sync</span><span data-es>Sincronizar</span></button>
   </div>
 
   <!-- SHIFT TOGGLE -->
@@ -401,7 +416,18 @@ function refreshJobSelect(){
 
 function toggleNewJobForm(){
   const f = document.getElementById('newJobForm');
-  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  const opening = f.style.display === 'none';
+  if (opening && currentJobId && jobs[currentJobId]){
+    const pending = (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length;
+    if (pending > 0){
+      const isEs = document.body.classList.contains('es');
+      const msg = isEs
+        ? `${pending} entrada(s) de "${jobs[currentJobId].po}" aún no se han sincronizado. Están guardadas en este dispositivo y no se perderán, pero otras tabletas no las verán hasta que se sincronicen. ¿Continuar de todos modos?`
+        : `${pending} entr${pending===1?'y':'ies'} from "${jobs[currentJobId].po}" ${pending===1?"hasn't":"haven't"} synced yet. They're saved on this device and won't be lost, but other tablets won't see them until they do. Continue anyway?`;
+      if (!confirm(msg)) return;
+    }
+  }
+  f.style.display = opening ? 'block' : 'none';
 }
 
 function createJob(){
@@ -574,7 +600,8 @@ function submitEntry(){
     loggedAt: Date.now(),
     edited: false,
     originalGood: null,
-    originalReject: null
+    originalReject: null,
+    synced: false
   };
   jobs[currentJobId].entries.push(entry);
   saveAll();
@@ -593,14 +620,42 @@ function fetchLive(){
   return fetch(bust, { method: 'GET', cache: 'no-store' }).then(res => res.json());
 }
 
-/* Pushes a just-submitted entry to the backend immediately, so other
-   tablets working the same PO can see it via Sync / the Dashboard's Live
-   Jobs tab without waiting for "Finish, Send Report". Fire-and-forget —
-   the entry is already saved locally, so a failed push just means other
-   devices won't see it until the next successful sync; nothing is lost. */
+/* ══════════════════════════════════════════════════════════════════
+   LIVE SYNC — every entry is saved locally FIRST (submitEntry, above),
+   so a failed push here never loses data; it only delays other devices
+   seeing it. entry.synced tracks whether the backend has confirmed it.
+   Weak WiFi on the tablets means pushes routinely fail on the first try,
+   so unsynced entries are retried automatically (on reconnect + on a
+   timer) as well as via the manual "Sync Now" button — nothing depends
+   on a person remembering to tap it.
+══════════════════════════════════════════════════════════════════ */
+function pendingSyncCount(){
+  let n = 0;
+  Object.values(jobs).forEach(job => {
+    (job.entries||[]).forEach(e => { if (e.synced !== true) n++; });
+  });
+  return n;
+}
+
+function renderGlobalSyncStatus(){
+  const isEs = document.body.classList.contains('es');
+  const el = document.getElementById('globalSyncStatus');
+  if (!el) return;
+  const pending = pendingSyncCount();
+  if (pending > 0){
+    el.classList.add('pending');
+    el.textContent = (isEs ? `⚠ ${pending} entrada(s) sin sincronizar` : `⚠ ${pending} entr${pending===1?'y':'ies'} not yet synced`);
+  } else {
+    el.classList.remove('pending');
+    el.textContent = isEs ? '✅ Todo sincronizado' : '✅ All synced';
+  }
+}
+
+/* Pushes a single entry to the backend. Returns a promise so callers
+   (submit, retry loop, manual sync) can all await/react to the result. */
 function pushLiveEntry(job, entry){
-  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return;
-  fetch(REPORT_ENDPOINT_URL, {
+  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve(false);
+  return fetch(REPORT_ENDPOINT_URL, {
     method: 'POST',
     body: JSON.stringify({
       action: 'log_entry',
@@ -608,19 +663,38 @@ function pushLiveEntry(job, entry){
       shift: entry.shift, date: entry.date, time: entry.time,
       good: entry.good, reject: entry.reject, flags: entry.flags, entryId: entry.id
     })
-  }).catch(function(){ /* see comment above — safe to ignore */ });
+  }).then(res => res.json()).then(res => {
+    if (res.result === 'success'){
+      entry.synced = true;
+      saveAll();
+      renderGlobalSyncStatus();
+      return true;
+    }
+    return false;
+  }).catch(function(){ return false; /* stays unsynced — will retry */ });
+}
+
+/* Retries every entry across every local job that hasn't been confirmed
+   synced yet. Called automatically (reconnect + timer) and by the manual
+   Sync button — never blocks anything, just keeps trying in the background. */
+function retryPendingSyncs(){
+  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve();
+  const pushes = [];
+  Object.values(jobs).forEach(job => {
+    (job.entries||[]).forEach(entry => {
+      if (entry.synced !== true) pushes.push(pushLiveEntry(job, entry));
+    });
+  });
+  return Promise.all(pushes);
 }
 
 /* Pulls active (not-yet-finished) entries for the current PO from the
    backend and merges any not already present locally, deduped by entryId.
-   Called automatically on job load, and manually via the Sync button. */
+   Called automatically on job load, and via the global Sync button. */
 function syncActiveEntries(manual){
-  if (!currentJobId) return;
-  const isEs = document.body.classList.contains('es');
-  const statusEl = document.getElementById('syncStatus');
-  if (manual && statusEl) statusEl.textContent = isEs ? '⏳ Sincronizando…' : '⏳ Syncing…';
+  if (!currentJobId) return Promise.resolve();
   const job = jobs[currentJobId];
-  fetchLive()
+  return fetchLive()
     .then(res => {
       if (res.result !== 'success') throw new Error(res.message || 'unknown error');
       const remote = (res.active || []).filter(e => String(e.PO) === String(job.po));
@@ -646,19 +720,27 @@ function syncActiveEntries(manual){
           time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           good: Number(e.Good) || 0, reject: Number(e.Reject) || 0, flags: e.Flags || '',
           loggedAt: loggedAt,
-          edited: false, originalGood: null, originalReject: null
+          edited: false, originalGood: null, originalReject: null,
+          synced: true // came from the backend — already known to be there
         });
         if (id) existingIds.add(id);
         added++;
       });
       if (added) saveAll();
-      const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-      if (statusEl) statusEl.textContent = (isEs ? '✅ Sincronizado a las ' : '✅ Synced at ') + time + (added ? (isEs ? ` · ${added} nuevo(s)` : ` · ${added} new`) : '');
       renderJob();
     })
-    .catch(err => {
-      if (statusEl) statusEl.textContent = (isEs ? '❌ Error: ' : '❌ Error: ') + err.message;
-    });
+    .catch(function(){ /* current job's pull failed — retryPendingSyncs still covers pushing pending entries */ });
+}
+
+/* The one button on the global sync bar: pushes everything pending across
+   every job, then pulls the latest for whichever job is currently open. */
+function manualGlobalSync(){
+  const isEs = document.body.classList.contains('es');
+  const el = document.getElementById('globalSyncStatus');
+  if (el){ el.classList.remove('pending'); el.textContent = isEs ? '⏳ Sincronizando…' : '⏳ Syncing…'; }
+  Promise.all([retryPendingSyncs(), syncActiveEntries(true)]).then(() => {
+    renderGlobalSyncStatus();
+  });
 }
 
 function sendReport(){
@@ -770,8 +852,8 @@ function saveEditEntry(jobId, entryId){
 }
 
 function renderJob(){
+  renderGlobalSyncStatus();
   const banner = document.getElementById('bannerSection');
-  const syncRow = document.getElementById('syncRow');
   const shiftSec = document.getElementById('shiftToggleSection');
   const logCard = document.getElementById('logCard');
   const historyCard = document.getElementById('historyCard');
@@ -779,7 +861,6 @@ function renderJob(){
 
   if(!currentJobId || !jobs[currentJobId]){
     banner.style.display='none';
-    syncRow.style.display='none';
     shiftSec.style.display='none';
     logCard.style.display='none';
     historyCard.style.display='none';
@@ -789,7 +870,6 @@ function renderJob(){
 
   const job = jobs[currentJobId];
   banner.style.display='block';
-  syncRow.style.display='flex';
   shiftSec.style.display='grid';
   logCard.style.display='block';
   historyCard.style.display='block';
@@ -866,6 +946,7 @@ function renderJob(){
             </div>
           </div>
           <div class="entry-flags">${e.flags||''}</div>
+          ${e.synced !== true ? `<div class="entry-pending-tag">⚠ ${isEs?'No sincronizado':'Not synced'}</div>` : ''}
           ${editRowHtml}
         </div>`;
       }).join('');
@@ -1043,6 +1124,16 @@ function renderDashData(){
 
 loadAll();
 refreshJobSelect();
+renderGlobalSyncStatus();
+
+// Automatic retry — weak tablet WiFi means a push routinely fails on the
+// first try. Retry whenever the browser regains connectivity, and on a
+// timer regardless (the 'online' event doesn't always fire reliably on
+// every device/browser), so nothing depends on someone remembering to tap
+// the Sync button.
+window.addEventListener('online', function(){ retryPendingSyncs().then(renderGlobalSyncStatus); });
+setInterval(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 30000);
+retryPendingSyncs().then(renderGlobalSyncStatus);
 </script>
 
 </body>
