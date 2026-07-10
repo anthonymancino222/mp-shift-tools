@@ -38,8 +38,11 @@
   }
   header{background:var(--black);color:#fff;padding:16px;text-align:center;border-top:5px solid var(--navy);}
   header h1{margin:0;font-size:1.4rem;}
+  /* Row of top-level buttons — sits in normal flow right below the header,
+     not fixed over it, so a longer title (e.g. the Spanish translation)
+     never gets covered regardless of screen width. */
+  .top-btn-row{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;flex-wrap:wrap;}
   .lang-toggle{
-    position:fixed; top:10px; right:10px; z-index:50;
     background:#fff; border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
   }
@@ -142,9 +145,8 @@
 
   select#jobSelect{font-weight:800;font-size:1.15rem;}
 
-  /* Dashboard button + sync row */
+  /* Dashboard button (sits in .top-btn-row alongside .lang-toggle — see above) */
   .dash-btn{
-    position:fixed; top:10px; left:10px; z-index:50;
     background:#fff; border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer; color:var(--navy);
   }
@@ -207,12 +209,14 @@
 </head>
 <body>
 
-<button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
-<button class="dash-btn" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
-
 <header>
   <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
 </header>
+
+<div class="top-btn-row">
+  <button class="dash-btn" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
+  <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
+</div>
 
 <!-- GLOBAL SYNC BAR — always visible, independent of which job is open, so
      a weak-WiFi backlog of unsynced entries is never out of sight. -->
