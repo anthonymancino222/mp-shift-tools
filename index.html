@@ -446,22 +446,28 @@ function toggleNewJobForm(){
 }
 
 /* Requires a Sync attempt (the ACTION, not the outcome) before running
-   onProceed — e.g. before starting a new job while the current one has
-   entries that haven't reached the backend yet. If the sync succeeds,
-   proceeds automatically. If it fails (no connection), "Continue Anyway"
-   still appears — this never traps someone who's genuinely offline,
-   since background auto-retry (retryPendingSyncs, called on reconnect and
-   every 30s) keeps working on the leftover pending entries regardless. */
+   onProceed — every single time "Start New Job" is tapped, unconditionally,
+   even when nothing is actually pending. This is deliberate: it's a
+   trained-habit control, not a technical necessity — floor staff have a
+   track record of skipping sync on the current QA system and losing data,
+   so the goal here is to make tapping Sync before starting a job an
+   unconditional muscle-memory step, not a rule with exceptions to remember.
+   The RESULT of the sync still never blocks: if it fails (no connection),
+   "Continue Anyway" appears, and background auto-retry (retryPendingSyncs,
+   on reconnect + every 30s) keeps working on anything pending regardless. */
 let syncGatePendingCallback = null;
 function requireSyncBeforeAction(onProceed){
-  if (!currentJobId || !jobs[currentJobId]) { onProceed(); return; }
-  const pending = (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length;
-  if (pending === 0){ onProceed(); return; }
   const isEs = document.body.classList.contains('es');
+  const job = (currentJobId && jobs[currentJobId]) ? jobs[currentJobId] : null;
+  const pending = job ? job.entries.filter(e => e.synced !== true).length : 0;
   syncGatePendingCallback = onProceed;
-  document.getElementById('syncGateMsg').textContent = isEs
-    ? `${pending} entrada(s) de "${jobs[currentJobId].po}" aún no se han sincronizado. Toca "Sincronizar Ahora" para intentarlo.`
-    : `${pending} entr${pending===1?'y':'ies'} from "${jobs[currentJobId].po}" ${pending===1?"hasn't":"haven't"} synced yet. Tap "Sync Now" to try.`;
+  document.getElementById('syncGateMsg').textContent = pending > 0
+    ? (isEs
+        ? `${pending} entrada(s) de "${job.po}" aún no se han sincronizado. Toca "Sincronizar Ahora" para intentarlo.`
+        : `${pending} entr${pending===1?'y':'ies'} from "${job.po}" ${pending===1?"hasn't":"haven't"} synced yet. Tap "Sync Now" to try.`)
+    : (isEs
+        ? 'Antes de iniciar un nuevo trabajo, toca "Sincronizar Ahora" para confirmar que todo está al día.'
+        : 'Before starting a new job, tap "Sync Now" to confirm everything is up to date.');
   document.getElementById('syncGateContinueBtn').style.display = 'none';
   document.getElementById('syncGateSyncBtn').disabled = false;
   document.getElementById('syncGateSyncBtn').innerHTML = '🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span>';
