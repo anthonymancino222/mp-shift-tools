@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   :root{
     /* Moquin brand palette (matches moquin_qa_checklists.html) — --navy /
@@ -141,6 +142,42 @@
 
   select#jobSelect{font-weight:800;font-size:1.15rem;}
 
+  /* Dashboard button + sync row */
+  .dash-btn{
+    position:fixed; top:10px; left:10px; z-index:50;
+    background:#fff; border:3px solid var(--navy); border-radius:24px;
+    padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer; color:var(--navy);
+  }
+  .sync-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:14px;font-size:0.8rem;color:#666;flex-wrap:wrap;}
+  .sync-btn{background:var(--pink-soft);color:var(--navy);border:none;border-radius:20px;padding:8px 16px;font-weight:700;font-size:0.85rem;cursor:pointer;flex-shrink:0;}
+
+  /* Dashboard overlay */
+  .dash-overlay{display:none;position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;}
+  .dash-overlay.open{display:block;}
+  .dash-header{
+    background:var(--black);color:#fff;padding:16px;display:flex;align-items:center;justify-content:space-between;
+    border-top:5px solid var(--navy);position:sticky;top:0;z-index:5;
+  }
+  .dash-header h2{margin:0;font-size:1.2rem;}
+  .dash-close{background:transparent;border:2px solid #fff;color:#fff;border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer;}
+  .dash-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px;max-width:900px;margin:0 auto;}
+  .dash-tab{padding:12px 8px;font-weight:800;border-radius:10px;border:3px solid var(--navy);background:#fff;color:var(--navy);font-size:0.95rem;cursor:pointer;}
+  .dash-tab.active{background:var(--navy);color:#fff;}
+  .dash-body{max-width:900px;margin:0 auto;padding:0 12px 24px;}
+  .dash-sync-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:0.85rem;color:#666;flex-wrap:wrap;gap:8px;}
+  .dash-refresh-btn{background:var(--pink-soft);color:var(--navy);border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:0.9rem;cursor:pointer;}
+  .dash-job-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
+  .dash-job-top{display:flex;justify-content:space-between;font-weight:800;color:var(--navy);margin-bottom:6px;}
+  .dash-job-meta{font-size:0.85rem;color:#666;margin-bottom:8px;}
+  .dash-job-counts{display:flex;gap:18px;font-size:0.9rem;}
+  .dash-job-counts b{display:block;font-size:1.3rem;}
+  .dash-log-toggle{background:transparent;border:none;color:var(--navy);font-weight:700;font-size:0.85rem;margin-top:6px;padding:0;cursor:pointer;}
+  .dash-log-body{white-space:pre-wrap;font-size:0.85rem;background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;display:none;}
+  .dash-log-body.open{display:block;}
+  .dash-chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;}
+  .dash-chart-wrap h3{margin:0 0 10px;font-size:1rem;color:var(--navy);}
+  .dash-empty{text-align:center;color:#888;padding:30px 10px;}
+
   [data-es]{display:none;}
   body.es [data-en]{display:none;}
   body.es [data-es]{display:inline;}
@@ -149,6 +186,7 @@
 <body>
 
 <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
+<button class="dash-btn" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
 
 <header>
   <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
@@ -197,6 +235,12 @@
         <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span></div></div>
       </div>
     </div>
+  </div>
+
+  <!-- LIVE SYNC — pulls in shift counts logged on other tablets for this same PO -->
+  <div class="sync-row" id="syncRow" style="display:none;">
+    <span id="syncStatus"><span data-en>Not synced yet</span><span data-es>Aún no sincronizado</span></span>
+    <button class="sync-btn" onclick="syncActiveEntries(true)">🔄 <span data-en>Sync</span><span data-es>Sincronizar</span></button>
   </div>
 
   <!-- SHIFT TOGGLE -->
@@ -248,6 +292,28 @@
     <button class="btn-secondary btn-danger" onclick="startOver()"><span data-en>Start Over (Clear This Job)</span><span data-es>Empezar de Nuevo (Borrar Trabajo)</span></button>
   </div>
 
+</div>
+
+<!-- DASHBOARD — History (past sent reports), Live Jobs (active on any device), Data (charts) -->
+<div class="dash-overlay" id="dashOverlay">
+  <div class="dash-header">
+    <h2><span data-en>Dashboard</span><span data-es>Panel</span></h2>
+    <button class="dash-close" onclick="closeDashboard()">✕ <span data-en>Close</span><span data-es>Cerrar</span></button>
+  </div>
+  <div class="dash-tabs">
+    <button class="dash-tab active" id="dashTabHistoryBtn" onclick="setDashTab('history')"><span data-en>History</span><span data-es>Historial</span></button>
+    <button class="dash-tab" id="dashTabLiveBtn" onclick="setDashTab('live')"><span data-en>Live Jobs</span><span data-es>Trabajos Activos</span></button>
+    <button class="dash-tab" id="dashTabDataBtn" onclick="setDashTab('data')"><span data-en>Data</span><span data-es>Datos</span></button>
+  </div>
+  <div class="dash-body">
+    <div class="dash-sync-row">
+      <span id="dashSyncStatus"><span data-en>Not loaded yet</span><span data-es>Aún no cargado</span></span>
+      <button class="dash-refresh-btn" onclick="loadDashboardData()">🔄 <span data-en>Refresh</span><span data-es>Actualizar</span></button>
+    </div>
+    <div id="dashTabHistory"></div>
+    <div id="dashTabLive" style="display:none;"></div>
+    <div id="dashTabData" style="display:none;"></div>
+  </div>
 </div>
 
 <script>
@@ -330,6 +396,7 @@ function refreshJobSelect(){
   sel.value = currentJobId;
   restoreDraft();
   renderJob();
+  syncActiveEntries(false);
 }
 
 function toggleNewJobForm(){
@@ -345,9 +412,13 @@ function createJob(){
     alert(document.body.classList.contains('es') ? 'Ingrese el número de trabajo.' : 'Enter job/PO number.');
     return;
   }
-  const id = 'job_' + Date.now();
-  jobs[id] = { po, product, machine: newJobStation, target: target?parseInt(target):0, createdAt: Date.now(), entries: [] };
-  saveAll();
+  // Keyed by PO (not a random id) so the same job is recognized across
+  // devices once synced — see syncActiveEntries().
+  const id = po;
+  if (!jobs[id]) {
+    jobs[id] = { po, product, machine: newJobStation, target: target?parseInt(target):0, createdAt: Date.now(), entries: [] };
+    saveAll();
+  }
   currentJobId = id;
   document.getElementById('njPO').value='';
   document.getElementById('njProduct').value='';
@@ -361,6 +432,7 @@ function loadJob(){
   clearEntryForm();
   restoreDraft();
   renderJob();
+  syncActiveEntries(false);
 }
 
 function startOver(){
@@ -493,7 +565,7 @@ function submitEntry(){
     return lbl;
   }).join(' • ');
 
-  jobs[currentJobId].entries.push({
+  const entry = {
     id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     shift: currentShift,
     date: new Date().toISOString().slice(0,10),
@@ -503,11 +575,90 @@ function submitEntry(){
     edited: false,
     originalGood: null,
     originalReject: null
-  });
+  };
+  jobs[currentJobId].entries.push(entry);
   saveAll();
   clearDraft(currentJobId);
   clearEntryForm();
   renderJob();
+  pushLiveEntry(jobs[currentJobId], entry);
+}
+
+/* GET requests for live data (Dashboard, Sync) must never be cached — a
+   stale response here silently hides other devices' entries. cache:'no-store'
+   plus a cache-busting query param covers both the browser's own cache and
+   any intermediate cache that ignores Cache-Control. */
+function fetchLive(){
+  const bust = REPORT_ENDPOINT_URL + (REPORT_ENDPOINT_URL.includes('?') ? '&' : '?') + '_=' + Date.now();
+  return fetch(bust, { method: 'GET', cache: 'no-store' }).then(res => res.json());
+}
+
+/* Pushes a just-submitted entry to the backend immediately, so other
+   tablets working the same PO can see it via Sync / the Dashboard's Live
+   Jobs tab without waiting for "Finish, Send Report". Fire-and-forget —
+   the entry is already saved locally, so a failed push just means other
+   devices won't see it until the next successful sync; nothing is lost. */
+function pushLiveEntry(job, entry){
+  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return;
+  fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'log_entry',
+      po: job.po, product: job.product || '', station: job.machine, target: job.target || 0,
+      shift: entry.shift, date: entry.date, time: entry.time,
+      good: entry.good, reject: entry.reject, flags: entry.flags, entryId: entry.id
+    })
+  }).catch(function(){ /* see comment above — safe to ignore */ });
+}
+
+/* Pulls active (not-yet-finished) entries for the current PO from the
+   backend and merges any not already present locally, deduped by entryId.
+   Called automatically on job load, and manually via the Sync button. */
+function syncActiveEntries(manual){
+  if (!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const statusEl = document.getElementById('syncStatus');
+  if (manual && statusEl) statusEl.textContent = isEs ? '⏳ Sincronizando…' : '⏳ Syncing…';
+  const job = jobs[currentJobId];
+  fetchLive()
+    .then(res => {
+      if (res.result !== 'success') throw new Error(res.message || 'unknown error');
+      const remote = (res.active || []).filter(e => String(e.PO) === String(job.po));
+      const existingIds = new Set(job.entries.map(e => e.id));
+      let added = 0;
+      remote.forEach(e => {
+        const id = e.EntryId;
+        if (id && existingIds.has(id)) return;
+        // Google Sheets auto-converts the Date/Time columns to full ISO
+        // timestamps on write, which garbles them for display — the
+        // Timestamp column (also a real Date, but always written the same
+        // way by `new Date()` server-side) is the one reliable field to
+        // derive a clean date/time string from.
+        const loggedAt = e.Timestamp ? new Date(e.Timestamp).getTime() : Date.now();
+        const dt = new Date(loggedAt);
+        job.entries.push({
+          id: id || ('remote_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+          // Google Sheets auto-types a numeric-looking Shift value as a
+          // Number, which breaks the strict '2' string comparison used to
+          // label shifts elsewhere — force it back to a string here.
+          shift: String(e.Shift),
+          date: dt.toISOString().slice(0, 10),
+          time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          good: Number(e.Good) || 0, reject: Number(e.Reject) || 0, flags: e.Flags || '',
+          loggedAt: loggedAt,
+          edited: false, originalGood: null, originalReject: null
+        });
+        if (id) existingIds.add(id);
+        added++;
+      });
+      if (added) saveAll();
+      const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      if (statusEl) statusEl.textContent = (isEs ? '✅ Sincronizado a las ' : '✅ Synced at ') + time + (added ? (isEs ? ` · ${added} nuevo(s)` : ` · ${added} new`) : '');
+      renderJob();
+    })
+    .catch(err => {
+      if (statusEl) statusEl.textContent = (isEs ? '❌ Error: ' : '❌ Error: ') + err.message;
+    });
 }
 
 function sendReport(){
@@ -535,6 +686,7 @@ function sendReport(){
   let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT REJECT/HOLD: ${totalReject.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
 
   const payload = {
+    action: 'finish_report',
     po: job.po,
     product: job.product || '',
     station: job.machine,
@@ -619,6 +771,7 @@ function saveEditEntry(jobId, entryId){
 
 function renderJob(){
   const banner = document.getElementById('bannerSection');
+  const syncRow = document.getElementById('syncRow');
   const shiftSec = document.getElementById('shiftToggleSection');
   const logCard = document.getElementById('logCard');
   const historyCard = document.getElementById('historyCard');
@@ -626,6 +779,7 @@ function renderJob(){
 
   if(!currentJobId || !jobs[currentJobId]){
     banner.style.display='none';
+    syncRow.style.display='none';
     shiftSec.style.display='none';
     logCard.style.display='none';
     historyCard.style.display='none';
@@ -635,6 +789,7 @@ function renderJob(){
 
   const job = jobs[currentJobId];
   banner.style.display='block';
+  syncRow.style.display='flex';
   shiftSec.style.display='grid';
   logCard.style.display='block';
   historyCard.style.display='block';
@@ -723,6 +878,167 @@ function renderJob(){
       </div>`;
     }).join('');
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DASHBOARD — History (past sent reports from the Sheet), Live Jobs
+   (aggregated ActiveEntries across every device), Data (Chart.js charts).
+   All three tabs share one GET fetch (dashData); Refresh re-fetches.
+══════════════════════════════════════════════════════════════════ */
+let dashData = null;
+let dashTab = 'history';
+let dashCharts = [];
+
+function openDashboard(){
+  document.getElementById('dashOverlay').classList.add('open');
+  if (!dashData) loadDashboardData();
+}
+function closeDashboard(){
+  document.getElementById('dashOverlay').classList.remove('open');
+}
+function setDashTab(tab){
+  dashTab = tab;
+  document.getElementById('dashTabHistoryBtn').classList.toggle('active', tab==='history');
+  document.getElementById('dashTabLiveBtn').classList.toggle('active', tab==='live');
+  document.getElementById('dashTabDataBtn').classList.toggle('active', tab==='data');
+  document.getElementById('dashTabHistory').style.display = tab==='history' ? 'block' : 'none';
+  document.getElementById('dashTabLive').style.display = tab==='live' ? 'block' : 'none';
+  document.getElementById('dashTabData').style.display = tab==='data' ? 'block' : 'none';
+  if (dashData) renderDashboard();
+}
+
+function loadDashboardData(){
+  const isEs = document.body.classList.contains('es');
+  const status = document.getElementById('dashSyncStatus');
+  status.textContent = isEs ? '⏳ Cargando…' : '⏳ Loading…';
+  fetchLive()
+    .then(res => {
+      if (res.result !== 'success') throw new Error(res.message || 'unknown error');
+      dashData = res;
+      const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      status.textContent = (isEs ? '✅ Actualizado a las ' : '✅ Updated at ') + time;
+      renderDashboard();
+    })
+    .catch(err => {
+      status.textContent = (isEs ? '❌ Error al cargar: ' : '❌ Failed to load: ') + err.message;
+    });
+}
+
+function renderDashboard(){
+  if (dashTab === 'history') renderDashHistory();
+  if (dashTab === 'live') renderDashLive();
+  if (dashTab === 'data') renderDashData();
+}
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderDashHistory(){
+  const isEs = document.body.classList.contains('es');
+  const el = document.getElementById('dashTabHistory');
+  const reports = (dashData.reports||[]).slice().reverse();
+  if (!reports.length){
+    el.innerHTML = `<div class="dash-empty">${isEs?'Aún no hay reportes enviados.':'No reports sent yet.'}</div>`;
+    return;
+  }
+  el.innerHTML = reports.map((r,i) => {
+    const ts = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : '';
+    const logId = 'dashlog_' + i;
+    return `<div class="dash-job-card">
+      <div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span><span>${escapeHtml(r.Station||'')}</span></div>
+      <div class="dash-job-meta">${escapeHtml(r.Product||'')}${r.Product?' · ':''}${ts}</div>
+      <div class="dash-job-counts">
+        <div><b style="color:var(--good)">${Number(r['Total Good']||0).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
+        <div><b style="color:var(--accent)">${Number(r['Total Reject']||0).toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
+        <div><b>${Number(r.Target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
+      </div>
+      <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
+      <div class="dash-log-body" id="${logId}">${escapeHtml(r['Full Log']||'')}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDashLive(){
+  const isEs = document.body.classList.contains('es');
+  const el = document.getElementById('dashTabLive');
+  const active = dashData.active || [];
+  if (!active.length){
+    el.innerHTML = `<div class="dash-empty">${isEs?'No hay trabajos activos en ningún dispositivo.':'No active jobs on any device.'}</div>`;
+    return;
+  }
+  const byPo = {};
+  active.forEach(e => {
+    const po = e.PO;
+    if (!byPo[po]) byPo[po] = { po, product: e.Product, station: e.Station, target: e.Target, good: 0, reject: 0, count: 0, lastTs: null };
+    byPo[po].good += Number(e.Good)||0;
+    byPo[po].reject += Number(e.Reject)||0;
+    byPo[po].count++;
+    const ts = e.Timestamp ? new Date(e.Timestamp) : null;
+    if (ts && (!byPo[po].lastTs || ts > byPo[po].lastTs)) byPo[po].lastTs = ts;
+  });
+  const jobsList = Object.values(byPo).sort((a,b) => (b.lastTs||0) - (a.lastTs||0));
+  el.innerHTML = jobsList.map(j => `<div class="dash-job-card">
+    <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}</span></div>
+    <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
+    <div class="dash-job-counts">
+      <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
+      <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
+      <div><b>${Number(j.target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
+    </div>
+  </div>`).join('');
+}
+
+function renderDashData(){
+  const isEs = document.body.classList.contains('es');
+  const el = document.getElementById('dashTabData');
+  const reports = dashData.reports || [];
+  dashCharts.forEach(c => c.destroy());
+  dashCharts = [];
+  if (!reports.length){
+    el.innerHTML = `<div class="dash-empty">${isEs?'Aún no hay datos para graficar.':'No data to chart yet.'}</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Rechazo por trabajo':'Target vs Good vs Reject by job'}</h3><canvas id="dashChartByJob" height="260"></canvas></div>
+    <div class="dash-chart-wrap"><h3>${isEs?'Totales por estación':'Totals by station'}</h3><canvas id="dashChartByStation" height="220"></canvas></div>`;
+
+  const labels = reports.map(r => String(r.PO||'—'));
+  const targets = reports.map(r => Number(r.Target)||0);
+  const goods = reports.map(r => Number(r['Total Good'])||0);
+  const rejects = reports.map(r => Number(r['Total Reject'])||0);
+
+  dashCharts.push(new Chart(document.getElementById('dashChartByJob'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: isEs?'Meta':'Target', data: targets, backgroundColor: '#0a0a0a' },
+        { label: isEs?'Bueno':'Good', data: goods, backgroundColor: '#2e7d4f' },
+        { label: isEs?'Rechazo':'Reject', data: rejects, backgroundColor: '#c8393a' }
+      ]
+    },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  }));
+
+  const byStation = {};
+  reports.forEach(r => {
+    const st = r.Station || (isEs?'Desconocido':'Unknown');
+    if (!byStation[st]) byStation[st] = { good: 0, reject: 0 };
+    byStation[st].good += Number(r['Total Good'])||0;
+    byStation[st].reject += Number(r['Total Reject'])||0;
+  });
+  const stLabels = Object.keys(byStation);
+  dashCharts.push(new Chart(document.getElementById('dashChartByStation'), {
+    type: 'bar',
+    data: {
+      labels: stLabels,
+      datasets: [
+        { label: isEs?'Bueno':'Good', data: stLabels.map(s=>byStation[s].good), backgroundColor: '#2e7d4f' },
+        { label: isEs?'Rechazo':'Reject', data: stLabels.map(s=>byStation[s].reject), backgroundColor: '#c8393a' }
+      ]
+    },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  }));
 }
 
 loadAll();
