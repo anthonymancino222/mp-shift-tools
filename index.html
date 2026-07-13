@@ -1140,8 +1140,9 @@ function renderLogEntryCards(entries){
   return entries.map(e => {
     const shiftClass = String(e.shift)==='2' ? 'shift2' : '';
     const shiftLabel = String(e.shift)==='2' ? (isEs?'Turno 2':'Shift 2') : (isEs?'Turno 1':'Shift 1');
+    const dateTimeLabel = [e.date, e.time].filter(Boolean).join(' ');
     return `<div class="entry ${shiftClass}">
-      <div class="entry-top"><span>${escapeHtml(e.time||'')}</span><span>${shiftLabel}</span></div>
+      <div class="entry-top"><span>${escapeHtml(dateTimeLabel)}</span><span>${shiftLabel}</span></div>
       <div class="entry-counts">
         <div><div class="ec-label">${goodLbl}</div><div class="ec-value good">${Number(e.good||0).toLocaleString()}</div></div>
         <div><div class="ec-label">${rejLbl}</div><div class="ec-value reject">${Number(e.reject||0).toLocaleString()}</div></div>
@@ -1160,12 +1161,14 @@ function parseFullLogText(text){
   return text.split('\n').filter(l => l.trim()).map(line => {
     const parts = line.split('|').map(p => p.trim());
     const dateTime = (parts[0]||'').split(' ');
+    const date = dateTime[0] || '';
     const time = dateTime.slice(1).join(' ');
     const shiftMatch = (parts[1]||'').match(/(\d)/);
     const goodMatch = (parts[2]||'').match(/([\d,]+)/);
     const rejectMatch = (parts[3]||'').match(/([\d,]+)/);
     const flagsPart = parts.slice(4).join(' | ').replace(/^Flags:\s*/i, '');
     return {
+      date: date,
       time: time,
       shift: shiftMatch ? shiftMatch[1] : '1',
       good: goodMatch ? parseInt(goodMatch[1].replace(/,/g,''),10) : 0,
@@ -1184,18 +1187,20 @@ function renderDashHistory(){
     return;
   }
   el.innerHTML = reports.map((r,i) => {
-    const ts = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : '';
+    const sentTs = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : '—';
     const logId = 'dashlog_' + i;
+    const parsedEntries = parseFullLogText(r['Full Log']);
+    const startedLabel = parsedEntries.length ? [parsedEntries[0].date, parsedEntries[0].time].filter(Boolean).join(' ') : '—';
     return `<div class="dash-job-card">
       <div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span><span>${escapeHtml(r.Station||'')}</span></div>
-      <div class="dash-job-meta">${escapeHtml(r.Product||'')}${r.Product?' · ':''}${ts}</div>
+      <div class="dash-job-meta">${escapeHtml(r.Product||'')}${r.Product?' · ':''}<span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · <span data-en>Sent</span><span data-es>Enviado</span>: ${sentTs}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${Number(r['Total Good']||0).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
         <div><b style="color:var(--accent)">${Number(r['Total Reject']||0).toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
         <div><b>${Number(r.Target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
-      <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parseFullLogText(r['Full Log']))}</div>
+      <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parsedEntries)}</div>
     </div>`;
   }).join('');
 }
@@ -1229,6 +1234,7 @@ function renderDashLive(){
     // derive a clean time string from the reliable Timestamp column instead.
     byPo[po].entries.push({
       ts, shift: e.Shift, good: e.Good, reject: e.Reject, flags: e.Flags,
+      date: ts ? ts.toLocaleDateString() : '',
       time: ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''
     });
   });
@@ -1236,9 +1242,10 @@ function renderDashLive(){
   el.innerHTML = jobsList.map((j,i) => {
     const logId = 'livelog_' + i;
     const sortedEntries = j.entries.slice().sort((a,b) => (a.ts||0)-(b.ts||0));
+    const startedLabel = sortedEntries.length ? [sortedEntries[0].date, sortedEntries[0].time].filter(Boolean).join(' ') : '—';
     return `<div class="dash-job-card">
       <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}</span></div>
-      <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
+      <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'}<br><span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
         <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
