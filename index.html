@@ -158,7 +158,20 @@
   .edit-cancel-btn{background:#fff;color:#666;border:1px solid var(--border);border-radius:8px;padding:12px;font-weight:800;}
   .empty-state{text-align:center;color:#888;padding:30px 10px;font-size:1rem;}
 
-  select#jobSelect{font-weight:800;font-size:1.15rem;}
+  /* Saved-job picker — a native <select> can't be styled enough to read as
+     "these are resumable saved jobs," so each job is its own tappable card.
+     Tapping a different job just SELECTS it (.pending, pink) — it only
+     actually loads once "Continue Job?" is tapped, so switching is always
+     a deliberate two-step action, not a stray-tap accident. */
+  .job-list-item{
+    display:flex; justify-content:space-between; align-items:center; width:100%;
+    padding:14px; margin-bottom:8px; border-radius:10px; border:2px solid var(--border);
+    background:#fff; font-size:1rem; font-weight:700; color:var(--text); text-align:left; cursor:pointer;
+  }
+  .job-list-item.active{border-color:var(--good); background:#e7f6ec;}
+  .job-list-item.pending{border-color:var(--navy); background:var(--pink-soft);}
+  .job-item-tag{font-size:0.7rem; font-weight:800; color:#888; background:var(--bg); border-radius:20px; padding:4px 10px; flex-shrink:0; margin-left:10px; white-space:nowrap;}
+  .job-item-tag.active{color:var(--good); background:#d7f0df;}
 
   /* Dashboard button (sits in .top-btn-row alongside .lang-toggle — see above) */
   .dash-btn{
@@ -248,7 +261,8 @@
   <!-- JOB SELECTOR -->
   <div class="card">
     <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span> <span style="text-transform:none;font-weight:400;font-size:0.75rem;color:#888;letter-spacing:0;"><span data-en>(the job you're currently logging counts for)</span><span data-es>(el trabajo para el que está registrando conteos ahora)</span></span></h2>
-    <select id="jobSelect" onchange="loadJob()"></select>
+    <div id="jobListWrap"></div>
+    <button class="btn-submit" id="continueJobBtn" style="display:none;margin-bottom:8px;" onclick="confirmContinueJob()">▸ <span data-en>Continue Job?</span><span data-es>¿Continuar Trabajo?</span></button>
     <button class="btn-secondary" onclick="toggleNewJobForm()">
       <span data-en>+ Start New Job</span><span data-es>+ Iniciar Nuevo Trabajo</span>
     </button>
@@ -410,7 +424,7 @@ let selectedFlags = [];
 let editingEntryId = null;
 // Set by saveProgress() so renderJob() collapses back to the minimal
 // "no job selected" layout — a clear, unmistakable signal that it's safe to
-// jump to another job. Cleared by loadJob()/createJob() or the resume button.
+// jump to another job. Cleared by confirmContinueJob()/createJob() or the resume button.
 let jobSectionsHidden = false;
 
 function formatThousands(el){
@@ -460,29 +474,76 @@ function selectStation(name){
   document.getElementById('stShortBtn').classList.toggle('selected', name==='Short Gluer');
 }
 
+/* Job picker — each saved job is its own tappable card (see .job-list-item),
+   not a native <select>, so it's obvious these are resumable saved jobs.
+   Tapping a DIFFERENT job than the one showing only marks it pending
+   (pink highlight) and reveals "Continue Job?" — switching is always a
+   deliberate two-step action. Tapping the already-active job is a no-op. */
+let pendingJobId = null;
+
 function refreshJobSelect(){
-  const sel = document.getElementById('jobSelect');
-  sel.innerHTML = '';
   const ids = Object.keys(jobs);
   if(ids.length === 0){
-    sel.innerHTML = '<option value="">-- No jobs yet --</option>';
     currentJobId = null;
+    pendingJobId = null;
+    renderJobList();
     renderJob();
     return;
   }
-  ids.sort((a,b)=> jobs[b].createdAt - jobs[a].createdAt);
-  ids.forEach(id=>{
-    const j = jobs[id];
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = `${j.po}${j.product ? ' — '+j.product : ''} — ${j.machine}`;
-    sel.appendChild(opt);
-  });
-  if(!currentJobId || !jobs[currentJobId]) currentJobId = ids[0];
-  sel.value = currentJobId;
+  if(!currentJobId || !jobs[currentJobId]){
+    currentJobId = ids.slice().sort((a,b)=> jobs[b].createdAt - jobs[a].createdAt)[0];
+  }
+  activateCurrentJob();
+}
+
+/* Shared by refreshJobSelect() (auto-select on load/create) and
+   confirmContinueJob() (deliberate switch) — shows currentJobId's data. */
+function activateCurrentJob(){
+  jobSectionsHidden = false;
+  pendingJobId = null;
+  clearEntryForm();
   restoreDraft();
   renderJob();
+  renderJobList();
   syncActiveEntries(false);
+}
+
+function renderJobList(){
+  const isEs = document.body.classList.contains('es');
+  const wrap = document.getElementById('jobListWrap');
+  const continueBtn = document.getElementById('continueJobBtn');
+  const ids = Object.keys(jobs).sort((a,b)=> jobs[b].createdAt - jobs[a].createdAt);
+  if (!ids.length){
+    wrap.innerHTML = `<div class="empty-state" style="padding:16px 0;">${isEs?'Aún no hay trabajos guardados.':'No saved jobs yet.'}</div>`;
+    continueBtn.style.display = 'none';
+    return;
+  }
+  wrap.innerHTML = ids.map(id => {
+    const j = jobs[id];
+    const isActive = id === currentJobId && !pendingJobId;
+    const isPending = id === pendingJobId;
+    const label = `${j.po}${j.product ? ' — '+j.product : ''} — ${j.machine}`;
+    const tagHtml = isActive
+      ? `<span class="job-item-tag active">✓ ${isEs?'Actual':'Current'}</span>`
+      : `<span class="job-item-tag">📋 ${isEs?'Guardado':'Saved'}</span>`;
+    return `<button type="button" class="job-list-item${isActive?' active':''}${isPending?' pending':''}" onclick="selectJobCard('${id}')">
+      <span class="job-item-label">${escapeHtml(label)}</span>
+      ${tagHtml}
+    </button>`;
+  }).join('');
+  continueBtn.style.display = pendingJobId ? 'block' : 'none';
+}
+
+function selectJobCard(id){
+  if (id === currentJobId){ pendingJobId = null; renderJobList(); return; }
+  pendingJobId = id;
+  renderJobList();
+}
+
+function confirmContinueJob(){
+  if (!pendingJobId) return;
+  currentJobId = pendingJobId;
+  activateCurrentJob();
 }
 
 function toggleNewJobForm(){
@@ -579,15 +640,6 @@ function createJob(){
   document.getElementById('njTarget').value='';
   document.getElementById('newJobForm').style.display='none';
   refreshJobSelect();
-}
-
-function loadJob(){
-  currentJobId = document.getElementById('jobSelect').value;
-  jobSectionsHidden = false;
-  clearEntryForm();
-  restoreDraft();
-  renderJob();
-  syncActiveEntries(false);
 }
 
 /* Brings the full entry view back after saveProgress() collapsed it —
