@@ -133,6 +133,9 @@
   .entry{border-left:6px solid var(--navy);background:#f9fafc;border-radius:8px;padding:12px 14px;margin-bottom:8px;}
   .entry.shift2{border-left-color:var(--accent);}
   .entry-top{display:flex;justify-content:space-between;font-weight:800;color:var(--navy);font-size:1rem;margin-bottom:8px;}
+  .entry-date{color:#888;font-weight:700;}
+  .entry-time{color:var(--navy);font-weight:800;}
+  .entry-datesep{display:inline-block;width:2px;height:12px;background:var(--border);margin:0 7px;vertical-align:middle;}
   .entry-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .ec-label{font-size:0.75rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
   .ec-original{font-size:0.95rem;font-weight:700;color:#9aa2b1;text-decoration:line-through;margin-bottom:2px;}
@@ -272,6 +275,20 @@
     </div>
   </div>
 
+  <!-- Saved/restored draft confirmation — deliberately OUTSIDE logCard so it
+       stays visible even when saveProgress() collapses the sections below. -->
+  <div id="draftNotice" style="display:none;text-align:center;font-size:0.95rem;font-weight:800;color:var(--good);margin-bottom:14px;padding:12px;border:2px solid var(--good);background:#e7f6ec;border-radius:10px;"></div>
+
+  <!-- Shown instead of the full entry view once saveProgress() collapses it —
+       an unmistakable "you're safe to leave, tap here to come back" prompt. -->
+  <div class="card" id="resumeJobPrompt" style="display:none;text-align:center;">
+    <div style="color:#666;font-size:0.9rem;margin-bottom:10px;">
+      <span data-en>Paused — pick a different job above, or continue this one.</span>
+      <span data-es>Pausado — elige otro trabajo arriba, o continúa con este.</span>
+    </div>
+    <button class="btn-submit" onclick="resumeJobView()">▸ <span data-en>Continue This Job</span><span data-es>Continuar Este Trabajo</span></button>
+  </div>
+
   <!-- BANNER -->
   <div id="bannerSection" style="display:none;">
     <div class="job-meta" id="jobMetaLine"></div>
@@ -320,7 +337,6 @@
 
     <button class="btn-submit" onclick="submitEntry()"><span data-en>Submit Shift Count</span><span data-es>Enviar Conteo de Turno</span></button>
     <button class="btn-secondary" onclick="saveProgress()">💾 <span data-en>Save Progress (jumping to another job)</span><span data-es>Guardar Progreso (cambiar a otro trabajo)</span></button>
-    <div id="draftNotice" style="display:none;text-align:center;font-size:0.95rem;font-weight:800;color:var(--good);margin-top:10px;padding:12px;border:2px solid var(--good);background:#e7f6ec;border-radius:10px;"></div>
   </div>
 
   <!-- HISTORY -->
@@ -392,6 +408,10 @@ let currentShift = '1';
 let newJobStation = 'Long Gluer';
 let selectedFlags = [];
 let editingEntryId = null;
+// Set by saveProgress() so renderJob() collapses back to the minimal
+// "no job selected" layout — a clear, unmistakable signal that it's safe to
+// jump to another job. Cleared by loadJob()/createJob() or the resume button.
+let jobSectionsHidden = false;
 
 function formatThousands(el){
   let raw = el.value.replace(/[^0-9]/g, '');
@@ -426,6 +446,12 @@ function toggleLang(){
   document.querySelectorAll('[data-ph-en]').forEach(el=>{
     el.placeholder = isEs ? el.dataset.phEs : el.dataset.phEn;
   });
+  // Static markup re-localizes automatically via the [data-en]/[data-es] CSS
+  // rule, but text that was generated once in JS (status messages) doesn't —
+  // re-render anything currently showing so it doesn't get stuck in the
+  // language it happened to be set in.
+  renderDraftNotice();
+  renderGlobalSyncStatus();
 }
 
 function selectStation(name){
@@ -547,6 +573,7 @@ function createJob(){
     saveAll();
   }
   currentJobId = id;
+  jobSectionsHidden = false;
   document.getElementById('njPO').value='';
   document.getElementById('njProduct').value='';
   document.getElementById('njTarget').value='';
@@ -556,10 +583,21 @@ function createJob(){
 
 function loadJob(){
   currentJobId = document.getElementById('jobSelect').value;
+  jobSectionsHidden = false;
   clearEntryForm();
   restoreDraft();
   renderJob();
   syncActiveEntries(false);
+}
+
+/* Brings the full entry view back after saveProgress() collapsed it —
+   restores the draft exactly as loadJob() would, since nothing about the
+   job itself changed, only its visibility. */
+function resumeJobView(){
+  jobSectionsHidden = false;
+  clearEntryForm();
+  restoreDraft();
+  renderJob();
 }
 
 function startOver(){
@@ -574,12 +612,27 @@ function startOver(){
   delete jobs[currentJobId];
   saveAll();
   currentJobId = null;
+  jobSectionsHidden = false;
   refreshJobSelect();
+}
+
+/* draftNotice's text is regenerated from these two data attributes rather
+   than baked in once — toggleLang() calls this too, so the message can't
+   get stuck in whichever language happened to be active when it was set. */
+function renderDraftNotice(){
+  const notice = document.getElementById('draftNotice');
+  const kind = notice.dataset.kind;
+  if (!kind) return;
+  const isEs = document.body.classList.contains('es');
+  const time = notice.dataset.time;
+  notice.textContent = kind === 'saved'
+    ? (isEs ? '✅ Progreso guardado a las ' : '✅ Progress saved at ') + time + (isEs ? '. Seguro para cambiar de trabajo.' : '. Safe to jump to another job.')
+    : (isEs ? '↩︎ Progreso restaurado de las ' : '↩︎ Restored draft from ') + time;
+  notice.style.display = 'block';
 }
 
 function saveProgress(){
   if(!currentJobId) return;
-  const isEs = document.body.classList.contains('es');
   drafts[currentJobId] = {
     shift: currentShift,
     good: document.getElementById('entryGood').value,
@@ -590,14 +643,20 @@ function saveProgress(){
   };
   saveDrafts();
   const notice = document.getElementById('draftNotice');
-  const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  notice.textContent = (isEs ? '✅ Progreso guardado a las ' : '✅ Progress saved at ') + time + (isEs ? '. Seguro para cambiar de trabajo.' : '. Safe to jump to another job.');
-  notice.style.display = 'block';
+  notice.dataset.kind = 'saved';
+  notice.dataset.time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  renderDraftNotice();
+  // Visually confirm it's safe to leave — collapse back to the same minimal
+  // layout as the "no job selected" state, instead of leaving every button
+  // for this job sitting there as if nothing changed.
+  jobSectionsHidden = true;
+  renderJob();
 }
 
 function restoreDraft(){
   const notice = document.getElementById('draftNotice');
   notice.style.display = 'none';
+  delete notice.dataset.kind;
   const d = drafts[currentJobId];
   if(!d) return;
   setShift(d.shift || '1');
@@ -615,10 +674,9 @@ function restoreDraft(){
   document.getElementById('otherNote').value = d.otherNote || '';
   if(selectedFlags.includes('other')) document.getElementById('otherNote').style.display = 'block';
 
-  const isEs = document.body.classList.contains('es');
-  const time = new Date(d.savedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  notice.textContent = (isEs ? '↩︎ Progreso restaurado de las ' : '↩︎ Restored draft from ') + time;
-  notice.style.display = 'block';
+  notice.dataset.kind = 'restored';
+  notice.dataset.time = new Date(d.savedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  renderDraftNotice();
 }
 
 function clearDraft(jobId){
@@ -657,7 +715,9 @@ function clearEntryForm(){
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
   document.getElementById('otherNote').style.display='none';
   document.getElementById('otherNote').value='';
-  document.getElementById('draftNotice').style.display='none';
+  const notice = document.getElementById('draftNotice');
+  notice.style.display='none';
+  delete notice.dataset.kind;
 }
 
 function submitEntry(){
@@ -971,15 +1031,19 @@ function renderJob(){
   const logCard = document.getElementById('logCard');
   const historyCard = document.getElementById('historyCard');
   const deleteCard = document.getElementById('deleteCard');
+  const resumePrompt = document.getElementById('resumeJobPrompt');
 
-  if(!currentJobId || !jobs[currentJobId]){
+  const validJob = currentJobId && jobs[currentJobId];
+  if(!validJob || jobSectionsHidden){
     banner.style.display='none';
     shiftSec.style.display='none';
     logCard.style.display='none';
     historyCard.style.display='none';
     deleteCard.style.display='none';
+    resumePrompt.style.display = (validJob && jobSectionsHidden) ? 'block' : 'none';
     return;
   }
+  resumePrompt.style.display='none';
 
   const job = jobs[currentJobId];
   banner.style.display='block';
@@ -1140,9 +1204,12 @@ function renderLogEntryCards(entries){
   return entries.map(e => {
     const shiftClass = String(e.shift)==='2' ? 'shift2' : '';
     const shiftLabel = String(e.shift)==='2' ? (isEs?'Turno 2':'Shift 2') : (isEs?'Turno 1':'Shift 1');
-    const dateTimeLabel = [e.date, e.time].filter(Boolean).join(' ');
+    const dateTimeHtml = [
+      e.date ? `<span class="entry-date">${escapeHtml(e.date)}</span>` : '',
+      e.time ? `<span class="entry-time">${escapeHtml(e.time)}</span>` : ''
+    ].filter(Boolean).join('<span class="entry-datesep"></span>');
     return `<div class="entry ${shiftClass}">
-      <div class="entry-top"><span>${escapeHtml(dateTimeLabel)}</span><span>${shiftLabel}</span></div>
+      <div class="entry-top"><span>${dateTimeHtml}</span><span>${shiftLabel}</span></div>
       <div class="entry-counts">
         <div><div class="ec-label">${goodLbl}</div><div class="ec-value good">${Number(e.good||0).toLocaleString()}</div></div>
         <div><div class="ec-label">${rejLbl}</div><div class="ec-value reject">${Number(e.reject||0).toLocaleString()}</div></div>
