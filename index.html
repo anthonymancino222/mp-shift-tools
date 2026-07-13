@@ -111,9 +111,12 @@
 
   .btn-submit{width:100%;padding:20px;font-size:1.4rem;font-weight:900;border-radius:12px;border:none;background:var(--navy);color:#fff;margin-top:8px;}
   .btn-submit:active{background:var(--navy-light);}
-  .btn-secondary{width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:none;background:var(--pink-soft);color:var(--navy);margin-top:8px;}
-  .btn-danger{background:#fdeceb;color:var(--accent);}
-  .btn-email{background:#e7f6ec;color:var(--good);}
+  .btn-secondary{width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:2px solid var(--navy);background:var(--pink-soft);color:var(--navy);margin-top:8px;box-shadow:0 1px 3px rgba(0,0,0,0.12);cursor:pointer;}
+  .btn-secondary:active{background:var(--navy);color:#fff;}
+  .btn-danger{background:#fdeceb;color:var(--accent);border-color:var(--accent);}
+  .btn-danger:active{background:var(--accent);color:#fff;}
+  .btn-email{background:#e7f6ec;color:var(--good);border-color:var(--good);}
+  .btn-email:active{background:var(--good);color:#fff;}
 
   .day-group{margin-bottom:16px;}
   .day-header{
@@ -197,6 +200,7 @@
   .dash-tab{padding:12px 8px;font-weight:800;border-radius:10px;border:3px solid var(--navy);background:#fff;color:var(--navy);font-size:0.95rem;cursor:pointer;}
   .dash-tab.active{background:var(--navy);color:#fff;}
   .dash-body{max-width:900px;margin:0 auto;padding:0 12px 24px;}
+  .dash-tab-explainer{font-size:0.82rem;color:#666;background:var(--pink-soft);border-radius:8px;padding:8px 12px;margin-bottom:10px;line-height:1.4;}
   .dash-sync-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:0.85rem;color:#666;flex-wrap:wrap;gap:8px;}
   .dash-refresh-btn{background:var(--pink-soft);color:var(--navy);border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:0.9rem;cursor:pointer;}
   .dash-job-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
@@ -205,7 +209,7 @@
   .dash-job-counts{display:flex;gap:18px;font-size:0.9rem;}
   .dash-job-counts b{display:block;font-size:1.3rem;}
   .dash-log-toggle{background:transparent;border:none;color:var(--navy);font-weight:700;font-size:0.85rem;margin-top:6px;padding:0;cursor:pointer;}
-  .dash-log-body{white-space:pre-wrap;font-size:0.85rem;background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;display:none;}
+  .dash-log-body{margin-top:8px;display:none;}
   .dash-log-body.open{display:block;}
   .dash-chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;}
   .dash-chart-wrap h3{margin:0 0 10px;font-size:1rem;color:var(--navy);}
@@ -240,7 +244,7 @@
 
   <!-- JOB SELECTOR -->
   <div class="card">
-    <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span></h2>
+    <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span> <span style="text-transform:none;font-weight:400;font-size:0.75rem;color:#888;letter-spacing:0;"><span data-en>(the job you're currently logging counts for)</span><span data-es>(el trabajo para el que está registrando conteos ahora)</span></span></h2>
     <select id="jobSelect" onchange="loadJob()"></select>
     <button class="btn-secondary" onclick="toggleNewJobForm()">
       <span data-en>+ Start New Job</span><span data-es>+ Iniciar Nuevo Trabajo</span>
@@ -316,7 +320,7 @@
 
     <button class="btn-submit" onclick="submitEntry()"><span data-en>Submit Shift Count</span><span data-es>Enviar Conteo de Turno</span></button>
     <button class="btn-secondary" onclick="saveProgress()">💾 <span data-en>Save Progress (jumping to another job)</span><span data-es>Guardar Progreso (cambiar a otro trabajo)</span></button>
-    <div id="draftNotice" style="display:none;text-align:center;font-size:0.85rem;font-weight:700;color:var(--warn);margin-top:8px;"></div>
+    <div id="draftNotice" style="display:none;text-align:center;font-size:0.95rem;font-weight:800;color:var(--good);margin-top:10px;padding:12px;border:2px solid var(--good);background:#e7f6ec;border-radius:10px;"></div>
   </div>
 
   <!-- HISTORY -->
@@ -358,6 +362,10 @@
     <button class="dash-tab" id="dashTabDataBtn" onclick="setDashTab('data')"><span data-en>Data</span><span data-es>Datos</span></button>
   </div>
   <div class="dash-body">
+    <div class="dash-tab-explainer" id="dashTabExplainer">
+      <span data-en>Jobs stay here in <b>Live Jobs</b> while shifts are still being logged. The moment "Finish, Send Report" is tapped, a job moves here to <b>History</b> instead.</span>
+      <span data-es>Los trabajos permanecen en <b>Trabajos Activos</b> mientras se siguen registrando turnos. En cuanto se toca "Terminar, Enviar Reporte", el trabajo pasa a <b>Historial</b>.</span>
+    </div>
     <div class="dash-sync-row">
       <span id="dashSyncStatus"><span data-en>Not loaded yet</span><span data-es>Aún no cargado</span></span>
       <button class="dash-refresh-btn" onclick="loadDashboardData()">🔄 <span data-en>Refresh</span><span data-es>Actualizar</span></button>
@@ -746,9 +754,18 @@ function renderGlobalSyncStatus(){
 
 /* Pushes a single entry to the backend. Returns a promise so callers
    (submit, retry loop, manual sync) can all await/react to the result. */
+// Tracks pushes currently in flight, keyed by entry id — NOT stored on the
+// entry object itself (would get pointlessly serialized by saveAll()).
+// Without this, the initial push from submitEntry() and a background retry
+// (30s timer / online event / manual sync) can race on the same not-yet-
+// confirmed entry and both fire a POST — the backend is now idempotent on
+// entryId too (belt and suspenders), but this avoids the redundant network
+// call in the first place.
+const pushesInFlight = new Map();
 function pushLiveEntry(job, entry){
   if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve(false);
-  return fetch(REPORT_ENDPOINT_URL, {
+  if (pushesInFlight.has(entry.id)) return pushesInFlight.get(entry.id);
+  const p = fetch(REPORT_ENDPOINT_URL, {
     method: 'POST',
     body: JSON.stringify({
       action: 'log_entry',
@@ -757,6 +774,7 @@ function pushLiveEntry(job, entry){
       good: entry.good, reject: entry.reject, flags: entry.flags, entryId: entry.id
     })
   }).then(res => res.json()).then(res => {
+    pushesInFlight.delete(entry.id);
     if (res.result === 'success'){
       entry.synced = true;
       saveAll();
@@ -764,7 +782,9 @@ function pushLiveEntry(job, entry){
       return true;
     }
     return false;
-  }).catch(function(){ return false; /* stays unsynced — will retry */ });
+  }).catch(function(){ pushesInFlight.delete(entry.id); return false; /* stays unsynced — will retry */ });
+  pushesInFlight.set(entry.id, p);
+  return p;
 }
 
 /* Retries every entry across every local job that hasn't been confirmed
@@ -1108,6 +1128,53 @@ function escapeHtml(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* Renders a list of shift entries as the same small readable cards used in
+   the main page's own "Shift Log History" (.entry/.entry-top/.entry-counts/
+   .ec-label/.ec-value/.entry-flags — already styled, reused as-is here) —
+   far easier to scan than one dense pipe-delimited text blob. */
+function renderLogEntryCards(entries){
+  const isEs = document.body.classList.contains('es');
+  const goodLbl = isEs ? 'CONTEO BUENO' : 'GOOD COUNT';
+  const rejLbl = isEs ? 'RECHAZO/RETENIDO' : 'REJECT/HOLD';
+  if (!entries.length) return `<div class="dash-empty" style="padding:10px;">${isEs?'Sin registros individuales.':'No individual entries.'}</div>`;
+  return entries.map(e => {
+    const shiftClass = String(e.shift)==='2' ? 'shift2' : '';
+    const shiftLabel = String(e.shift)==='2' ? (isEs?'Turno 2':'Shift 2') : (isEs?'Turno 1':'Shift 1');
+    return `<div class="entry ${shiftClass}">
+      <div class="entry-top"><span>${escapeHtml(e.time||'')}</span><span>${shiftLabel}</span></div>
+      <div class="entry-counts">
+        <div><div class="ec-label">${goodLbl}</div><div class="ec-value good">${Number(e.good||0).toLocaleString()}</div></div>
+        <div><div class="ec-label">${rejLbl}</div><div class="ec-value reject">${Number(e.reject||0).toLocaleString()}</div></div>
+      </div>
+      ${e.flags ? `<div class="entry-flags">${escapeHtml(e.flags)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* The Reports sheet only stores the flattened text log built by sendReport()
+   (one line per entry: "date time | Shift N | Good: x | Reject: y [| Flags: z]"),
+   not structured data — parse it back so History can use the same card
+   renderer as Live Jobs, which has structured rows already. */
+function parseFullLogText(text){
+  if (!text) return [];
+  return text.split('\n').filter(l => l.trim()).map(line => {
+    const parts = line.split('|').map(p => p.trim());
+    const dateTime = (parts[0]||'').split(' ');
+    const time = dateTime.slice(1).join(' ');
+    const shiftMatch = (parts[1]||'').match(/(\d)/);
+    const goodMatch = (parts[2]||'').match(/([\d,]+)/);
+    const rejectMatch = (parts[3]||'').match(/([\d,]+)/);
+    const flagsPart = parts.slice(4).join(' | ').replace(/^Flags:\s*/i, '');
+    return {
+      time: time,
+      shift: shiftMatch ? shiftMatch[1] : '1',
+      good: goodMatch ? parseInt(goodMatch[1].replace(/,/g,''),10) : 0,
+      reject: rejectMatch ? parseInt(rejectMatch[1].replace(/,/g,''),10) : 0,
+      flags: flagsPart
+    };
+  });
+}
+
 function renderDashHistory(){
   const isEs = document.body.classList.contains('es');
   const el = document.getElementById('dashTabHistory');
@@ -1128,7 +1195,7 @@ function renderDashHistory(){
         <div><b>${Number(r.Target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
-      <div class="dash-log-body" id="${logId}">${escapeHtml(r['Full Log']||'')}</div>
+      <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parseFullLogText(r['Full Log']))}</div>
     </div>`;
   }).join('');
 }
@@ -1142,25 +1209,45 @@ function renderDashLive(){
     return;
   }
   const byPo = {};
+  const seenIds = new Set();
   active.forEach(e => {
+    // Defensive dedup by EntryId — the backend is now idempotent on write,
+    // but this guards against any stray duplicate already on the sheet
+    // (e.g. rows written before that fix shipped).
+    if (e.EntryId){
+      if (seenIds.has(e.EntryId)) return;
+      seenIds.add(e.EntryId);
+    }
     const po = e.PO;
-    if (!byPo[po]) byPo[po] = { po, product: e.Product, station: e.Station, target: e.Target, good: 0, reject: 0, count: 0, lastTs: null };
+    if (!byPo[po]) byPo[po] = { po, product: e.Product, station: e.Station, target: e.Target, good: 0, reject: 0, count: 0, lastTs: null, entries: [] };
     byPo[po].good += Number(e.Good)||0;
     byPo[po].reject += Number(e.Reject)||0;
     byPo[po].count++;
     const ts = e.Timestamp ? new Date(e.Timestamp) : null;
     if (ts && (!byPo[po].lastTs || ts > byPo[po].lastTs)) byPo[po].lastTs = ts;
+    // Same Sheets Date/Time-column garbling issue as syncActiveEntries —
+    // derive a clean time string from the reliable Timestamp column instead.
+    byPo[po].entries.push({
+      ts, shift: e.Shift, good: e.Good, reject: e.Reject, flags: e.Flags,
+      time: ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''
+    });
   });
   const jobsList = Object.values(byPo).sort((a,b) => (b.lastTs||0) - (a.lastTs||0));
-  el.innerHTML = jobsList.map(j => `<div class="dash-job-card">
-    <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}</span></div>
-    <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
-    <div class="dash-job-counts">
-      <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
-      <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
-      <div><b>${Number(j.target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
-    </div>
-  </div>`).join('');
+  el.innerHTML = jobsList.map((j,i) => {
+    const logId = 'livelog_' + i;
+    const sortedEntries = j.entries.slice().sort((a,b) => (a.ts||0)-(b.ts||0));
+    return `<div class="dash-job-card">
+      <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}</span></div>
+      <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
+      <div class="dash-job-counts">
+        <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
+        <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
+        <div><b>${Number(j.target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
+      </div>
+      <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
+      <div class="dash-log-body" id="${logId}">${renderLogEntryCards(sortedEntries)}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderDashData(){
