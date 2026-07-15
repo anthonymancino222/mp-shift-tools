@@ -61,6 +61,18 @@ function normalizePO(po){
   return /^0+[0-9]+$/.test(trimmed) ? trimmed.replace(/^0+/, '') : trimmed;
 }
 
+// Note: the object key under each job (what Object.keys(jobs) returns) is
+// the LOCAL storage key — "45402_p1" for a 1st-Pass job, plain "45402" for
+// jobs created before Pass existed — NOT the same as job.po, which is the
+// real PO to match against the server. Always use job.po/job.pass for
+// anything sent to or compared against the backend; use the object key only
+// to look the job back up in localStorage.
+function passLabel(pass){
+  if (pass === '1') return '1st Pass';
+  if (pass === '2') return '2nd Pass';
+  return '';
+}
+
 function renderJobList(){
   const jobs = loadJobs();
   const wrap = document.getElementById('jobList');
@@ -69,8 +81,8 @@ function renderJobList(){
     wrap.innerHTML = '<div class="empty">No jobs stored on this device.</div>';
     return;
   }
-  wrap.innerHTML = ids.map(po => {
-    const job = jobs[po];
+  wrap.innerHTML = ids.map(id => {
+    const job = jobs[id];
     const entries = job.entries || [];
     const pallets = job.pallets || [];
     const good = entries.reduce((s,e)=>s+e.good,0);
@@ -78,13 +90,14 @@ function renderJobList(){
     const activePallets = pallets.filter(p=>!p.voided).length;
     const unsyncedEntries = entries.filter(e=>e.synced!==true).length;
     const unsyncedPallets = pallets.filter(p=>p.synced!==true).length;
+    const pass = passLabel(job.pass);
     return `<div class="job-row">
-      <div class="po">${escapeHtml(po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine||'')}</div>
+      <div class="po">${escapeHtml(job.po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine||'')}${pass ? ' — '+pass : ''}</div>
       <div class="meta">Target: ${(job.target||0).toLocaleString()} · ${entries.length} entries (${unsyncedEntries} unsynced) · ${activePallets} active pallets (${unsyncedPallets} unsynced)</div>
       <div class="counts">Good: <b>${good.toLocaleString()}</b> &nbsp; Reject: <span class="r">${reject.toLocaleString()}</span></div>
-      <button class="btn" onclick="resetAndResync('${escapeAttr(po)}')">Reset &amp; re-pull from server</button>
-      <button class="btn btn-danger" onclick="deleteJobLocally('${escapeAttr(po)}')">Delete this job from this device</button>
-      <div class="out" id="out_${cssSafe(po)}"></div>
+      <button class="btn" onclick="resetAndResync('${escapeAttr(id)}')">Reset &amp; re-pull from server</button>
+      <button class="btn btn-danger" onclick="deleteJobLocally('${escapeAttr(id)}')">Delete this job from this device</button>
+      <div class="out" id="out_${cssSafe(id)}"></div>
     </div>`;
   }).join('');
 }
@@ -93,23 +106,28 @@ function cssSafe(s){ return String(s).replace(/[^a-zA-Z0-9]/g,'_'); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escapeAttr(s){ return String(s).replace(/'/g,"\\'"); }
 
-function resetAndResync(po){
+function resetAndResync(id){
   const jobs = loadJobs();
-  const job = jobs[po];
+  const job = jobs[id];
   if (!job) return;
-  const out = document.getElementById('out_' + cssSafe(po));
+  const out = document.getElementById('out_' + cssSafe(id));
   const oldGood = (job.entries||[]).reduce((s,e)=>s+e.good,0);
   const oldReject = (job.entries||[]).reduce((s,e)=>s+e.reject,0);
-  const msg = `This clears ${ (job.entries||[]).length } entries (Good: ${oldGood.toLocaleString()}, Reject: ${oldReject.toLocaleString()}) and ${ (job.pallets||[]).length } pallet taps for "${po}" on THIS DEVICE ONLY, then re-downloads the correct current totals from the server. Continue?`;
+  const pass = passLabel(job.pass);
+  const label = job.po + (pass ? ' ('+pass+')' : '');
+  const msg = `This clears ${ (job.entries||[]).length } entries (Good: ${oldGood.toLocaleString()}, Reject: ${oldReject.toLocaleString()}) and ${ (job.pallets||[]).length } pallet taps for "${label}" on THIS DEVICE ONLY, then re-downloads the correct current totals from the server. Continue?`;
   if (!confirm(msg)) return;
   out.textContent = 'Contacting server...';
-  const target = normalizePO(po);
+  const target = normalizePO(job.po);
+  const jobPass = job.pass || '';
   fetch(REPORT_ENDPOINT_URL + '?_=' + Date.now(), { method:'GET', cache:'no-store' })
     .then(r => r.json())
     .then(res => {
       if (res.result !== 'success'){ out.textContent = 'Could not reach server: ' + (res.message||'unknown error'); return; }
-      const remote = (res.active||[]).filter(e => normalizePO(e.PO) === target);
-      const remotePallets = (res.pallets||[]).filter(p => normalizePO(p.PO) === target);
+      // Match on Pass too — jobs created before Pass existed have no
+      // job.pass, so they fall back to matching by PO alone.
+      const remote = (res.active||[]).filter(e => normalizePO(e.PO) === target && (!jobPass || String(e.Pass||'') === jobPass));
+      const remotePallets = (res.pallets||[]).filter(p => normalizePO(p.PO) === target && (!jobPass || String(p.Pass||'') === jobPass));
       job.entries = remote.map(e => {
         const loggedAt = e.Timestamp ? new Date(e.Timestamp).getTime() : Date.now();
         const dt = new Date(loggedAt);
@@ -140,11 +158,14 @@ function resetAndResync(po){
     .catch(err => { out.textContent = 'Network error: ' + err.message; });
 }
 
-function deleteJobLocally(po){
+function deleteJobLocally(id){
   const jobs = loadJobs();
-  if (!jobs[po]) return;
-  if (!confirm(`Delete job "${po}" from THIS DEVICE's storage only? This does not affect the server or other devices.`)) return;
-  delete jobs[po];
+  if (!jobs[id]) return;
+  const job = jobs[id];
+  const pass = passLabel(job.pass);
+  const label = job.po + (pass ? ' ('+pass+')' : '');
+  if (!confirm(`Delete job "${label}" from THIS DEVICE's storage only? This does not affect the server or other devices.`)) return;
+  delete jobs[id];
   saveJobs(jobs);
   renderJobList();
 }
@@ -153,21 +174,22 @@ function scanAndPush(){
   const jobs = loadJobs();
   const out = document.getElementById('scanOut');
   let found = null;
-  Object.keys(jobs).forEach(po => {
+  Object.keys(jobs).forEach(id => {
     if (found) return;
-    const job = jobs[po];
+    const job = jobs[id];
     const e = (job.entries||[]).find(x => x.synced !== true);
-    if (e){ found = {po, type:'entry', item:e}; return; }
+    if (e){ found = {id, type:'entry', item:e}; return; }
     const p = (job.pallets||[]).find(x => x.synced !== true);
-    if (p){ found = {po, type:'pallet', item:p}; }
+    if (p){ found = {id, type:'pallet', item:p}; }
   });
   if (!found){ out.textContent = 'No unsynced items found in any locally-saved job.'; return; }
-  const job = jobs[found.po];
+  const job = jobs[found.id];
   const e = found.item;
+  const label = job.po + (passLabel(job.pass) ? ' ('+passLabel(job.pass)+')' : '');
   const payload = found.type === 'pallet'
-    ? { action:'log_pallet', po: job.po, product: job.product||'', station: job.machine, shift: e.shift, date: e.date, time: e.time, entryId: e.id }
-    : { action:'log_entry', po: job.po, product: job.product||'', station: job.machine, target: job.target||0, shift: e.shift, date: e.date, time: e.time, good: e.good, reject: e.reject, flags: e.flags||'', entryId: e.id };
-  out.textContent = `Found in job "${found.po}" (${found.type}):\n${JSON.stringify(e, null, 1)}\n\nAttempting manual push...`;
+    ? { action:'log_pallet', po: job.po, product: job.product||'', station: job.machine, pass: job.pass||'', shift: e.shift, date: e.date, time: e.time, entryId: e.id }
+    : { action:'log_entry', po: job.po, product: job.product||'', station: job.machine, pass: job.pass||'', target: job.target||0, shift: e.shift, date: e.date, time: e.time, good: e.good, reject: e.reject, flags: e.flags||'', entryId: e.id };
+  out.textContent = `Found in job "${label}" (${found.type}):\n${JSON.stringify(e, null, 1)}\n\nAttempting manual push...`;
   fetch(REPORT_ENDPOINT_URL, { method:'POST', body: JSON.stringify(payload) })
     .then(r => r.text().then(t => ({status:r.status, text:t})))
     .then(res => { out.textContent += `\n\nServer responded (HTTP ${res.status}):\n${res.text}`; })

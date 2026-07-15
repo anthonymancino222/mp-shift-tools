@@ -300,6 +300,16 @@
         </button>
       </div>
 
+      <label><span data-en>Pass (required)</span><span data-es>Pasada (obligatorio)</span></label>
+      <div class="station-grid">
+        <button type="button" class="station-btn" id="pass1Btn" onclick="selectPass('1')">
+          <span data-en>1st Pass</span><span data-es>1ra Pasada</span>
+        </button>
+        <button type="button" class="station-btn" id="pass2Btn" onclick="selectPass('2')">
+          <span data-en>2nd Pass</span><span data-es>2da Pasada</span>
+        </button>
+      </div>
+
       <label><span data-en>Quantity to Produce</span><span data-es>Cantidad a Producir</span></label>
       <input id="njTarget" type="text" inputmode="numeric" placeholder="50,000" oninput="formatThousands(this)">
       <button class="btn-submit" onclick="createJob()"><span data-en>Create Job</span><span data-es>Crear Trabajo</span></button>
@@ -450,6 +460,10 @@ let drafts = {};
 let currentJobId = null;
 let currentShift = '1';
 let newJobStation = 'Long Gluer';
+// No default — unlike station, pass has no safe assumption to fall back on
+// (picking wrong doubles-up or skips a real production pass), so it starts
+// unselected every time and createJob() refuses to proceed without a tap.
+let newJobPass = null;
 let selectedFlags = [];
 let editingEntryId = null;
 // Set by saveProgress() so renderJob() collapses back to the minimal
@@ -506,6 +520,18 @@ function selectStation(name){
   document.getElementById('stShortBtn').classList.toggle('selected', name==='Short Gluer');
 }
 
+function selectPass(pass){
+  newJobPass = pass;
+  document.getElementById('pass1Btn').classList.toggle('selected', pass==='1');
+  document.getElementById('pass2Btn').classList.toggle('selected', pass==='2');
+}
+
+function passLabel(pass, isEs){
+  if (pass === '1') return isEs ? '1ra Pasada' : '1st Pass';
+  if (pass === '2') return isEs ? '2da Pasada' : '2nd Pass';
+  return '';
+}
+
 /* Job picker — each saved job is its own tappable card (see .job-list-item),
    not a native <select>, so it's obvious these are resumable saved jobs.
    Tapping a DIFFERENT job than the one showing only marks it pending
@@ -554,7 +580,7 @@ function renderJobList(){
     const j = jobs[id];
     const isActive = id === currentJobId && !pendingJobId;
     const isPending = id === pendingJobId;
-    const label = `${j.po}${j.product ? ' — '+j.product : ''} — ${j.machine}`;
+    const label = `${j.po}${j.product ? ' — '+j.product : ''} — ${j.machine}${j.pass ? ' — '+passLabel(j.pass, isEs) : ''}`;
     let tagHtml;
     if (isActive && jobSectionsHidden){
       // Paused via Save Progress — a small inline button right on this
@@ -601,7 +627,14 @@ function toggleNewJobForm(){
   const f = document.getElementById('newJobForm');
   const opening = f.style.display === 'none';
   if (!opening){ f.style.display = 'none'; return; }
-  requireSyncBeforeAction(() => { f.style.display = 'block'; });
+  requireSyncBeforeAction(() => {
+    // Always force a fresh, explicit pass choice — never carry over whatever
+    // was selected for the last job created in this form.
+    newJobPass = null;
+    document.getElementById('pass1Btn').classList.remove('selected');
+    document.getElementById('pass2Btn').classList.remove('selected');
+    f.style.display = 'block';
+  });
 }
 
 /* Requires a Sync attempt (the ACTION, not the outcome) before running
@@ -681,16 +714,24 @@ function createJob(){
     alert(document.body.classList.contains('es') ? 'Ingrese el número de trabajo.' : 'Enter job/PO number.');
     return;
   }
-  // Keyed by normalized PO (not a random id) so the same job is recognized
-  // across devices once synced, regardless of leading zeros — see
-  // syncActiveEntries() and normalizePO() above.
-  const id = po;
+  if(!newJobPass){
+    alert(document.body.classList.contains('es') ? 'Seleccione 1ra Pasada o 2da Pasada.' : 'Select 1st Pass or 2nd Pass.');
+    return;
+  }
+  // Keyed by normalized PO + Pass (not PO alone, and not a random id) so the
+  // same job is recognized across devices once synced, regardless of leading
+  // zeros — see syncActiveEntries() and normalizePO() above. Pass IS part of
+  // this key, unlike station: a 1st Pass run and a 2nd Pass run under the
+  // same PO are fully independent jobs with their own counts/target/report —
+  // the 2nd pass never inherits the 1st pass's running total.
+  const id = po + '_p' + newJobPass;
   if (!jobs[id]) {
-    jobs[id] = { po, product, machine: newJobStation, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [] };
+    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [] };
     saveAll();
   }
   currentJobId = id;
   jobSectionsHidden = false;
+  newJobPass = null;
   document.getElementById('njPO').value='';
   document.getElementById('njProduct').value='';
   document.getElementById('njTarget').value='';
@@ -927,7 +968,7 @@ function pushLivePallet(job, pallet){
     method: 'POST',
     body: JSON.stringify({
       action: 'log_pallet',
-      po: job.po, product: job.product || '', station: job.machine,
+      po: job.po, product: job.product || '', station: job.machine, pass: job.pass || '',
       shift: pallet.shift, date: pallet.date, time: pallet.time, entryId: pallet.id
     })
   }).then(res => res.json()).then(res => {
@@ -978,11 +1019,14 @@ function pendingSyncCount(){
 // here a pending item sitting in a job you're not currently viewing is
 // invisible until you happen to switch to it.
 function jobsWithPendingSync(){
+  const isEs = document.body.classList.contains('es');
   const pos = [];
   Object.values(jobs).forEach(job => {
     const n = (job.entries||[]).filter(e => e.synced !== true).length
       + (job.pallets||[]).filter(p => p.synced !== true).length;
-    if (n > 0) pos.push(job.po);
+    // Include the pass — two jobs can now share the same PO (1st Pass / 2nd
+    // Pass), so the bare PO alone would be ambiguous about which one is stuck.
+    if (n > 0) pos.push(job.po + (job.pass ? ' ('+passLabel(job.pass, isEs)+')' : ''));
   });
   return pos;
 }
@@ -1021,7 +1065,7 @@ function pushLiveEntry(job, entry){
     method: 'POST',
     body: JSON.stringify({
       action: 'log_entry',
-      po: job.po, product: job.product || '', station: job.machine, target: job.target || 0,
+      po: job.po, product: job.product || '', station: job.machine, pass: job.pass || '', target: job.target || 0,
       shift: entry.shift, date: entry.date, time: entry.time,
       good: entry.good, reject: entry.reject, flags: entry.flags, entryId: entry.id
     })
@@ -1066,7 +1110,13 @@ function syncActiveEntries(manual){
     .then(res => {
       if (res.result !== 'success') throw new Error(res.message || 'unknown error');
       const jobPO = normalizePO(job.po);
-      const remote = (res.active || []).filter(e => normalizePO(e.PO) === jobPO);
+      // Pass is part of what makes 1st Pass and 2nd Pass separate jobs now —
+      // match on it too, or a pull would merge the OTHER pass's entries into
+      // this one. Jobs created before Pass existed have no job.pass, so they
+      // fall back to matching by PO alone (unchanged prior behavior).
+      const jobPass = job.pass || '';
+      const remote = (res.active || []).filter(e =>
+        normalizePO(e.PO) === jobPO && (!jobPass || String(e.Pass||'') === jobPass));
       const existingIds = new Set(job.entries.map(e => e.id));
       let added = 0;
       remote.forEach(e => {
@@ -1101,7 +1151,8 @@ function syncActiveEntries(manual){
         existingIds.add(id);
         added++;
       });
-      const remotePallets = (res.pallets || []).filter(p => normalizePO(p.PO) === jobPO);
+      const remotePallets = (res.pallets || []).filter(p =>
+        normalizePO(p.PO) === jobPO && (!jobPass || String(p.Pass||'') === jobPass));
       // Includes already-voided local pallets so a locally-undone tap can
       // never get resurrected by the next pull (see undoPallet()).
       const existingPalletIds = new Set(job.pallets.map(p => p.id));
@@ -1144,16 +1195,17 @@ function sendReport(){
   const job = jobs[currentJobId];
   const isEs = document.body.classList.contains('es');
 
+  const passText = passLabel(job.pass, isEs);
   const confirmMsg = isEs
-    ? `¿Terminar este trabajo y enviar el reporte a Jayro?\n\nTrabajo: ${job.po}\nEstación: ${job.machine}`
-    : `Finish this job and send the report to Jayro?\n\nJob: ${job.po}\nStation: ${job.machine}`;
+    ? `¿Terminar este trabajo y enviar el reporte a Jayro?\n\nTrabajo: ${job.po}\nEstación: ${job.machine}\nPasada: ${passText || 'N/A'}`
+    : `Finish this job and send the report to Jayro?\n\nJob: ${job.po}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}`;
   if(!confirm(confirmMsg)) return;
 
   const totalGood = job.entries.reduce((s,e)=>s+e.good,0);
   const totalReject = job.entries.reduce((s,e)=>s+e.reject,0);
   const totalPallets = job.pallets.filter(p=>!p.voided).length;
 
-  const subject = `Shift Count Report — ${job.po} (${job.machine})`;
+  const subject = `Shift Count Report — ${job.po} (${job.machine}${passText ? ', '+passText : ''})`;
   let fullLog = '';
   const sorted = [...job.entries].sort((a,b)=>a.loggedAt-b.loggedAt);
   sorted.forEach(e=>{
@@ -1162,13 +1214,14 @@ function sendReport(){
     if(e.flags) fullLog += ` | Flags: ${e.flags}`;
     fullLog += '\n';
   });
-  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT REJECT/HOLD: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT REJECT/HOLD: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
 
   const payload = {
     action: 'finish_report',
     po: job.po,
     product: job.product || '',
     station: job.machine,
+    pass: job.pass || '',
     target: job.target || 0,
     totalGood, totalReject, totalPallets,
     subject, body,
@@ -1298,8 +1351,9 @@ function renderJob(){
   {
     const jmIsEs = document.body.classList.contains('es');
     const jmLabel = jmIsEs ? 'Ahora registrando conteos para:' : 'Now logging counts for:';
+    const jmPass = passLabel(job.pass, jmIsEs);
     document.getElementById('jobMetaLine').innerHTML =
-      `<span class="jm-label">${jmLabel}</span>${escapeHtml(job.po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine)}`;
+      `<span class="jm-label">${jmLabel}</span>${escapeHtml(job.po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine)}${jmPass ? ' — '+escapeHtml(jmPass) : ''}`;
   }
 
   const isEs = document.body.classList.contains('es');
@@ -1509,7 +1563,7 @@ function renderDashHistory(){
     const parsedEntries = parseFullLogText(r['Full Log']);
     const startedLabel = parsedEntries.length ? [parsedEntries[0].date, parsedEntries[0].time].filter(Boolean).join(' ') : '—';
     return `<div class="dash-job-card">
-      <div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span><span>${escapeHtml(r.Station||'')}</span></div>
+      <div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span><span>${escapeHtml(r.Station||'')}${r.Pass ? ' · '+escapeHtml(passLabel(String(r.Pass), isEs)) : ''}</span></div>
       <div class="dash-job-meta">${escapeHtml(r.Product||'')}${r.Product?' · ':''}<span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · <span data-en>Sent</span><span data-es>Enviado</span>: ${sentTs}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${Number(r['Total Good']||0).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
@@ -1542,16 +1596,19 @@ function renderDashLive(){
       if (seenIds.has(e.EntryId)) return;
       seenIds.add(e.EntryId);
     }
-    const po = e.PO;
-    if (!byPo[po]) byPo[po] = { po, product: e.Product, station: e.Station, target: e.Target, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
-    byPo[po].good += Number(e.Good)||0;
-    byPo[po].reject += Number(e.Reject)||0;
-    byPo[po].count++;
+    // Grouped by PO + Pass, not PO alone — a 1st Pass and 2nd Pass run under
+    // the same PO are separate jobs now and must show as separate cards, not
+    // merge their counts together.
+    const groupKey = e.PO + '|' + (e.Pass || '');
+    if (!byPo[groupKey]) byPo[groupKey] = { po: e.PO, product: e.Product, station: e.Station, pass: e.Pass, target: e.Target, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
+    byPo[groupKey].good += Number(e.Good)||0;
+    byPo[groupKey].reject += Number(e.Reject)||0;
+    byPo[groupKey].count++;
     const ts = e.Timestamp ? new Date(e.Timestamp) : null;
-    if (ts && (!byPo[po].lastTs || ts > byPo[po].lastTs)) byPo[po].lastTs = ts;
+    if (ts && (!byPo[groupKey].lastTs || ts > byPo[groupKey].lastTs)) byPo[groupKey].lastTs = ts;
     // Same Sheets Date/Time-column garbling issue as syncActiveEntries —
     // derive a clean time string from the reliable Timestamp column instead.
-    byPo[po].entries.push({
+    byPo[groupKey].entries.push({
       ts, shift: e.Shift, good: e.Good, reject: e.Reject, flags: e.Flags,
       date: ts ? ts.toLocaleDateString() : '',
       time: ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''
@@ -1563,11 +1620,11 @@ function renderDashLive(){
       if (seenPalletIds.has(p.EntryId)) return;
       seenPalletIds.add(p.EntryId);
     }
-    const po = p.PO;
-    if (!byPo[po]) byPo[po] = { po, product: p.Product, station: p.Station, target: 0, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
-    byPo[po].pallets++;
+    const groupKey = p.PO + '|' + (p.Pass || '');
+    if (!byPo[groupKey]) byPo[groupKey] = { po: p.PO, product: p.Product, station: p.Station, pass: p.Pass, target: 0, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
+    byPo[groupKey].pallets++;
     const ts = p.Timestamp ? new Date(p.Timestamp) : null;
-    if (ts && (!byPo[po].lastTs || ts > byPo[po].lastTs)) byPo[po].lastTs = ts;
+    if (ts && (!byPo[groupKey].lastTs || ts > byPo[groupKey].lastTs)) byPo[groupKey].lastTs = ts;
   });
   const jobsList = Object.values(byPo).sort((a,b) => (b.lastTs||0) - (a.lastTs||0));
   el.innerHTML = jobsList.map((j,i) => {
@@ -1575,7 +1632,7 @@ function renderDashLive(){
     const sortedEntries = j.entries.slice().sort((a,b) => (a.ts||0)-(b.ts||0));
     const startedLabel = sortedEntries.length ? [sortedEntries[0].date, sortedEntries[0].time].filter(Boolean).join(' ') : '—';
     return `<div class="dash-job-card">
-      <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}</span></div>
+      <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}${j.pass ? ' · '+escapeHtml(passLabel(String(j.pass), isEs)) : ''}</span></div>
       <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'}<br><span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
