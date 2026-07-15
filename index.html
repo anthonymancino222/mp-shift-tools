@@ -75,6 +75,8 @@
     border:3px solid var(--navy);background:#fff;color:var(--navy);
   }
   .station-btn.selected{background:var(--navy);color:#fff;}
+  /* Pass buttons — its own 3-up grid since Station stays 2-up */
+  .pass-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px;}
 
   .handoff-banner{
     background:var(--black);
@@ -301,12 +303,15 @@
       </div>
 
       <label><span data-en>Pass (required)</span><span data-es>Pasada (obligatorio)</span></label>
-      <div class="station-grid">
+      <div class="pass-grid">
         <button type="button" class="station-btn" id="pass1Btn" onclick="selectPass('1')">
           <span data-en>1st Pass</span><span data-es>1ra Pasada</span>
         </button>
         <button type="button" class="station-btn" id="pass2Btn" onclick="selectPass('2')">
           <span data-en>2nd Pass</span><span data-es>2da Pasada</span>
+        </button>
+        <button type="button" class="station-btn" id="passSBtn" onclick="selectPass('S')">
+          <span data-en>Single Pass</span><span data-es>Pasada Única</span>
         </button>
       </div>
 
@@ -525,11 +530,13 @@ function selectPass(pass){
   newJobPass = pass;
   document.getElementById('pass1Btn').classList.toggle('selected', pass==='1');
   document.getElementById('pass2Btn').classList.toggle('selected', pass==='2');
+  document.getElementById('passSBtn').classList.toggle('selected', pass==='S');
 }
 
 function passLabel(pass, isEs){
   if (pass === '1') return isEs ? '1ra Pasada' : '1st Pass';
   if (pass === '2') return isEs ? '2da Pasada' : '2nd Pass';
+  if (pass === 'S') return isEs ? 'Pasada Única' : 'Single Pass';
   return '';
 }
 
@@ -637,6 +644,7 @@ function toggleNewJobForm(){
     document.getElementById('stShortBtn').classList.remove('selected');
     document.getElementById('pass1Btn').classList.remove('selected');
     document.getElementById('pass2Btn').classList.remove('selected');
+    document.getElementById('passSBtn').classList.remove('selected');
     f.style.display = 'block';
   });
 }
