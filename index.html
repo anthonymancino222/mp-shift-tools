@@ -290,9 +290,9 @@
       <label><span data-en>Product Number</span><span data-es>Número de Producto</span></label>
       <input id="njProduct" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="10234">
 
-      <label><span data-en>Station</span><span data-es>Estación</span></label>
+      <label><span data-en>Station (required)</span><span data-es>Estación (obligatorio)</span></label>
       <div class="station-grid">
-        <button type="button" class="station-btn selected" id="stLongBtn" onclick="selectStation('Long Gluer')">
+        <button type="button" class="station-btn" id="stLongBtn" onclick="selectStation('Long Gluer')">
           <span data-en>Long Gluer</span><span data-es>Pegadora Larga</span>
         </button>
         <button type="button" class="station-btn" id="stShortBtn" onclick="selectStation('Short Gluer')">
@@ -459,10 +459,11 @@ let jobs = {};
 let drafts = {};
 let currentJobId = null;
 let currentShift = '1';
-let newJobStation = 'Long Gluer';
-// No default — unlike station, pass has no safe assumption to fall back on
-// (picking wrong doubles-up or skips a real production pass), so it starts
-// unselected every time and createJob() refuses to proceed without a tap.
+// No defaults on station or pass — every field in "Start New Job" is now
+// mandatory, and a pre-picked default would let someone create a job without
+// ever actually looking at that field. Both start unselected every time and
+// createJob() refuses to proceed without an explicit tap on each.
+let newJobStation = null;
 let newJobPass = null;
 let selectedFlags = [];
 let editingEntryId = null;
@@ -628,9 +629,12 @@ function toggleNewJobForm(){
   const opening = f.style.display === 'none';
   if (!opening){ f.style.display = 'none'; return; }
   requireSyncBeforeAction(() => {
-    // Always force a fresh, explicit pass choice — never carry over whatever
-    // was selected for the last job created in this form.
+    // Always force a fresh, explicit station and pass choice — never carry
+    // over whatever was selected for the last job created in this form.
+    newJobStation = null;
     newJobPass = null;
+    document.getElementById('stLongBtn').classList.remove('selected');
+    document.getElementById('stShortBtn').classList.remove('selected');
     document.getElementById('pass1Btn').classList.remove('selected');
     document.getElementById('pass2Btn').classList.remove('selected');
     f.style.display = 'block';
@@ -707,15 +711,28 @@ function syncGateCancel(){
 }
 
 function createJob(){
+  const isEs = document.body.classList.contains('es');
   const po = normalizePO(document.getElementById('njPO').value);
   const product = document.getElementById('njProduct').value.trim();
   const target = document.getElementById('njTarget').value.replace(/,/g,'').trim();
   if(!po){
-    alert(document.body.classList.contains('es') ? 'Ingrese el número de trabajo.' : 'Enter job/PO number.');
+    alert(isEs ? 'Ingrese el número de trabajo.' : 'Enter job/PO number.');
+    return;
+  }
+  if(!product){
+    alert(isEs ? 'Ingrese el número de producto.' : 'Enter the product number.');
+    return;
+  }
+  if(!newJobStation){
+    alert(isEs ? 'Seleccione Pegadora Larga o Pegadora Corta.' : 'Select Long Gluer or Short Gluer.');
     return;
   }
   if(!newJobPass){
-    alert(document.body.classList.contains('es') ? 'Seleccione 1ra Pasada o 2da Pasada.' : 'Select 1st Pass or 2nd Pass.');
+    alert(isEs ? 'Seleccione 1ra Pasada o 2da Pasada.' : 'Select 1st Pass or 2nd Pass.');
+    return;
+  }
+  if(!target || parseInt(target, 10) <= 0){
+    alert(isEs ? 'Ingrese la cantidad a producir.' : 'Enter the quantity to produce.');
     return;
   }
   // Keyed by normalized PO + Pass (not PO alone, and not a random id) so the
@@ -731,6 +748,7 @@ function createJob(){
   }
   currentJobId = id;
   jobSectionsHidden = false;
+  newJobStation = null;
   newJobPass = null;
   document.getElementById('njPO').value='';
   document.getElementById('njProduct').value='';
