@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Gluer Shift Hand-Off — Fix Tool</title>
+<style>
+  :root{ --navy:#ff1f8f; --black:#0a0a0a; --good:#2e7d4f; --accent:#c8393a; --bg:#f5f5f3; --border:#e0e0e0; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:#1c232b;padding-bottom:40px;}
+  header{background:var(--black);color:#fff;padding:16px;text-align:center;border-top:5px solid var(--navy);}
+  header h1{margin:0;font-size:1.3rem;}
+  .container{max-width:760px;margin:0 auto;padding:12px;}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+  .card h2{margin:0 0 10px;font-size:1.05rem;color:var(--navy);}
+  .job-row{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:#fafbfc;}
+  .job-row .po{font-weight:800;font-size:1.05rem;color:var(--navy);}
+  .job-row .meta{font-size:0.85rem;color:#666;margin:4px 0 8px;}
+  .job-row .counts{font-size:0.95rem;margin-bottom:8px;}
+  .job-row .counts b{color:var(--good);} .job-row .counts .r{color:var(--accent);}
+  .btn{padding:12px 16px;font-size:0.95rem;font-weight:800;border-radius:10px;border:2px solid var(--navy);background:#fff;color:var(--navy);margin-right:8px;margin-top:4px;cursor:pointer;}
+  .btn:active{background:var(--navy);color:#fff;}
+  .btn-danger{border-color:var(--accent);color:var(--accent);}
+  .btn-danger:active{background:var(--accent);color:#fff;}
+  .out{white-space:pre-wrap;word-break:break-word;background:#0a0a0a;color:#8fe0ab;font-family:monospace;font-size:0.85rem;padding:12px;border-radius:8px;margin-top:10px;min-height:20px;}
+  .empty{color:#888;text-align:center;padding:20px;}
+  .warn{background:#fff3cd;color:#5c4400;border-radius:8px;padding:10px 12px;font-size:0.9rem;margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<header><h1>Gluer Shift Hand-Off — Fix Tool</h1></header>
+
+<div class="container">
+  <div class="warn">⚠ This only affects <b>this device's</b> local storage for this site. It reads and writes the exact same data the main app uses. Reload this page after making changes elsewhere to see fresh state.</div>
+
+  <div class="card">
+    <h2>Jobs stored on this device</h2>
+    <div id="jobList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Scan all jobs for unsynced items</h2>
+    <button class="btn" onclick="scanAndPush()">Scan &amp; attempt manual push</button>
+    <div class="out" id="scanOut"></div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'shiftHandoffJobs_v3';
+const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.dev/';
+
+function loadJobs(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveJobs(jobs){ localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs)); }
+
+function normalizePO(po){
+  const trimmed = String(po||'').trim();
+  return /^0+[0-9]+$/.test(trimmed) ? trimmed.replace(/^0+/, '') : trimmed;
+}
+
+function renderJobList(){
+  const jobs = loadJobs();
+  const wrap = document.getElementById('jobList');
+  const ids = Object.keys(jobs);
+  if (!ids.length){
+    wrap.innerHTML = '<div class="empty">No jobs stored on this device.</div>';
+    return;
+  }
+  wrap.innerHTML = ids.map(po => {
+    const job = jobs[po];
+    const entries = job.entries || [];
+    const pallets = job.pallets || [];
+    const good = entries.reduce((s,e)=>s+e.good,0);
+    const reject = entries.reduce((s,e)=>s+e.reject,0);
+    const activePallets = pallets.filter(p=>!p.voided).length;
+    const unsyncedEntries = entries.filter(e=>e.synced!==true).length;
+    const unsyncedPallets = pallets.filter(p=>p.synced!==true).length;
+    return `<div class="job-row">
+      <div class="po">${escapeHtml(po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine||'')}</div>
+      <div class="meta">Target: ${(job.target||0).toLocaleString()} · ${entries.length} entries (${unsyncedEntries} unsynced) · ${activePallets} active pallets (${unsyncedPallets} unsynced)</div>
+      <div class="counts">Good: <b>${good.toLocaleString()}</b> &nbsp; Reject: <span class="r">${reject.toLocaleString()}</span></div>
+      <button class="btn" onclick="resetAndResync('${escapeAttr(po)}')">Reset &amp; re-pull from server</button>
+      <button class="btn btn-danger" onclick="deleteJobLocally('${escapeAttr(po)}')">Delete this job from this device</button>
+      <div class="out" id="out_${cssSafe(po)}"></div>
+    </div>`;
+  }).join('');
+}
+
+function cssSafe(s){ return String(s).replace(/[^a-zA-Z0-9]/g,'_'); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escapeAttr(s){ return String(s).replace(/'/g,"\\'"); }
+
+function resetAndResync(po){
+  const jobs = loadJobs();
+  const job = jobs[po];
+  if (!job) return;
+  const out = document.getElementById('out_' + cssSafe(po));
+  const oldGood = (job.entries||[]).reduce((s,e)=>s+e.good,0);
+  const oldReject = (job.entries||[]).reduce((s,e)=>s+e.reject,0);
+  const msg = `This clears ${ (job.entries||[]).length } entries (Good: ${oldGood.toLocaleString()}, Reject: ${oldReject.toLocaleString()}) and ${ (job.pallets||[]).length } pallet taps for "${po}" on THIS DEVICE ONLY, then re-downloads the correct current totals from the server. Continue?`;
+  if (!confirm(msg)) return;
+  out.textContent = 'Contacting server...';
+  const target = normalizePO(po);
+  fetch(REPORT_ENDPOINT_URL + '?_=' + Date.now(), { method:'GET', cache:'no-store' })
+    .then(r => r.json())
+    .then(res => {
+      if (res.result !== 'success'){ out.textContent = 'Could not reach server: ' + (res.message||'unknown error'); return; }
+      const remote = (res.active||[]).filter(e => normalizePO(e.PO) === target);
+      const remotePallets = (res.pallets||[]).filter(p => normalizePO(p.PO) === target);
+      job.entries = remote.map(e => {
+        const loggedAt = e.Timestamp ? new Date(e.Timestamp).getTime() : Date.now();
+        const dt = new Date(loggedAt);
+        return {
+          id: e.EntryId || ('legacy_' + [e.Date,e.Time,e.Shift,e.Good,e.Reject,e.Flags].join('_')),
+          shift: String(e.Shift), date: dt.toISOString().slice(0,10),
+          time: dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+          good: Number(e.Good)||0, reject: Number(e.Reject)||0, flags: e.Flags||'',
+          loggedAt, edited:false, originalGood:null, originalReject:null, synced:true
+        };
+      });
+      job.pallets = remotePallets.map(p => {
+        const loggedAt = p.Timestamp ? new Date(p.Timestamp).getTime() : Date.now();
+        const dt = new Date(loggedAt);
+        return {
+          id: p.EntryId || ('legacy_' + [p.Date,p.Time,p.Shift].join('_')),
+          shift: String(p.Shift), date: dt.toISOString().slice(0,10),
+          time: dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+          loggedAt, synced:true, voided:false
+        };
+      });
+      saveJobs(jobs);
+      const newGood = job.entries.reduce((s,e)=>s+e.good,0);
+      const newReject = job.entries.reduce((s,e)=>s+e.reject,0);
+      out.textContent = `Done. New totals — Good: ${newGood.toLocaleString()}, Reject: ${newReject.toLocaleString()}, Active pallets: ${job.pallets.filter(p=>!p.voided).length}.`;
+      renderJobList();
+    })
+    .catch(err => { out.textContent = 'Network error: ' + err.message; });
+}
+
+function deleteJobLocally(po){
+  const jobs = loadJobs();
+  if (!jobs[po]) return;
+  if (!confirm(`Delete job "${po}" from THIS DEVICE's storage only? This does not affect the server or other devices.`)) return;
+  delete jobs[po];
+  saveJobs(jobs);
+  renderJobList();
+}
+
+function scanAndPush(){
+  const jobs = loadJobs();
+  const out = document.getElementById('scanOut');
+  let found = null;
+  Object.keys(jobs).forEach(po => {
+    if (found) return;
+    const job = jobs[po];
+    const e = (job.entries||[]).find(x => x.synced !== true);
+    if (e){ found = {po, type:'entry', item:e}; return; }
+    const p = (job.pallets||[]).find(x => x.synced !== true);
+    if (p){ found = {po, type:'pallet', item:p}; }
+  });
+  if (!found){ out.textContent = 'No unsynced items found in any locally-saved job.'; return; }
+  const job = jobs[found.po];
+  const e = found.item;
+  const payload = found.type === 'pallet'
+    ? { action:'log_pallet', po: job.po, product: job.product||'', station: job.machine, shift: e.shift, date: e.date, time: e.time, entryId: e.id }
+    : { action:'log_entry', po: job.po, product: job.product||'', station: job.machine, target: job.target||0, shift: e.shift, date: e.date, time: e.time, good: e.good, reject: e.reject, flags: e.flags||'', entryId: e.id };
+  out.textContent = `Found in job "${found.po}" (${found.type}):\n${JSON.stringify(e, null, 1)}\n\nAttempting manual push...`;
+  fetch(REPORT_ENDPOINT_URL, { method:'POST', body: JSON.stringify(payload) })
+    .then(r => r.text().then(t => ({status:r.status, text:t})))
+    .then(res => { out.textContent += `\n\nServer responded (HTTP ${res.status}):\n${res.text}`; })
+    .catch(err => { out.textContent += `\n\nNetwork-level failure:\n${err.message}`; });
+}
+
+renderJobList();
+</script>
+
+</body>
+</html>
