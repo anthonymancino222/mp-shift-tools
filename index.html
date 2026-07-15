@@ -27,6 +27,10 @@
     --navy-light:#d4006e;
     --black:#0a0a0a;
     --pink-soft:#fff0f7;
+    /* Bright but deliberately NOT pink — every tappable button in this app is
+       pink, so a pink "Now logging counts for" badge reads as clickable. This
+       is informational only. */
+    --info:#0ea5e9;
     --accent:#c8393a;
     --good:#2e7d4f;
     --good-light:#3a9e65;
@@ -93,9 +97,13 @@
      between "reading the right job's count" and "reading the wrong one." */
   .job-meta{
     font-size:1.05rem;color:#fff;font-weight:800;margin-bottom:10px;text-align:center;
-    background:var(--navy);border-radius:10px;padding:8px 12px;
+    background:var(--info);border-radius:10px;padding:8px 12px;
   }
-  .job-meta .jm-label{display:block;font-size:0.7rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#ffd6ea;margin-bottom:2px;}
+  .job-meta .jm-label{display:block;font-size:0.7rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#e0f6ff;margin-bottom:2px;}
+  .preview-hint{
+    text-align:center;font-size:0.85rem;font-weight:700;color:#5c4400;
+    background:#fff3cd;border-radius:8px;padding:8px 12px;margin-top:-4px;margin-bottom:14px;
+  }
 
   .shift-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .shift-btn{padding:20px 10px;font-size:1.5rem;font-weight:800;border-radius:12px;border:3px solid var(--navy);background:#fff;color:var(--navy);}
@@ -336,6 +344,7 @@
         <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span></div></div>
       </div>
     </div>
+    <div class="preview-hint" id="previewHint" style="display:none;">👆 <span data-en>This is a preview — tap "Continue Job?" above to start logging for this job.</span><span data-es>Esto es una vista previa — toca "¿Continuar Trabajo?" arriba para empezar a registrar este trabajo.</span></div>
   </div>
 
   <!-- SHIFT TOGGLE -->
@@ -610,9 +619,10 @@ function renderJobList(){
 }
 
 function selectJobCard(id){
-  if (id === currentJobId){ pendingJobId = null; renderJobList(); return; }
+  if (id === currentJobId){ pendingJobId = null; renderJobList(); renderJob(); return; }
   pendingJobId = id;
   renderJobList();
+  renderJob();
 }
 
 function confirmContinueJob(){
@@ -1343,15 +1353,25 @@ function saveEditEntry(jobId, entryId){
 function renderJob(){
   renderGlobalSyncStatus();
   const banner = document.getElementById('bannerSection');
+  const previewHint = document.getElementById('previewHint');
   const shiftSec = document.getElementById('shiftToggleSection');
   const palletCard = document.getElementById('palletCard');
   const logCard = document.getElementById('logCard');
   const historyCard = document.getElementById('historyCard');
   const deleteCard = document.getElementById('deleteCard');
 
-  const validJob = currentJobId && jobs[currentJobId];
+  // While a DIFFERENT job is pending (tapped in the list but not yet
+  // confirmed via "Continue Job?"), the banner previews THAT job's own
+  // numbers instead of silently continuing to show the still-active job's —
+  // otherwise the highlighted job and the numbers underneath it belong to two
+  // different jobs, reading as if the numbers ARE for the highlighted one.
+  // Everything below the banner stays hidden during preview so nothing can
+  // be submitted against a job that hasn't actually been switched to yet.
+  const previewId = pendingJobId || currentJobId;
+  const validJob = previewId && jobs[previewId];
   if(!validJob || jobSectionsHidden){
     banner.style.display='none';
+    previewHint.style.display='none';
     shiftSec.style.display='none';
     palletCard.style.display='none';
     logCard.style.display='none';
@@ -1360,8 +1380,32 @@ function renderJob(){
     return;
   }
 
-  const job = jobs[currentJobId];
+  const job = jobs[previewId];
   banner.style.display='block';
+
+  if (pendingJobId){
+    previewHint.style.display='block';
+    shiftSec.style.display='none';
+    palletCard.style.display='none';
+    logCard.style.display='none';
+    historyCard.style.display='none';
+    deleteCard.style.display='none';
+    // Preview only shows the banner counts — skip everything else (shift
+    // toggle, entry form, pallets, history) since it isn't shown anyway.
+    const totalGoodPreview = job.entries.reduce((s,e)=>s+e.good,0);
+    const totalRejectPreview = job.entries.reduce((s,e)=>s+e.reject,0);
+    document.getElementById('bannerCount').textContent = totalGoodPreview.toLocaleString();
+    document.getElementById('bannerHold').textContent = totalRejectPreview.toLocaleString();
+    document.getElementById('bannerTarget').textContent = job.target ? job.target.toLocaleString() : '—';
+    const pvIsEs = document.body.classList.contains('es');
+    const pvLabel = pvIsEs ? 'Vista previa de:' : 'Previewing:';
+    const pvPass = passLabel(job.pass, pvIsEs);
+    document.getElementById('jobMetaLine').innerHTML =
+      `<span class="jm-label">${pvLabel}</span>${escapeHtml(job.po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine)}${pvPass ? ' — '+escapeHtml(pvPass) : ''}`;
+    return;
+  }
+
+  previewHint.style.display='none';
   shiftSec.style.display='grid';
   palletCard.style.display='block';
   logCard.style.display='block';
