@@ -971,14 +971,33 @@ function pendingSyncCount(){
   return n;
 }
 
+// Which jobs (by PO) actually hold the pending items — surfaced in the
+// global sync status so "N not synced" doesn't leave the user guessing which
+// job to go check. This bar covers every locally-saved job, but Shift Log
+// History only ever shows the currently-open one, so without naming the job
+// here a pending item sitting in a job you're not currently viewing is
+// invisible until you happen to switch to it.
+function jobsWithPendingSync(){
+  const pos = [];
+  Object.values(jobs).forEach(job => {
+    const n = (job.entries||[]).filter(e => e.synced !== true).length
+      + (job.pallets||[]).filter(p => p.synced !== true).length;
+    if (n > 0) pos.push(job.po);
+  });
+  return pos;
+}
+
 function renderGlobalSyncStatus(){
   const isEs = document.body.classList.contains('es');
   const el = document.getElementById('globalSyncStatus');
   if (!el) return;
   const pending = pendingSyncCount();
   if (pending > 0){
+    const posText = jobsWithPendingSync().map(po => `"${po}"`).join(', ');
     el.classList.add('pending');
-    el.textContent = (isEs ? `⚠ ${pending} entrada(s) sin sincronizar` : `⚠ ${pending} entr${pending===1?'y':'ies'} not yet synced`);
+    el.textContent = isEs
+      ? `⚠ ${pending} entrada(s) sin sincronizar (${posText})`
+      : `⚠ ${pending} entr${pending===1?'y':'ies'} not yet synced (${posText})`;
   } else {
     el.classList.remove('pending');
     el.textContent = isEs ? '✅ Todo sincronizado' : '✅ All synced';
