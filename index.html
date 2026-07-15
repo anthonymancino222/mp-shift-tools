@@ -340,7 +340,7 @@
       <div class="label"><span data-en>Current Good Count</span><span data-es>Conteo Bueno Actual</span></div>
       <div class="count" id="bannerCount">0</div>
       <div class="banner-grid">
-        <div><div class="n" id="bannerHold">0</div><div class="l"><span data-en>REJECT / HOLD</span><span data-es>RECHAZO</span></div></div>
+        <div><div class="n" id="bannerHold">0</div><div class="l"><span data-en>HOLD / REVIEW</span><span data-es>RETENIDO / REVISIÓN</span></div></div>
         <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span></div></div>
       </div>
     </div>
@@ -374,7 +374,7 @@
     </div>
 
     <div class="counter-block">
-      <div class="counter-title reject">⚠️ <span data-en>Reject / Hold Count</span><span data-es>Conteo de Rechazo</span></div>
+      <div class="counter-title reject">⚠️ <span data-en>Hold / Review Count</span><span data-es>Retenido / Revisión</span></div>
       <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Type count here" data-ph-en="Type count here" data-ph-es="Escriba el conteo aquí" oninput="formatThousands(this)">
     </div>
 
@@ -927,8 +927,8 @@ function submitEntry(){
 
   if(reject > 0){
     const rejectMsg = isEs
-      ? `¿Confirmar Conteo de Rechazo/Retenido?\n\n${reject.toLocaleString()}`
-      : `Confirm Reject/Hold Count?\n\n${reject.toLocaleString()}`;
+      ? `¿Confirmar Conteo de Retenido/Revisión?\n\n${reject.toLocaleString()}`
+      : `Confirm Hold/Review Count?\n\n${reject.toLocaleString()}`;
     if(!confirm(rejectMsg)) return;
   }
 
@@ -1250,7 +1250,7 @@ function sendReport(){
     if(e.flags) fullLog += ` | Flags: ${e.flags}`;
     fullLog += '\n';
   });
-  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT REJECT/HOLD: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
 
   const payload = {
     action: 'finish_report',
@@ -1441,7 +1441,7 @@ function renderJob(){
   } else {
     const sorted = [...job.entries].sort((a,b)=>b.loggedAt-a.loggedAt);
     const goodLbl = isEs ? 'CONTEO BUENO' : 'GOOD COUNT';
-    const rejLbl = isEs ? 'RECHAZO/RETENIDO' : 'REJECT/HOLD';
+    const rejLbl = isEs ? 'RETENIDO/REVISIÓN' : 'HOLD/REVIEW';
 
     // group by date, preserving most-recent-first order
     const groups = [];
@@ -1469,7 +1469,7 @@ function renderJob(){
           editRowHtml = `<div class="edit-form">
             <label>${isEs?'Conteo Bueno':'Good Count'}</label>
             <input type="text" inputmode="numeric" id="editGood_${e.id}" value="${e.good.toLocaleString()}" oninput="formatThousands(this)">
-            <label>${isEs?'Conteo de Rechazo':'Reject/Hold Count'}</label>
+            <label>${isEs?'Retenido/Revisión':'Hold/Review Count'}</label>
             <input type="text" inputmode="numeric" id="editReject_${e.id}" value="${e.reject.toLocaleString()}" oninput="formatThousands(this)">
             <div class="edit-form-btns">
               <button class="edit-cancel-btn" onclick="cancelEditEntry()">${isEs?'Cancelar':'Cancel'}</button>
@@ -1504,7 +1504,7 @@ function renderJob(){
       return `<div class="day-group">
         <div class="day-header">
           <span class="day-date">📅 ${g.date}</span>
-          <span class="day-subtotal"><span class="sg">${isEs?'Bueno':'Good'}: ${dayGood.toLocaleString()}</span> &nbsp;|&nbsp; <span class="sr">${isEs?'Rechazo':'Reject'}: ${dayReject.toLocaleString()}</span></span>
+          <span class="day-subtotal"><span class="sg">${isEs?'Bueno':'Good'}: ${dayGood.toLocaleString()}</span> &nbsp;|&nbsp; <span class="sr">${isEs?'Retenido/Revisión':'Hold/Review'}: ${dayReject.toLocaleString()}</span></span>
         </div>
         <div class="day-entries">${entriesHtml}</div>
       </div>`;
@@ -1573,7 +1573,7 @@ function escapeHtml(s){
 function renderLogEntryCards(entries){
   const isEs = document.body.classList.contains('es');
   const goodLbl = isEs ? 'CONTEO BUENO' : 'GOOD COUNT';
-  const rejLbl = isEs ? 'RECHAZO/RETENIDO' : 'REJECT/HOLD';
+  const rejLbl = isEs ? 'RETENIDO/REVISIÓN' : 'HOLD/REVIEW';
   if (!entries.length) return `<div class="dash-empty" style="padding:10px;">${isEs?'Sin registros individuales.':'No individual entries.'}</div>`;
   return entries.map(e => {
     const shiftClass = String(e.shift)==='2' ? 'shift2' : '';
@@ -1637,7 +1637,7 @@ function renderDashHistory(){
       <div class="dash-job-meta">${escapeHtml(r.Product||'')}${r.Product?' · ':''}<span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · <span data-en>Sent</span><span data-es>Enviado</span>: ${sentTs}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${Number(r['Total Good']||0).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
-        <div><b style="color:var(--accent)">${Number(r['Total Reject']||0).toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
+        <div><b style="color:var(--accent)">${Number(r['Total Reject']||0).toLocaleString()}</b>${isEs?'Retenido':'Hold'}</div>
         <div><b>${Number(r.Target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
         <div><b style="color:var(--navy)">${Number(r['Total Pallets']||0).toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
@@ -1706,7 +1706,7 @@ function renderDashLive(){
       <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'}<br><span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
-        <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
+        <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Retenido':'Hold'}</div>
         <div><b>${Number(j.target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
         <div><b style="color:var(--navy)">${j.pallets.toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
@@ -1726,7 +1726,7 @@ function renderDashData(){
     el.innerHTML = `<div class="dash-empty">${isEs?'Aún no hay datos para graficar.':'No data to chart yet.'}</div>`;
     return;
   }
-  el.innerHTML = `<div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Rechazo por trabajo':'Target vs Good vs Reject by job'}</h3><canvas id="dashChartByJob" height="260"></canvas></div>
+  el.innerHTML = `<div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Retenido por trabajo':'Target vs Good vs Hold by job'}</h3><canvas id="dashChartByJob" height="260"></canvas></div>
     <div class="dash-chart-wrap"><h3>${isEs?'Totales por estación':'Totals by station'}</h3><canvas id="dashChartByStation" height="220"></canvas></div>`;
 
   const labels = reports.map(r => String(r.PO||'—'));
@@ -1742,7 +1742,7 @@ function renderDashData(){
       datasets: [
         { label: isEs?'Meta':'Target', data: targets, backgroundColor: '#0a0a0a' },
         { label: isEs?'Bueno':'Good', data: goods, backgroundColor: '#2e7d4f' },
-        { label: isEs?'Rechazo':'Reject', data: rejects, backgroundColor: '#c8393a' },
+        { label: isEs?'Retenido':'Hold', data: rejects, backgroundColor: '#c8393a' },
         { label: isEs?'Tarimas':'Pallets', data: pallets, backgroundColor: '#ff1f8f' }
       ]
     },
@@ -1763,7 +1763,7 @@ function renderDashData(){
       labels: stLabels,
       datasets: [
         { label: isEs?'Bueno':'Good', data: stLabels.map(s=>byStation[s].good), backgroundColor: '#2e7d4f' },
-        { label: isEs?'Rechazo':'Reject', data: stLabels.map(s=>byStation[s].reject), backgroundColor: '#c8393a' }
+        { label: isEs?'Retenido':'Hold', data: stLabels.map(s=>byStation[s].reject), backgroundColor: '#c8393a' }
       ]
     },
     options: { responsive: true, scales: { y: { beginAtZero: true } } }
