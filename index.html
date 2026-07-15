@@ -86,7 +86,14 @@
   .banner-grid div{background:rgba(255,255,255,0.14);border-radius:10px;padding:10px;}
   .banner-grid .n{font-size:1.8rem;font-weight:800;}
   .banner-grid .l{font-size:0.8rem;color:#dde5f5;font-weight:600;}
-  .job-meta{font-size:1rem;color:#444;font-weight:600;margin-bottom:4px;text-align:center;}
+  /* Sits directly above the giant Good Count number — has to be unmistakable
+     about WHICH job that number belongs to, since it's the one thing standing
+     between "reading the right job's count" and "reading the wrong one." */
+  .job-meta{
+    font-size:1.05rem;color:#fff;font-weight:800;margin-bottom:10px;text-align:center;
+    background:var(--navy);border-radius:10px;padding:8px 12px;
+  }
+  .job-meta .jm-label{display:block;font-size:0.7rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#ffd6ea;margin-bottom:2px;}
 
   .shift-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .shift-btn{padding:20px 10px;font-size:1.5rem;font-weight:800;border-radius:12px;border:3px solid var(--navy);background:#fff;color:var(--navy);}
@@ -427,6 +434,17 @@ const QA_EMAIL = 'qualitygroup@moquinpress.com';
 // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW (see setup instructions)
 const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.dev/';
 
+// A PO typed as "45402" and "045402" is the same real job, but Google Sheets
+// itself strips leading zeros from anything that looks numeric once it lands
+// in a cell — so without normalizing here too, the two spellings silently
+// become two unrelated local jobs (confusing near-duplicate rows in the job
+// picker, AND a job that never sees entries logged by a device that typed
+// the PO the other way).
+function normalizePO(po){
+  const trimmed = String(po||'').trim();
+  return /^0+[0-9]+$/.test(trimmed) ? trimmed.replace(/^0+/, '') : trimmed;
+}
+
 let jobs = {};
 let drafts = {};
 let currentJobId = null;
@@ -479,6 +497,7 @@ function toggleLang(){
   // language it happened to be set in.
   renderDraftNotice();
   renderGlobalSyncStatus();
+  if (currentJobId && jobs[currentJobId] && !jobSectionsHidden) renderJob();
 }
 
 function selectStation(name){
@@ -564,6 +583,16 @@ function selectJobCard(id){
 
 function confirmContinueJob(){
   if (!pendingJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const from = currentJobId && jobs[currentJobId] ? jobs[currentJobId] : null;
+  const to = jobs[pendingJobId];
+  // Naming both jobs by name, not just requiring a second tap, so a fast-paced
+  // fat-finger switch is caught by actually reading it instead of muscle-memory
+  // tapping through a generic confirmation.
+  const msg = isEs
+    ? `¿Cambiar de "${from ? from.po : '(ninguno)'}" a "${to.po}"?\n\nDejará de registrar conteos para "${from ? from.po : '(ninguno)'}" y empezará a registrar para "${to.po}".`
+    : `Switch from "${from ? from.po : '(none)'}" to "${to.po}"?\n\nYou'll stop logging counts for "${from ? from.po : '(none)'}" and start logging for "${to.po}".`;
+  if (!confirm(msg)) return;
   currentJobId = pendingJobId;
   activateCurrentJob();
 }
@@ -645,15 +674,16 @@ function syncGateCancel(){
 }
 
 function createJob(){
-  const po = document.getElementById('njPO').value.trim();
+  const po = normalizePO(document.getElementById('njPO').value);
   const product = document.getElementById('njProduct').value.trim();
   const target = document.getElementById('njTarget').value.replace(/,/g,'').trim();
   if(!po){
     alert(document.body.classList.contains('es') ? 'Ingrese el número de trabajo.' : 'Enter job/PO number.');
     return;
   }
-  // Keyed by PO (not a random id) so the same job is recognized across
-  // devices once synced — see syncActiveEntries().
+  // Keyed by normalized PO (not a random id) so the same job is recognized
+  // across devices once synced, regardless of leading zeros — see
+  // syncActiveEntries() and normalizePO() above.
   const id = po;
   if (!jobs[id]) {
     jobs[id] = { po, product, machine: newJobStation, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [] };
@@ -1016,12 +1046,19 @@ function syncActiveEntries(manual){
   return fetchLive()
     .then(res => {
       if (res.result !== 'success') throw new Error(res.message || 'unknown error');
-      const remote = (res.active || []).filter(e => String(e.PO) === String(job.po));
+      const jobPO = normalizePO(job.po);
+      const remote = (res.active || []).filter(e => normalizePO(e.PO) === jobPO);
       const existingIds = new Set(job.entries.map(e => e.id));
       let added = 0;
       remote.forEach(e => {
-        const id = e.EntryId;
-        if (id && existingIds.has(id)) return;
+        // Legacy rows written before the entryId/idempotency feature existed
+        // have no EntryId. A random fallback id here would defeat this very
+        // dedup check on every future pull (existingIds never remembers an id
+        // it was never given), silently re-adding — and re-summing — the same
+        // row every single time a sync runs. A key derived from the row's own
+        // content is stable across pulls instead.
+        const id = e.EntryId || ('legacy_' + [e.Date, e.Time, e.Shift, e.Good, e.Reject, e.Flags].join('_'));
+        if (existingIds.has(id)) return;
         // Google Sheets auto-converts the Date/Time columns to full ISO
         // timestamps on write, which garbles them for display — the
         // Timestamp column (also a real Date, but always written the same
@@ -1030,7 +1067,7 @@ function syncActiveEntries(manual){
         const loggedAt = e.Timestamp ? new Date(e.Timestamp).getTime() : Date.now();
         const dt = new Date(loggedAt);
         job.entries.push({
-          id: id || ('remote_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+          id,
           // Google Sheets auto-types a numeric-looking Shift value as a
           // Number, which breaks the strict '2' string comparison used to
           // label shifts elsewhere — force it back to a string here.
@@ -1042,20 +1079,20 @@ function syncActiveEntries(manual){
           edited: false, originalGood: null, originalReject: null,
           synced: true // came from the backend — already known to be there
         });
-        if (id) existingIds.add(id);
+        existingIds.add(id);
         added++;
       });
-      const remotePallets = (res.pallets || []).filter(p => String(p.PO) === String(job.po));
+      const remotePallets = (res.pallets || []).filter(p => normalizePO(p.PO) === jobPO);
       // Includes already-voided local pallets so a locally-undone tap can
       // never get resurrected by the next pull (see undoPallet()).
       const existingPalletIds = new Set(job.pallets.map(p => p.id));
       remotePallets.forEach(p => {
-        const id = p.EntryId;
-        if (id && existingPalletIds.has(id)) return;
+        const id = p.EntryId || ('legacy_' + [p.Date, p.Time, p.Shift].join('_'));
+        if (existingPalletIds.has(id)) return;
         const loggedAt = p.Timestamp ? new Date(p.Timestamp).getTime() : Date.now();
         const dt = new Date(loggedAt);
         job.pallets.push({
-          id: id || ('remote_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+          id,
           shift: String(p.Shift),
           date: dt.toISOString().slice(0, 10),
           time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1063,7 +1100,7 @@ function syncActiveEntries(manual){
           synced: true,
           voided: false
         });
-        if (id) existingPalletIds.add(id);
+        existingPalletIds.add(id);
         added++;
       });
       if (added) saveAll();
@@ -1143,6 +1180,19 @@ function sendReport(){
     btn.innerHTML = originalHTML;
     if(res.result === 'success'){
       alert(isEs ? '✅ Reporte enviado a Jayro y guardado en la hoja de cálculo.' : '✅ Report sent to Jayro and saved to the spreadsheet.');
+      // The backend has now wiped this PO out of ActiveEntries (see
+      // removeActiveEntriesForPO/removePalletsForPO) — the job is DONE.
+      // Clear it locally too, or it would sit in "Active Job" indistinguishable
+      // from a still-open job, and any further counts logged against it would
+      // pile on top of the already-reported totals instead of starting fresh
+      // (this was the cause of local totals silently drifting way above what
+      // the Dashboard's Live Jobs view showed).
+      delete jobs[currentJobId];
+      saveAll();
+      clearDraft(currentJobId);
+      currentJobId = null;
+      jobSectionsHidden = false;
+      refreshJobSelect();
     } else {
       alert((isEs ? 'Error al enviar: ' : 'Error sending: ') + (res.message || 'unknown error'));
     }
@@ -1226,7 +1276,12 @@ function renderJob(){
   document.getElementById('bannerCount').textContent = totalGood.toLocaleString();
   document.getElementById('bannerHold').textContent = totalReject.toLocaleString();
   document.getElementById('bannerTarget').textContent = job.target ? job.target.toLocaleString() : '—';
-  document.getElementById('jobMetaLine').textContent = `${job.po}${job.product ? ' — '+job.product : ''} — ${job.machine}`;
+  {
+    const jmIsEs = document.body.classList.contains('es');
+    const jmLabel = jmIsEs ? 'Ahora registrando conteos para:' : 'Now logging counts for:';
+    document.getElementById('jobMetaLine').innerHTML =
+      `<span class="jm-label">${jmLabel}</span>${escapeHtml(job.po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine)}`;
+  }
 
   const isEs = document.body.classList.contains('es');
 
