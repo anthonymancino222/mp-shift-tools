@@ -92,6 +92,14 @@
   .shift-btn{padding:20px 10px;font-size:1.5rem;font-weight:800;border-radius:12px;border:3px solid var(--navy);background:#fff;color:var(--navy);}
   .shift-btn.active{background:var(--navy);color:#fff;}
 
+  /* Pallet tracking */
+  .pallet-display{text-align:center;margin-bottom:2px;}
+  .pallet-total{font-size:3.6rem;font-weight:900;color:var(--navy);line-height:1;}
+  .pallet-total-label{font-size:0.8rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+  .pallet-shift-line{text-align:center;font-size:0.95rem;font-weight:700;color:#444;margin-bottom:14px;}
+  .btn-pallet{width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;background:var(--good);color:#fff;}
+  .btn-pallet:active{background:var(--good-light);}
+
   /* Manual numeric count fields */
   .counter-block{margin-bottom:16px;}
   .counter-title{font-size:1.15rem;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
@@ -172,6 +180,8 @@
   .job-list-item.pending{border-color:var(--navy); background:var(--pink-soft);}
   .job-item-tag{font-size:0.7rem; font-weight:800; color:#888; background:var(--bg); border-radius:20px; padding:4px 10px; flex-shrink:0; margin-left:10px; white-space:nowrap;}
   .job-item-tag.active{color:var(--good); background:#d7f0df;}
+  .job-item-resume-btn{font-size:0.8rem; font-weight:800; color:#fff; background:var(--navy); border:none; border-radius:20px; padding:7px 14px; flex-shrink:0; margin-left:10px; cursor:pointer; white-space:nowrap;}
+  .job-item-resume-btn:active{background:var(--navy-light);}
 
   /* Dashboard button (sits in .top-btn-row alongside .lang-toggle — see above) */
   .dash-btn{
@@ -293,16 +303,6 @@
        stays visible even when saveProgress() collapses the sections below. -->
   <div id="draftNotice" style="display:none;text-align:center;font-size:0.95rem;font-weight:800;color:var(--good);margin-bottom:14px;padding:12px;border:2px solid var(--good);background:#e7f6ec;border-radius:10px;"></div>
 
-  <!-- Shown instead of the full entry view once saveProgress() collapses it —
-       an unmistakable "you're safe to leave, tap here to come back" prompt. -->
-  <div class="card" id="resumeJobPrompt" style="display:none;text-align:center;">
-    <div style="color:#666;font-size:0.9rem;margin-bottom:10px;">
-      <span data-en>Paused — pick a different job above, or continue this one.</span>
-      <span data-es>Pausado — elige otro trabajo arriba, o continúa con este.</span>
-    </div>
-    <button class="btn-submit" onclick="resumeJobView()">▸ <span data-en>Continue This Job</span><span data-es>Continuar Este Trabajo</span></button>
-  </div>
-
   <!-- BANNER -->
   <div id="bannerSection" style="display:none;">
     <div class="job-meta" id="jobMetaLine"></div>
@@ -320,6 +320,18 @@
   <div class="shift-toggle" id="shiftToggleSection" style="display:none;">
     <button class="shift-btn active" id="shift1Btn" onclick="setShift('1')">1<span data-en>st Shift</span><span data-es>er Turno</span></button>
     <button class="shift-btn" id="shift2Btn" onclick="setShift('2')">2<span data-en>nd Shift</span><span data-es>do Turno</span></button>
+  </div>
+
+  <!-- PALLET TRACKING -->
+  <div class="card" id="palletCard" style="display:none;">
+    <h2><span data-en>Pallets Ready for Shipping</span><span data-es>Tarimas Listas para Envío</span></h2>
+    <div class="pallet-display">
+      <div class="pallet-total" id="palletTotal">0</div>
+      <div class="pallet-total-label"><span data-en>Total Pallets</span><span data-es>Total de Tarimas</span></div>
+    </div>
+    <div class="pallet-shift-line" id="palletShiftLine"></div>
+    <button class="btn-pallet" onclick="addPallet()">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
+    <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
 
   <!-- ENTRY CARD -->
@@ -447,6 +459,7 @@ function loadAll(){
       if(e.originalGood === undefined){ e.originalGood = null; needsSave = true; }
       if(e.originalReject === undefined){ e.originalReject = null; needsSave = true; }
     });
+    if(!job.pallets){ job.pallets = []; needsSave = true; }
   });
   if(needsSave) saveAll();
 }
@@ -523,13 +536,22 @@ function renderJobList(){
     const isActive = id === currentJobId && !pendingJobId;
     const isPending = id === pendingJobId;
     const label = `${j.po}${j.product ? ' — '+j.product : ''} — ${j.machine}`;
-    const tagHtml = isActive
-      ? `<span class="job-item-tag active">✓ ${isEs?'Actual':'Current'}</span>`
-      : `<span class="job-item-tag">📋 ${isEs?'Guardado':'Saved'}</span>`;
-    return `<button type="button" class="job-list-item${isActive?' active':''}${isPending?' pending':''}" onclick="selectJobCard('${id}')">
+    let tagHtml;
+    if (isActive && jobSectionsHidden){
+      // Paused via Save Progress — a small inline button right on this
+      // job's own card, instead of a separate full-width prompt elsewhere.
+      tagHtml = `<button type="button" class="job-item-resume-btn" onclick="event.stopPropagation();resumeJobView();">▸ ${isEs?'Reanudar':'Resume'}</button>`;
+    } else if (isActive){
+      tagHtml = `<span class="job-item-tag active">✓ ${isEs?'Actual':'Current'}</span>`;
+    } else {
+      tagHtml = `<span class="job-item-tag">📋 ${isEs?'Guardado':'Saved'}</span>`;
+    }
+    // A <div>, not a <button> — needs to contain the real nested Resume
+    // button above, which isn't valid inside another <button>.
+    return `<div class="job-list-item${isActive?' active':''}${isPending?' pending':''}" onclick="selectJobCard('${id}')">
       <span class="job-item-label">${escapeHtml(label)}</span>
       ${tagHtml}
-    </button>`;
+    </div>`;
   }).join('');
   continueBtn.style.display = pendingJobId ? 'block' : 'none';
 }
@@ -567,7 +589,9 @@ let syncGatePendingCallback = null;
 function requireSyncBeforeAction(onProceed){
   const isEs = document.body.classList.contains('es');
   const job = (currentJobId && jobs[currentJobId]) ? jobs[currentJobId] : null;
-  const pending = job ? job.entries.filter(e => e.synced !== true).length : 0;
+  const pending = job
+    ? job.entries.filter(e => e.synced !== true).length + job.pallets.filter(p => p.synced !== true).length
+    : 0;
   syncGatePendingCallback = onProceed;
   document.getElementById('syncGateMsg').textContent = pending > 0
     ? (isEs
@@ -592,7 +616,9 @@ function syncGateAttempt(){
     btn.disabled = false;
     btn.innerHTML = '🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span>';
     const pending = currentJobId && jobs[currentJobId]
-      ? (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length : 0;
+      ? (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length
+        + (jobs[currentJobId].pallets||[]).filter(p => p.synced !== true).length
+      : 0;
     const msgEl = document.getElementById('syncGateMsg');
     if (pending === 0){
       msgEl.textContent = isEs ? '✅ ¡Todo sincronizado!' : '✅ All synced!';
@@ -630,7 +656,7 @@ function createJob(){
   // devices once synced — see syncActiveEntries().
   const id = po;
   if (!jobs[id]) {
-    jobs[id] = { po, product, machine: newJobStation, target: target?parseInt(target):0, createdAt: Date.now(), entries: [] };
+    jobs[id] = { po, product, machine: newJobStation, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [] };
     saveAll();
   }
   currentJobId = id;
@@ -650,6 +676,7 @@ function resumeJobView(){
   clearEntryForm();
   restoreDraft();
   renderJob();
+  renderJobList();
 }
 
 function startOver(){
@@ -703,6 +730,7 @@ function saveProgress(){
   // for this job sitting there as if nothing changed.
   jobSectionsHidden = true;
   renderJob();
+  renderJobList();
 }
 
 function restoreDraft(){
@@ -824,6 +852,68 @@ function submitEntry(){
   pushLiveEntry(jobs[currentJobId], entry);
 }
 
+/* Pallet tracking — a single tap logs one pallet leaving the gluer line as
+   "complete," no typing required. Mirrors the good/reject entry flow (own
+   id, synced flag, pushed live) so counts agree across every tablet/shift
+   instead of only living on whichever device happened to tap it.
+   Undo never calls the backend (same as editing a good/reject count doesn't
+   re-push the corrected value) — it only flips a local `voided` flag so a
+   stray tap can't resurrect via the next sync pull, and the final report
+   totals from local non-voided pallets, which is the authoritative number. */
+function addPallet(){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const pallet = {
+    id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    shift: currentShift,
+    date: new Date().toISOString().slice(0,10),
+    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+    loggedAt: Date.now(),
+    synced: false,
+    voided: false
+  };
+  job.pallets.push(pallet);
+  saveAll();
+  renderJob();
+  pushLivePallet(job, pallet);
+}
+
+function undoPallet(){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const active = job.pallets.filter(p=>!p.voided);
+  if(!active.length) return;
+  const last = active.reduce((a,b)=> b.loggedAt > a.loggedAt ? b : a);
+  last.voided = true;
+  saveAll();
+  renderJob();
+}
+
+const palletPushesInFlight = new Map();
+function pushLivePallet(job, pallet){
+  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve(false);
+  if (palletPushesInFlight.has(pallet.id)) return palletPushesInFlight.get(pallet.id);
+  const p = fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'log_pallet',
+      po: job.po, product: job.product || '', station: job.machine,
+      shift: pallet.shift, date: pallet.date, time: pallet.time, entryId: pallet.id
+    })
+  }).then(res => res.json()).then(res => {
+    palletPushesInFlight.delete(pallet.id);
+    if (res.result === 'success'){
+      pallet.synced = true;
+      saveAll();
+      renderGlobalSyncStatus();
+      return true;
+    }
+    return false;
+  }).catch(function(){ palletPushesInFlight.delete(pallet.id); return false; });
+  palletPushesInFlight.set(pallet.id, p);
+  return p;
+}
+
 /* GET requests for live data (Dashboard, Sync) must never be cached — a
    stale response here silently hides other devices' entries. cache:'no-store'
    plus a cache-busting query param covers both the browser's own cache and
@@ -846,6 +936,7 @@ function pendingSyncCount(){
   let n = 0;
   Object.values(jobs).forEach(job => {
     (job.entries||[]).forEach(e => { if (e.synced !== true) n++; });
+    (job.pallets||[]).forEach(p => { if (p.synced !== true) n++; });
   });
   return n;
 }
@@ -909,6 +1000,9 @@ function retryPendingSyncs(){
     (job.entries||[]).forEach(entry => {
       if (entry.synced !== true) pushes.push(pushLiveEntry(job, entry));
     });
+    (job.pallets||[]).forEach(pallet => {
+      if (pallet.synced !== true) pushes.push(pushLivePallet(job, pallet));
+    });
   });
   return Promise.all(pushes);
 }
@@ -951,6 +1045,27 @@ function syncActiveEntries(manual){
         if (id) existingIds.add(id);
         added++;
       });
+      const remotePallets = (res.pallets || []).filter(p => String(p.PO) === String(job.po));
+      // Includes already-voided local pallets so a locally-undone tap can
+      // never get resurrected by the next pull (see undoPallet()).
+      const existingPalletIds = new Set(job.pallets.map(p => p.id));
+      remotePallets.forEach(p => {
+        const id = p.EntryId;
+        if (id && existingPalletIds.has(id)) return;
+        const loggedAt = p.Timestamp ? new Date(p.Timestamp).getTime() : Date.now();
+        const dt = new Date(loggedAt);
+        job.pallets.push({
+          id: id || ('remote_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+          shift: String(p.Shift),
+          date: dt.toISOString().slice(0, 10),
+          time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          loggedAt: loggedAt,
+          synced: true,
+          voided: false
+        });
+        if (id) existingPalletIds.add(id);
+        added++;
+      });
       if (added) saveAll();
       renderJob();
     })
@@ -980,6 +1095,7 @@ function sendReport(){
 
   const totalGood = job.entries.reduce((s,e)=>s+e.good,0);
   const totalReject = job.entries.reduce((s,e)=>s+e.reject,0);
+  const totalPallets = job.pallets.filter(p=>!p.voided).length;
 
   const subject = `Shift Count Report — ${job.po} (${job.machine})`;
   let fullLog = '';
@@ -990,7 +1106,7 @@ function sendReport(){
     if(e.flags) fullLog += ` | Flags: ${e.flags}`;
     fullLog += '\n';
   });
-  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT REJECT/HOLD: ${totalReject.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT REJECT/HOLD: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
 
   const payload = {
     action: 'finish_report',
@@ -998,7 +1114,7 @@ function sendReport(){
     product: job.product || '',
     station: job.machine,
     target: job.target || 0,
-    totalGood, totalReject,
+    totalGood, totalReject, totalPallets,
     subject, body,
     fullLog
   };
@@ -1080,26 +1196,26 @@ function renderJob(){
   renderGlobalSyncStatus();
   const banner = document.getElementById('bannerSection');
   const shiftSec = document.getElementById('shiftToggleSection');
+  const palletCard = document.getElementById('palletCard');
   const logCard = document.getElementById('logCard');
   const historyCard = document.getElementById('historyCard');
   const deleteCard = document.getElementById('deleteCard');
-  const resumePrompt = document.getElementById('resumeJobPrompt');
 
   const validJob = currentJobId && jobs[currentJobId];
   if(!validJob || jobSectionsHidden){
     banner.style.display='none';
     shiftSec.style.display='none';
+    palletCard.style.display='none';
     logCard.style.display='none';
     historyCard.style.display='none';
     deleteCard.style.display='none';
-    resumePrompt.style.display = (validJob && jobSectionsHidden) ? 'block' : 'none';
     return;
   }
-  resumePrompt.style.display='none';
 
   const job = jobs[currentJobId];
   banner.style.display='block';
   shiftSec.style.display='grid';
+  palletCard.style.display='block';
   logCard.style.display='block';
   historyCard.style.display='block';
   deleteCard.style.display='block';
@@ -1113,6 +1229,14 @@ function renderJob(){
   document.getElementById('jobMetaLine').textContent = `${job.po}${job.product ? ' — '+job.product : ''} — ${job.machine}`;
 
   const isEs = document.body.classList.contains('es');
+
+  const activePallets = job.pallets.filter(p=>!p.voided);
+  const totalPallets = activePallets.length;
+  const shiftPallets = activePallets.filter(p=>p.shift===currentShift).length;
+  document.getElementById('palletTotal').textContent = totalPallets.toLocaleString();
+  document.getElementById('palletShiftLine').textContent = isEs
+    ? `Este turno: ${shiftPallets} — Total: ${totalPallets}`
+    : `This shift: ${shiftPallets} — Total: ${totalPallets}`;
   const list = document.getElementById('historyList');
   if(job.entries.length === 0){
     list.innerHTML = `<div class="empty-state">${isEs?'Aún no hay registros.':'No entries yet.'}</div>`;
@@ -1317,6 +1441,7 @@ function renderDashHistory(){
         <div><b style="color:var(--good)">${Number(r['Total Good']||0).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
         <div><b style="color:var(--accent)">${Number(r['Total Reject']||0).toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
         <div><b>${Number(r.Target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
+        <div><b style="color:var(--navy)">${Number(r['Total Pallets']||0).toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parsedEntries)}</div>
@@ -1328,7 +1453,8 @@ function renderDashLive(){
   const isEs = document.body.classList.contains('es');
   const el = document.getElementById('dashTabLive');
   const active = dashData.active || [];
-  if (!active.length){
+  const activePallets = dashData.pallets || [];
+  if (!active.length && !activePallets.length){
     el.innerHTML = `<div class="dash-empty">${isEs?'No hay trabajos activos en ningún dispositivo.':'No active jobs on any device.'}</div>`;
     return;
   }
@@ -1343,7 +1469,7 @@ function renderDashLive(){
       seenIds.add(e.EntryId);
     }
     const po = e.PO;
-    if (!byPo[po]) byPo[po] = { po, product: e.Product, station: e.Station, target: e.Target, good: 0, reject: 0, count: 0, lastTs: null, entries: [] };
+    if (!byPo[po]) byPo[po] = { po, product: e.Product, station: e.Station, target: e.Target, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
     byPo[po].good += Number(e.Good)||0;
     byPo[po].reject += Number(e.Reject)||0;
     byPo[po].count++;
@@ -1357,6 +1483,18 @@ function renderDashLive(){
       time: ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''
     });
   });
+  const seenPalletIds = new Set();
+  activePallets.forEach(p => {
+    if (p.EntryId){
+      if (seenPalletIds.has(p.EntryId)) return;
+      seenPalletIds.add(p.EntryId);
+    }
+    const po = p.PO;
+    if (!byPo[po]) byPo[po] = { po, product: p.Product, station: p.Station, target: 0, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
+    byPo[po].pallets++;
+    const ts = p.Timestamp ? new Date(p.Timestamp) : null;
+    if (ts && (!byPo[po].lastTs || ts > byPo[po].lastTs)) byPo[po].lastTs = ts;
+  });
   const jobsList = Object.values(byPo).sort((a,b) => (b.lastTs||0) - (a.lastTs||0));
   el.innerHTML = jobsList.map((j,i) => {
     const logId = 'livelog_' + i;
@@ -1369,6 +1507,7 @@ function renderDashLive(){
         <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
         <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Rechazo':'Reject'}</div>
         <div><b>${Number(j.target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
+        <div><b style="color:var(--navy)">${j.pallets.toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(sortedEntries)}</div>
@@ -1393,6 +1532,7 @@ function renderDashData(){
   const targets = reports.map(r => Number(r.Target)||0);
   const goods = reports.map(r => Number(r['Total Good'])||0);
   const rejects = reports.map(r => Number(r['Total Reject'])||0);
+  const pallets = reports.map(r => Number(r['Total Pallets'])||0);
 
   dashCharts.push(new Chart(document.getElementById('dashChartByJob'), {
     type: 'bar',
@@ -1401,7 +1541,8 @@ function renderDashData(){
       datasets: [
         { label: isEs?'Meta':'Target', data: targets, backgroundColor: '#0a0a0a' },
         { label: isEs?'Bueno':'Good', data: goods, backgroundColor: '#2e7d4f' },
-        { label: isEs?'Rechazo':'Reject', data: rejects, backgroundColor: '#c8393a' }
+        { label: isEs?'Rechazo':'Reject', data: rejects, backgroundColor: '#c8393a' },
+        { label: isEs?'Tarimas':'Pallets', data: pallets, backgroundColor: '#ff1f8f' }
       ]
     },
     options: { responsive: true, scales: { y: { beginAtZero: true } } }
