@@ -44,6 +44,14 @@
     <button class="btn" onclick="scanAndPush()">Scan &amp; attempt manual push</button>
     <div class="out" id="scanOut"></div>
   </div>
+
+  <div class="card">
+    <h2>Inspect raw server data for a PO</h2>
+    <p style="font-size:0.85rem;color:#666;margin-top:-4px;">Shows every ActiveEntries and Pallets row the server actually has for this PO, across ALL passes — for comparing what's really there against what the app displays.</p>
+    <input id="inspectPO" placeholder="e.g. 46907" style="width:100%;padding:10px;font-size:1rem;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+    <button class="btn" onclick="inspectPO()">Fetch raw data</button>
+    <div class="out" id="inspectOut"></div>
+  </div>
 </div>
 
 <script>
@@ -195,6 +203,26 @@ function scanAndPush(){
     .then(r => r.text().then(t => ({status:r.status, text:t})))
     .then(res => { out.textContent += `\n\nServer responded (HTTP ${res.status}):\n${res.text}`; })
     .catch(err => { out.textContent += `\n\nNetwork-level failure:\n${err.message}`; });
+}
+
+function inspectPO(){
+  const out = document.getElementById('inspectOut');
+  const target = normalizePO(document.getElementById('inspectPO').value);
+  if (!target){ out.textContent = 'Enter a PO first.'; return; }
+  out.textContent = 'Contacting server...';
+  fetch(REPORT_ENDPOINT_URL + '?_=' + Date.now(), { method:'GET', cache:'no-store' })
+    .then(r => r.json())
+    .then(res => {
+      if (res.result !== 'success'){ out.textContent = 'Could not reach server: ' + (res.message||'unknown error'); return; }
+      const entries = (res.active||[]).filter(e => normalizePO(e.PO) === target);
+      const pallets = (res.pallets||[]).filter(p => normalizePO(p.PO) === target);
+      const reports = (res.reports||[]).filter(r => normalizePO(r.PO) === target);
+      out.textContent =
+        `=== ActiveEntries rows (${entries.length}) ===\n` + JSON.stringify(entries, null, 1) +
+        `\n\n=== Pallets rows (${pallets.length}) ===\n` + JSON.stringify(pallets, null, 1) +
+        `\n\n=== Finished Reports rows (${reports.length}) ===\n` + JSON.stringify(reports, null, 1);
+    })
+    .catch(err => { out.textContent = 'Network error: ' + err.message; });
 }
 
 renderJobList();
