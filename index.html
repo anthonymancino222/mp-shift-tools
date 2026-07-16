@@ -79,6 +79,14 @@
     border:3px solid var(--navy);background:#fff;color:var(--navy);
   }
   .station-btn.selected{background:var(--navy);color:#fff;}
+  /* Suggested-but-not-yet-confirmed (e.g. a Pass carried over from a QA-app
+     deep link) — visually distinct from .selected so it's obvious this
+     still needs an actual tap, not just a glance. */
+  .station-btn.suggested{background:#fff3cd;border-color:var(--warn);color:#5c4400;border-style:dashed;}
+  .pass-hint{
+    font-size:0.85rem;font-weight:700;color:#5c4400;background:#fff3cd;
+    border-radius:8px;padding:8px 12px;margin-bottom:6px;
+  }
   /* Pass buttons — its own 3-up grid since Station stays 2-up */
   .pass-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px;}
 
@@ -235,6 +243,31 @@
   .modal-box button{margin-bottom:8px;}
   .modal-cancel-btn{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:1px solid var(--border);background:#fff;color:#666;cursor:pointer;}
 
+  /* Notes — a button + red count badge, never the notes themselves sitting
+     permanently on-screen (see the modal below instead). */
+  .notes-btn{
+    position:relative;display:inline-flex;align-items:center;gap:6px;
+    background:var(--pink-soft);color:var(--navy);border:2px solid var(--navy);
+    border-radius:20px;padding:8px 14px;font-weight:700;font-size:0.9rem;cursor:pointer;
+    margin-bottom:10px;
+  }
+  .notes-btn:active{background:var(--navy);color:#fff;}
+  .notes-btn.small{padding:4px 9px;font-size:0.8rem;border-width:1px;border-radius:8px;margin-bottom:0;}
+  .notes-badge{
+    background:var(--accent);color:#fff;border-radius:50%;min-width:18px;height:18px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:800;padding:0 4px;line-height:1;
+  }
+  .notes-modal-box{max-width:480px;}
+  .notes-list{max-height:260px;overflow-y:auto;margin-bottom:14px;}
+  .note-card{background:var(--bg);border-left:4px solid var(--warn);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:0.9rem;}
+  .note-card .note-lock{font-size:0.75rem;font-weight:700;color:var(--warn);margin-bottom:4px;}
+  .note-card .note-text{color:var(--text);white-space:pre-wrap;}
+  .notes-empty{text-align:center;color:#888;padding:16px;font-size:0.9rem;}
+  #notesModalInput{
+    width:100%;padding:10px;font-size:1rem;border:1px solid var(--border);border-radius:8px;
+    margin-top:4px;margin-bottom:10px;font-family:inherit;resize:vertical;
+  }
+
   /* Dashboard overlay */
   .dash-overlay{display:none;position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;}
   .dash-overlay.open{display:block;}
@@ -336,6 +369,7 @@
       </div>
 
       <label><span data-en>Pass (required)</span><span data-es>Pasada (obligatorio)</span></label>
+      <div class="pass-hint" id="passSuggestHint" style="display:none;"></div>
       <div class="pass-grid">
         <button type="button" class="station-btn" id="pass1Btn" onclick="selectPass('1')">
           <span data-en>1st Pass</span><span data-es>1ra Pasada</span>
@@ -361,6 +395,7 @@
   <!-- BANNER -->
   <div id="bannerSection" style="display:none;">
     <div class="job-meta" id="jobMetaLine"></div>
+    <button class="notes-btn" id="jobNotesBtn">📝 <span data-en>Notes</span><span data-es>Notas</span><span class="notes-badge" id="jobNotesBadge" style="display:none;">0</span></button>
     <div class="handoff-banner">
       <div class="label"><span data-en>Current Good Count</span><span data-es>Conteo Bueno Actual</span></div>
       <div class="count" id="bannerCount">0</div>
@@ -448,6 +483,21 @@
   </div>
 </div>
 
+<!-- NOTES — job-level or entry-level, opened via a 📝 button so notes never
+     sit permanently on-screen (a job with many notes would otherwise fill the
+     whole page). Notes are append-only/locked: once added there is no edit or
+     delete control, on purpose. -->
+<div class="modal-overlay" id="notesModalOverlay">
+  <div class="modal-box notes-modal-box">
+    <h3 id="notesModalTitle">Notes</h3>
+    <div class="notes-list" id="notesModalList"></div>
+    <label><span data-en>Add a note (for your manager)</span><span data-es>Agregar una nota (para su gerente)</span></label>
+    <textarea id="notesModalInput" rows="3" data-ph-en="Type a note…" data-ph-es="Escriba una nota…" placeholder="Type a note…"></textarea>
+    <button class="btn-submit" onclick="submitNoteFromModal()">📝 <span data-en>Add Note</span><span data-es>Agregar Nota</span></button>
+    <button class="modal-cancel-btn" onclick="closeNotesModal()"><span data-en>Close</span><span data-es>Cerrar</span></button>
+  </div>
+</div>
+
 <!-- DASHBOARD — History (past sent reports), Live Jobs (active on any device), Data (charts) -->
 <div class="dash-overlay" id="dashOverlay">
   <div class="dash-header">
@@ -513,6 +563,8 @@ let newJobStation = null;
 let newJobPass = null;
 let selectedFlags = [];
 let editingEntryId = null;
+// Which job/entry the Notes modal is currently open for — null when closed.
+let notesModalContext = null;
 // Set by saveProgress() so renderJob() collapses back to the minimal
 // "no job selected" layout — a clear, unmistakable signal that it's safe to
 // jump to another job. Cleared by confirmContinueJob()/createJob() or the resume button.
@@ -537,8 +589,10 @@ function loadAll(){
       if(e.edited === undefined){ e.edited = false; needsSave = true; }
       if(e.originalGood === undefined){ e.originalGood = null; needsSave = true; }
       if(e.originalReject === undefined){ e.originalReject = null; needsSave = true; }
+      if(!e.notes){ e.notes = []; needsSave = true; }
     });
     if(!job.pallets){ job.pallets = []; needsSave = true; }
+    if(!job.notes){ job.notes = []; needsSave = true; }
   });
   if(needsSave) saveAll();
 }
@@ -575,6 +629,27 @@ function selectPass(pass){
   document.getElementById('pass1Btn').classList.toggle('selected', pass==='1');
   document.getElementById('pass2Btn').classList.toggle('selected', pass==='2');
   document.getElementById('passSBtn').classList.toggle('selected', pass==='S');
+  // An actual tap always wins over a carried-over suggestion, whichever
+  // pass got tapped — clear the dashed highlight and hint either way.
+  ['pass1Btn','pass2Btn','passSBtn'].forEach(function(id){ document.getElementById(id).classList.remove('suggested'); });
+  document.getElementById('passSuggestHint').style.display = 'none';
+}
+
+/* Highlights a Pass button as a SUGGESTION (dashed, not filled) without
+   setting newJobPass — unlike selectPass(), this does not satisfy
+   createJob()'s required-field check. Used for values arriving via a QA-app
+   deep link: that source is decent but not certain (see _gluerPassForHandoff
+   in the QA app — it falls back to Single Pass whenever More Options hasn't
+   been answered yet), and getting Pass wrong doesn't just mislabel this job,
+   it silently files counts under the wrong job entirely (id = po + '_p' +
+   pass). So Pass still needs an explicit tap, same as manual entry. */
+function suggestPass(pass){
+  var isEs = document.body.classList.contains('es');
+  var btnId = pass === '1' ? 'pass1Btn' : pass === '2' ? 'pass2Btn' : 'passSBtn';
+  document.getElementById(btnId).classList.add('suggested');
+  var hint = document.getElementById('passSuggestHint');
+  hint.textContent = (isEs ? '💡 Sugerido: ' : '💡 Suggested: ') + passLabel(pass, isEs) + (isEs ? ' — toque para confirmar' : ' — tap to confirm');
+  hint.style.display = 'block';
 }
 
 function passLabel(pass, isEs){
@@ -582,6 +657,108 @@ function passLabel(pass, isEs){
   if (pass === '2') return isEs ? '2da Pasada' : '2nd Pass';
   if (pass === 'S') return isEs ? 'Pasada Única' : 'Single Pass';
   return '';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   NOTES — job-level or entry-level, free-text only (no quality-issue
+   categorization, unlike the QA Checklist app's version). Notes are
+   append-only/locked: adding one requires a confirm(), and there is no edit
+   or delete control anywhere in this app once it's saved. They never sit
+   permanently on-screen — only a button + red count badge does, opening a
+   modal that lists everything added so far.
+══════════════════════════════════════════════════════════════════ */
+function getNotesArray(scope, jobId, entryId){
+  const job = jobs[jobId];
+  if (!job) return null;
+  if (scope === 'job') return job.notes;
+  const entry = (job.entries||[]).find(e => e.id === entryId);
+  return entry ? entry.notes : null;
+}
+
+function openNotesModal(scope, jobId, entryId){
+  notesModalContext = { scope, jobId, entryId };
+  renderNotesModalContent();
+  document.getElementById('notesModalOverlay').classList.add('open');
+}
+
+function closeNotesModal(){
+  document.getElementById('notesModalOverlay').classList.remove('open');
+  notesModalContext = null;
+}
+
+function renderNotesModalContent(){
+  if (!notesModalContext) return;
+  const isEs = document.body.classList.contains('es');
+  const job = jobs[notesModalContext.jobId];
+  const titleEl = document.getElementById('notesModalTitle');
+  titleEl.textContent = notesModalContext.scope === 'job'
+    ? (isEs?'Notas para: ':'Notes for: ') + (job ? job.po : '')
+    : (isEs?'Notas para este registro':'Notes for this entry');
+
+  const notes = getNotesArray(notesModalContext.scope, notesModalContext.jobId, notesModalContext.entryId) || [];
+  const listEl = document.getElementById('notesModalList');
+  listEl.innerHTML = notes.length
+    ? notes.slice().sort((a,b)=>a.loggedAt-b.loggedAt).map(n => `
+        <div class="note-card">
+          <div class="note-lock">🔒 ${isEs?'Bloqueada':'Locked'} — ${new Date(n.loggedAt).toLocaleString()}</div>
+          <div class="note-text">${escapeHtml(n.text)}</div>
+        </div>`).join('')
+    : `<div class="notes-empty">${isEs?'Aún no hay notas.':'No notes yet.'}</div>`;
+  document.getElementById('notesModalInput').value = '';
+}
+
+function submitNoteFromModal(){
+  if (!notesModalContext) return;
+  const isEs = document.body.classList.contains('es');
+  const textarea = document.getElementById('notesModalInput');
+  const text = textarea.value.trim();
+  if (!text){
+    alert(isEs ? 'Escriba una nota primero.' : 'Type a note first.');
+    return;
+  }
+  const confirmMsg = isEs
+    ? `¿Agregar esta nota? Quedará bloqueada permanentemente — no se podrá editar ni eliminar después.\n\n"${text}"`
+    : `Add this note? It will be permanently locked — it cannot be edited or removed afterward.\n\n"${text}"`;
+  if (!confirm(confirmMsg)) return;
+
+  const job = jobs[notesModalContext.jobId];
+  if (!job) return;
+  const note = {
+    id: 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    text, loggedAt: Date.now(), synced: false
+  };
+  const arr = getNotesArray(notesModalContext.scope, notesModalContext.jobId, notesModalContext.entryId);
+  if (!arr) return;
+  arr.push(note);
+  saveAll();
+  pushLiveNote(job, note, notesModalContext.scope, notesModalContext.entryId);
+  renderNotesModalContent();
+  renderJob();
+}
+
+const notePushesInFlight = new Map();
+function pushLiveNote(job, note, scope, entryId){
+  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve(false);
+  if (notePushesInFlight.has(note.id)) return notePushesInFlight.get(note.id);
+  const p = fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'add_note',
+      po: job.po, station: job.machine, pass: job.pass || '',
+      scope, entryId: entryId || '', noteId: note.id, text: note.text
+    })
+  }).then(res => res.json()).then(res => {
+    notePushesInFlight.delete(note.id);
+    if (res.result === 'success'){
+      note.synced = true;
+      saveAll();
+      renderGlobalSyncStatus();
+      return true;
+    }
+    return false;
+  }).catch(function(){ notePushesInFlight.delete(note.id); return false; });
+  notePushesInFlight.set(note.id, p);
+  return p;
 }
 
 /* Job picker — each saved job is its own tappable card (see .job-list-item),
@@ -676,6 +853,47 @@ function confirmContinueJob(){
   activateCurrentJob();
 }
 
+/* Deep-link prefill from the QA Checklist app — when a gluer job's operator
+   taps "Open Shift Handoff" there, it opens this app with ?po=&product=&
+   station=&pass=&qty= so Job/PO #, Product #, and Qty carry over instead of
+   being retyped. Station gets pre-SELECTED — it's a deliberate choice
+   already made in the QA app for THIS specific job, not stale leftover
+   state from an unrelated previous job (which is what toggleNewJobForm()'s
+   reset-on-open guards against), and getting it wrong is just a wrong
+   label. Pass only gets SUGGESTED (see suggestPass()), never pre-selected:
+   it's part of the job's storage key (po + '_p' + pass), so a wrong Pass
+   doesn't just mislabel the job, it silently files counts under the wrong
+   one — and the QA app's guess can be wrong whenever its More Options
+   field hasn't been answered yet. Pass still needs an explicit tap. */
+function _applyPrefillFromURL(){
+  var params = new URLSearchParams(location.search);
+  var po = params.get('po');
+  if (!po) return;
+  var product = params.get('product') || '';
+  var station = params.get('station') || '';
+  var pass = params.get('pass') || '';
+  var qty = params.get('qty') || '';
+
+  var passKey = (pass === '1' || pass === '2' || pass === 'S') ? pass : 'S';
+  var existingId = normalizePO(po) + '_p' + passKey;
+  if (jobs[existingId]) {
+    // Already created (deep-linked before, or entered manually) — just switch to it.
+    currentJobId = existingId;
+    activateCurrentJob();
+    return;
+  }
+
+  requireSyncBeforeAction(function(){
+    document.getElementById('njPO').value = po;
+    document.getElementById('njProduct').value = product;
+    if (qty) { var q = parseInt(qty, 10); if (q > 0) document.getElementById('njTarget').value = q.toLocaleString('en-US'); }
+    if (station === 'Long Gluer' || station === 'Short Gluer') selectStation(station);
+    if (pass === '1' || pass === '2' || pass === 'S') suggestPass(pass);
+    document.getElementById('newJobForm').style.display = 'block';
+    document.getElementById('newJobForm').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+}
+
 function toggleNewJobForm(){
   const f = document.getElementById('newJobForm');
   const opening = f.style.display === 'none';
@@ -690,6 +908,8 @@ function toggleNewJobForm(){
     document.getElementById('pass1Btn').classList.remove('selected');
     document.getElementById('pass2Btn').classList.remove('selected');
     document.getElementById('passSBtn').classList.remove('selected');
+    ['pass1Btn','pass2Btn','passSBtn'].forEach(function(id){ document.getElementById(id).classList.remove('suggested'); });
+    document.getElementById('passSuggestHint').style.display = 'none';
     f.style.display = 'block';
   });
 }
@@ -708,9 +928,7 @@ let syncGatePendingCallback = null;
 function requireSyncBeforeAction(onProceed){
   const isEs = document.body.classList.contains('es');
   const job = (currentJobId && jobs[currentJobId]) ? jobs[currentJobId] : null;
-  const pending = job
-    ? job.entries.filter(e => e.synced !== true).length + job.pallets.filter(p => p.synced !== true).length
-    : 0;
+  const pending = job ? pendingCountForJob(job) : 0;
   syncGatePendingCallback = onProceed;
   document.getElementById('syncGateMsg').textContent = pending > 0
     ? (isEs
@@ -734,10 +952,7 @@ function syncGateAttempt(){
     renderGlobalSyncStatus();
     btn.disabled = false;
     btn.innerHTML = '🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span>';
-    const pending = currentJobId && jobs[currentJobId]
-      ? (jobs[currentJobId].entries||[]).filter(e => e.synced !== true).length
-        + (jobs[currentJobId].pallets||[]).filter(p => p.synced !== true).length
-      : 0;
+    const pending = currentJobId && jobs[currentJobId] ? pendingCountForJob(jobs[currentJobId]) : 0;
     const msgEl = document.getElementById('syncGateMsg');
     if (pending === 0){
       msgEl.textContent = isEs ? '✅ ¡Todo sincronizado!' : '✅ All synced!';
@@ -796,7 +1011,7 @@ function createJob(){
   // the 2nd pass never inherits the 1st pass's running total.
   const id = po + '_p' + newJobPass;
   if (!jobs[id]) {
-    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [] };
+    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [], notes: [] };
     saveAll();
   }
   currentJobId = id;
@@ -984,7 +1199,8 @@ function submitEntry(){
     edited: false,
     originalGood: null,
     originalReject: null,
-    synced: false
+    synced: false,
+    notes: []
   };
   jobs[currentJobId].entries.push(entry);
   saveAll();
@@ -1074,12 +1290,20 @@ function fetchLive(){
    timer) as well as via the manual "Sync Now" button — nothing depends
    on a person remembering to tap it.
 ══════════════════════════════════════════════════════════════════ */
+// Shared by the global sync bar, the sync-gate modal, and the per-job sync
+// message — one definition of "how many things in this job aren't synced
+// yet" (entries, pallets, and now notes at both the job and entry level).
+function pendingCountForJob(job){
+  const entryNotes = (job.entries||[]).reduce((s,e) => s + (e.notes||[]).filter(note => note.synced !== true).length, 0);
+  return (job.entries||[]).filter(e => e.synced !== true).length
+    + (job.pallets||[]).filter(p => p.synced !== true).length
+    + (job.notes||[]).filter(note => note.synced !== true).length
+    + entryNotes;
+}
+
 function pendingSyncCount(){
   let n = 0;
-  Object.values(jobs).forEach(job => {
-    (job.entries||[]).forEach(e => { if (e.synced !== true) n++; });
-    (job.pallets||[]).forEach(p => { if (p.synced !== true) n++; });
-  });
+  Object.values(jobs).forEach(job => { n += pendingCountForJob(job); });
   return n;
 }
 
@@ -1093,8 +1317,7 @@ function jobsWithPendingSync(){
   const isEs = document.body.classList.contains('es');
   const pos = [];
   Object.values(jobs).forEach(job => {
-    const n = (job.entries||[]).filter(e => e.synced !== true).length
-      + (job.pallets||[]).filter(p => p.synced !== true).length;
+    const n = pendingCountForJob(job);
     // Include the pass — two jobs can now share the same PO (1st Pass / 2nd
     // Pass), so the bare PO alone would be ambiguous about which one is stuck.
     if (n > 0) pos.push(job.po + (job.pass ? ' ('+passLabel(job.pass, isEs)+')' : ''));
@@ -1163,9 +1386,15 @@ function retryPendingSyncs(){
   Object.values(jobs).forEach(job => {
     (job.entries||[]).forEach(entry => {
       if (entry.synced !== true) pushes.push(pushLiveEntry(job, entry));
+      (entry.notes||[]).forEach(note => {
+        if (note.synced !== true) pushes.push(pushLiveNote(job, note, 'entry', entry.id));
+      });
     });
     (job.pallets||[]).forEach(pallet => {
       if (pallet.synced !== true) pushes.push(pushLivePallet(job, pallet));
+    });
+    (job.notes||[]).forEach(note => {
+      if (note.synced !== true) pushes.push(pushLiveNote(job, note, 'job', null));
     });
   });
   return Promise.all(pushes);
@@ -1217,7 +1446,8 @@ function syncActiveEntries(manual){
           good: Number(e.Good) || 0, reject: Number(e.Reject) || 0, flags: e.Flags || '',
           loggedAt: loggedAt,
           edited: false, originalGood: null, originalReject: null,
-          synced: true // came from the backend — already known to be there
+          synced: true, // came from the backend — already known to be there
+          notes: []
         });
         existingIds.add(id);
         added++;
@@ -1242,6 +1472,37 @@ function syncActiveEntries(manual){
           voided: false
         });
         existingPalletIds.add(id);
+        added++;
+      });
+      const remoteNotes = (res.notes || []).filter(n =>
+        normalizePO(n.PO) === jobPO && (!jobPass || String(n.Pass||'') === jobPass));
+      const existingJobNoteIds = new Set(job.notes.map(n => n.id));
+      remoteNotes.filter(n => n.Scope === 'job').forEach(n => {
+        const id = n.NoteId;
+        if (!id || existingJobNoteIds.has(id)) return;
+        job.notes.push({
+          id, text: n.Text || '',
+          loggedAt: n.Timestamp ? new Date(n.Timestamp).getTime() : Date.now(),
+          synced: true
+        });
+        existingJobNoteIds.add(id);
+        added++;
+      });
+      // Entry-level notes need their parent entry to exist locally first —
+      // if the entry hasn't synced down yet, its notes just wait for a later
+      // pull once the entry itself is here (same eventual-consistency model
+      // as everything else in this app).
+      remoteNotes.filter(n => n.Scope === 'entry').forEach(n => {
+        const entry = job.entries.find(e => e.id === n.EntryId);
+        if (!entry) return;
+        if (!entry.notes) entry.notes = [];
+        const id = n.NoteId;
+        if (!id || entry.notes.some(x => x.id === id)) return;
+        entry.notes.push({
+          id, text: n.Text || '',
+          loggedAt: n.Timestamp ? new Date(n.Timestamp).getTime() : Date.now(),
+          synced: true
+        });
         added++;
       });
       if (added) saveAll();
@@ -1285,7 +1546,27 @@ function sendReport(){
     if(e.flags) fullLog += ` | Flags: ${e.flags}`;
     fullLog += '\n';
   });
-  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}`;
+  // Notes get cleared server-side once this job finishes (see
+  // removeNotesForPO in apps_script_backend.gs), so this report is the only
+  // permanent record of them from here on — capture everything now.
+  let notesText = '';
+  if (job.notes.length){
+    notesText += '\n--- Job Notes ---\n';
+    job.notes.slice().sort((a,b)=>a.loggedAt-b.loggedAt).forEach(n=>{
+      notesText += `${new Date(n.loggedAt).toLocaleString()} | ${n.text}\n`;
+    });
+  }
+  const entryNotesList = [];
+  sorted.forEach(e=>{
+    (e.notes||[]).forEach(n=>{ entryNotesList.push({ entryTime: `${e.date} ${e.time}`, ...n }); });
+  });
+  if (entryNotesList.length){
+    notesText += '\n--- Entry Notes ---\n';
+    entryNotesList.sort((a,b)=>a.loggedAt-b.loggedAt).forEach(n=>{
+      notesText += `${new Date(n.loggedAt).toLocaleString()} (re: entry ${n.entryTime}) | ${n.text}\n`;
+    });
+  }
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
 
   const payload = {
     action: 'finish_report',
@@ -1407,6 +1688,7 @@ function renderJob(){
   if(!validJob || jobSectionsHidden){
     banner.style.display='none';
     previewHint.style.display='none';
+    document.getElementById('jobNotesBtn').style.display='none';
     shiftSec.style.display='none';
     palletCard.style.display='none';
     logCard.style.display='none';
@@ -1420,6 +1702,10 @@ function renderJob(){
 
   if (pendingJobId){
     previewHint.style.display='block';
+    // Notes aren't shown/editable during preview either — same reasoning as
+    // the rest of the interactive section: nothing should be addable to a
+    // job that hasn't actually been confirmed/switched to yet.
+    document.getElementById('jobNotesBtn').style.display='none';
     shiftSec.style.display='none';
     palletCard.style.display='none';
     logCard.style.display='none';
@@ -1459,6 +1745,16 @@ function renderJob(){
     const jmPass = passLabel(job.pass, jmIsEs);
     document.getElementById('jobMetaLine').innerHTML =
       `<span class="jm-label">${jmLabel}</span>${escapeHtml(job.po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine)}${jmPass ? ' — '+escapeHtml(jmPass) : ''}`;
+  }
+
+  {
+    const notesBtn = document.getElementById('jobNotesBtn');
+    notesBtn.style.display = 'inline-flex';
+    notesBtn.onclick = () => openNotesModal('job', previewId, null);
+    const badge = document.getElementById('jobNotesBadge');
+    const noteCount = (job.notes||[]).length;
+    badge.style.display = noteCount ? 'inline-flex' : 'none';
+    badge.textContent = noteCount;
   }
 
   const isEs = document.body.classList.contains('es');
@@ -1533,6 +1829,7 @@ function renderJob(){
           </div>
           <div class="entry-flags">${e.flags||''}</div>
           ${e.synced !== true ? `<div class="entry-pending-tag">⚠ ${isEs?'No sincronizado':'Not synced'}</div>` : ''}
+          <button class="notes-btn small" onclick="openNotesModal('entry','${currentJobId}','${e.id}')">📝 ${isEs?'Notas':'Notes'}${(e.notes&&e.notes.length) ? `<span class="notes-badge">${e.notes.length}</span>` : ''}</button>
           ${editRowHtml}
         </div>`;
       }).join('');
@@ -1963,6 +2260,7 @@ function renderDashData(){
 loadAll();
 refreshJobSelect();
 renderGlobalSyncStatus();
+_applyPrefillFromURL();
 
 // Automatic retry — weak tablet WiFi means a push routinely fails on the
 // first try. Retry whenever the browser regains connectivity, and on a
