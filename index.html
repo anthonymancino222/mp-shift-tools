@@ -1668,7 +1668,10 @@ function renderLogEntryCards(entries){
    not structured data — parse it back so History can use the same card
    renderer as Live Jobs, which has structured rows already. */
 function parseFullLogText(text){
-  if (!text) return [];
+  // A sheet-schema mismatch (old header, newer row layout) can hand this a
+  // number/Date instead of the log string — never let one bad row crash the
+  // whole Dashboard, just treat it as an empty log.
+  if (!text || typeof text !== 'string') return [];
   return text.split('\n').filter(l => l.trim()).map(line => {
     const parts = line.split('|').map(p => p.trim());
     const dateTime = (parts[0]||'').split(' ');
@@ -1698,6 +1701,10 @@ function renderDashHistory(){
     return;
   }
   el.innerHTML = reports.map((r,i) => {
+    // A single row with unexpected data (e.g. a sheet-schema mismatch from a
+    // past column change) must never take down every OTHER report in this
+    // list — render a visible-but-harmless fallback for just that one row.
+    try {
     const sentTs = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : '—';
     const logId = 'dashlog_' + i;
     const parsedEntries = parseFullLogText(r['Full Log']);
@@ -1714,6 +1721,9 @@ function renderDashHistory(){
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parsedEntries)}</div>
     </div>`;
+    } catch (rowErr) {
+      return `<div class="dash-job-card"><div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span></div><div class="dash-empty">${isEs?'No se pudo mostrar este reporte (datos inesperados).':'Could not display this report (unexpected data).'}</div></div>`;
+    }
   }).join('');
 }
 
