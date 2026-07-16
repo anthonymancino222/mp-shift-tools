@@ -157,10 +157,15 @@
 
   .entry{border-left:6px solid var(--navy);background:#f9fafc;border-radius:8px;padding:12px 14px;margin-bottom:8px;}
   .entry.shift2{border-left-color:var(--accent);}
-  .entry-top{display:flex;justify-content:space-between;font-weight:800;color:var(--navy);font-size:1rem;margin-bottom:8px;}
+  .entry-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800;color:var(--navy);font-size:1rem;margin-bottom:8px;}
   .entry-date{color:#888;font-weight:700;}
   .entry-time{color:var(--navy);font-weight:800;}
   .entry-datesep{display:inline-block;width:2px;height:12px;background:var(--border);margin:0 7px;vertical-align:middle;}
+  .entry-delete-btn{
+    background:#fdeceb;color:var(--accent);border:1px solid var(--accent);
+    border-radius:8px;padding:4px 9px;font-size:0.9rem;line-height:1;cursor:pointer;
+  }
+  .entry-delete-btn:active{background:var(--accent);color:#fff;}
   .entry-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .ec-label{font-size:0.75rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
   .ec-original{font-size:0.95rem;font-weight:700;color:#9aa2b1;text-decoration:line-through;margin-bottom:2px;}
@@ -252,6 +257,11 @@
   .dash-job-counts{display:flex;gap:18px;font-size:0.9rem;}
   .dash-job-counts b{display:block;font-size:1.3rem;}
   .dash-log-toggle{background:transparent;border:none;color:var(--navy);font-weight:700;font-size:0.85rem;margin-top:6px;padding:0;cursor:pointer;}
+  .dash-delete-job-btn{
+    display:block;width:100%;margin-top:10px;padding:8px 12px;font-size:0.85rem;font-weight:700;
+    background:#fdeceb;color:var(--accent);border:1px solid var(--accent);border-radius:8px;cursor:pointer;
+  }
+  .dash-delete-job-btn:active{background:var(--accent);color:#fff;}
   .dash-log-body{margin-top:8px;display:none;}
   .dash-log-body.open{display:block;}
   .dash-chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;}
@@ -1556,6 +1566,58 @@ function loadDashboardData(){
     });
 }
 
+/* Admin delete — PIN is verified server-side in Apps Script against a Script
+   Property (see apps_script_backend.gs), never checked here. This code only
+   ever learns pass/fail, so there's nothing secret to find by viewing this
+   public page's source. */
+function deleteJobPrompt(po, pass, station){
+  const isEs = document.body.classList.contains('es');
+  const passText = pass ? passLabel(pass, isEs) : '';
+  const label = po + (passText ? ' ('+passText+')' : '');
+  const confirmMsg = isEs
+    ? `¿Eliminar TODO el trabajo "${label}" (todos sus registros y tarimas activos)? Esto NO afecta reportes ya enviados. Requiere PIN.`
+    : `Delete the ENTIRE job "${label}" (all its active entries and pallets)? This does NOT affect already-sent reports. Requires a PIN.`;
+  if (!confirm(confirmMsg)) return;
+  const pin = prompt(isEs ? 'Ingrese el PIN de eliminación:' : 'Enter the delete PIN:');
+  if (pin === null) return;
+  fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_job', po, pass, pin, station: station || 'admin' })
+  }).then(res => res.json()).then(res => {
+    if (res.result === 'success'){
+      alert(isEs ? '✅ Trabajo eliminado.' : '✅ Job deleted.');
+      loadDashboardData();
+    } else {
+      alert((isEs ? 'Error: ' : 'Error: ') + (res.message || 'unknown error'));
+    }
+  }).catch(err => {
+    alert((isEs ? 'No se pudo conectar: ' : 'Could not connect: ') + err.message);
+  });
+}
+
+function deleteEntryPrompt(entryId, entryType){
+  const isEs = document.body.classList.contains('es');
+  const confirmMsg = isEs
+    ? '¿Eliminar este registro individual? Esta acción no se puede deshacer. Requiere PIN.'
+    : 'Delete this individual entry? This cannot be undone. Requires a PIN.';
+  if (!confirm(confirmMsg)) return;
+  const pin = prompt(isEs ? 'Ingrese el PIN de eliminación:' : 'Enter the delete PIN:');
+  if (pin === null) return;
+  fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_entry', entryId, entryType, pin, po: 'admin', station: 'admin' })
+  }).then(res => res.json()).then(res => {
+    if (res.result === 'success'){
+      alert(isEs ? '✅ Registro eliminado.' : '✅ Entry deleted.');
+      loadDashboardData();
+    } else {
+      alert((isEs ? 'Error: ' : 'Error: ') + (res.message || 'unknown error'));
+    }
+  }).catch(err => {
+    alert((isEs ? 'No se pudo conectar: ' : 'Could not connect: ') + err.message);
+  });
+}
+
 function renderDashboard(){
   if (dashTab === 'history') renderDashHistory();
   if (dashTab === 'live') renderDashLive();
@@ -1565,6 +1627,8 @@ function renderDashboard(){
 function escapeHtml(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function escapeAttr(s){ return String(s).replace(/'/g,"\\'"); }
 
 /* Renders a list of shift entries as the same small readable cards used in
    the main page's own "Shift Log History" (.entry/.entry-top/.entry-counts/
@@ -1582,8 +1646,14 @@ function renderLogEntryCards(entries){
       e.date ? `<span class="entry-date">${escapeHtml(e.date)}</span>` : '',
       e.time ? `<span class="entry-time">${escapeHtml(e.time)}</span>` : ''
     ].filter(Boolean).join('<span class="entry-datesep"></span>');
+    // Only Live Jobs entries carry a real entryId (History's come from
+    // parseFullLogText, which has no id to delete by) — the delete icon only
+    // shows up where deletion is actually possible.
+    const deleteBtn = e.entryId
+      ? `<button class="entry-delete-btn" onclick="deleteEntryPrompt('${escapeAttr(e.entryId)}','entry')">🗑</button>`
+      : '';
     return `<div class="entry ${shiftClass}">
-      <div class="entry-top"><span>${dateTimeHtml}</span><span>${shiftLabel}</span></div>
+      <div class="entry-top"><span>${dateTimeHtml}</span><span>${shiftLabel}</span>${deleteBtn}</div>
       <div class="entry-counts">
         <div><div class="ec-label">${goodLbl}</div><div class="ec-value good">${Number(e.good||0).toLocaleString()}</div></div>
         <div><div class="ec-label">${rejLbl}</div><div class="ec-value reject">${Number(e.reject||0).toLocaleString()}</div></div>
@@ -1681,7 +1751,8 @@ function renderDashLive(){
     byPo[groupKey].entries.push({
       ts, shift: e.Shift, good: e.Good, reject: e.Reject, flags: e.Flags,
       date: ts ? ts.toLocaleDateString() : '',
-      time: ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''
+      time: ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '',
+      entryId: e.EntryId
     });
   });
   const seenPalletIds = new Set();
@@ -1712,6 +1783,7 @@ function renderDashLive(){
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(sortedEntries)}</div>
+      <button class="dash-delete-job-btn" onclick="deleteJobPrompt('${escapeAttr(j.po)}','${escapeAttr(j.pass||'')}','${escapeAttr(j.station||'')}')">🗑 ${isEs?'Eliminar Trabajo':'Delete Job'}</button>
     </div>`;
   }).join('');
 }
