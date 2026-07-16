@@ -251,6 +251,21 @@
   .dash-tab-explainer{font-size:0.82rem;color:#666;background:var(--pink-soft);border-radius:8px;padding:8px 12px;margin-bottom:10px;line-height:1.4;}
   .dash-sync-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:0.85rem;color:#666;flex-wrap:wrap;gap:8px;}
   .dash-refresh-btn{background:var(--pink-soft);color:var(--navy);border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:0.9rem;cursor:pointer;}
+  .history-search-input{
+    width:100%;padding:12px;font-size:1rem;border:2px solid var(--navy);border-radius:10px;
+    margin-bottom:12px;background:#fff;
+  }
+  .history-nav-label{font-size:0.85rem;font-weight:700;color:#666;margin-bottom:8px;}
+  .history-btn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px;margin-bottom:14px;}
+  .history-nav-btn{
+    padding:16px 8px;font-size:1rem;font-weight:800;border-radius:10px;
+    border:3px solid var(--navy);background:#fff;color:var(--navy);cursor:pointer;
+  }
+  .history-nav-btn:active{background:var(--navy);color:#fff;}
+  .history-back-btn{
+    background:var(--pink-soft);color:var(--navy);border:none;border-radius:8px;
+    padding:8px 14px;font-weight:700;font-size:0.85rem;cursor:pointer;margin-bottom:10px;
+  }
   .dash-job-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
   .dash-job-top{display:flex;justify-content:space-between;font-weight:800;color:var(--navy);margin-bottom:6px;}
   .dash-job-meta{font-size:0.85rem;color:#666;margin-bottom:8px;}
@@ -453,7 +468,14 @@
       <span id="dashSyncStatus"><span data-en>Not loaded yet</span><span data-es>Aún no cargado</span></span>
       <button class="dash-refresh-btn" onclick="loadDashboardData()">🔄 <span data-en>Refresh</span><span data-es>Actualizar</span></button>
     </div>
-    <div id="dashTabHistory"></div>
+    <div id="dashTabHistory">
+      <input type="text" id="historySearchInput" class="history-search-input"
+        oninput="onHistorySearchInput(this.value)"
+        data-ph-en="Search by Job/PO or Product #…" data-ph-es="Buscar por Trabajo/OC o Producto…"
+        placeholder="Search by Job/PO or Product #…">
+      <div id="historyYearMonthNav"></div>
+      <div id="historyList"></div>
+    </div>
     <div id="dashTabLive" style="display:none;"></div>
     <div id="dashTabData" style="display:none;"></div>
   </div>
@@ -537,6 +559,9 @@ function toggleLang(){
   renderDraftNotice();
   renderGlobalSyncStatus();
   if (currentJobId && jobs[currentJobId] && !jobSectionsHidden) renderJob();
+  // The History tab's year/month nav labels are JS-generated too (like the
+  // above), so they'd stay stuck in the old language without this.
+  if (dashData) renderDashboard();
 }
 
 function selectStation(name){
@@ -1692,12 +1717,95 @@ function parseFullLogText(text){
   });
 }
 
+// Drill-down state for the History tab — Year -> Month -> that month's jobs.
+// A non-empty search term bypasses this entirely (search runs across ALL
+// reports regardless of what year/month is currently selected), since
+// requiring someone to first navigate to the right month just to search
+// defeats the point of having a search box at all.
+let historySelectedYear = null;
+let historySelectedMonth = null;
+let historySearchTerm = '';
+
+function onHistorySearchInput(val){
+  historySearchTerm = val;
+  renderDashHistory();
+}
+function selectHistoryYear(y){ historySelectedYear = y; historySelectedMonth = null; renderDashHistory(); }
+function selectHistoryMonth(m){ historySelectedMonth = m; renderDashHistory(); }
+function backToHistoryYears(){ historySelectedYear = null; historySelectedMonth = null; renderDashHistory(); }
+function backToHistoryMonths(){ historySelectedMonth = null; renderDashHistory(); }
+
+const MONTH_NAMES_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_NAMES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+/* Renders the year/month picker above the job list. Hidden entirely while
+   searching — the search results below already show whatever matches,
+   independent of year/month. */
+function renderHistoryNav(reports){
+  const isEs = document.body.classList.contains('es');
+  const wrap = document.getElementById('historyYearMonthNav');
+  const monthNames = isEs ? MONTH_NAMES_ES : MONTH_NAMES_EN;
+
+  if (historySearchTerm.trim()){
+    wrap.innerHTML = '';
+    return;
+  }
+
+  const withDates = reports.filter(r => r.Timestamp);
+
+  if (!historySelectedYear){
+    const years = [...new Set(withDates.map(r => new Date(r.Timestamp).getFullYear()))].sort((a,b) => b-a);
+    if (!years.length){ wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `<div class="history-nav-label">${isEs?'Seleccione un año:':'Select a year:'}</div>
+      <div class="history-btn-grid">${years.map(y => `<button class="history-nav-btn" onclick="selectHistoryYear(${y})">${y}</button>`).join('')}</div>`;
+    return;
+  }
+
+  if (historySelectedMonth === null){
+    const months = [...new Set(
+      withDates.filter(r => new Date(r.Timestamp).getFullYear() === historySelectedYear)
+        .map(r => new Date(r.Timestamp).getMonth())
+    )].sort((a,b) => a-b);
+    wrap.innerHTML = `<button class="history-back-btn" onclick="backToHistoryYears()">← ${isEs?'Años':'Years'}</button>
+      <div class="history-nav-label">${historySelectedYear} — ${isEs?'Seleccione un mes:':'Select a month:'}</div>
+      <div class="history-btn-grid">${months.map(m => `<button class="history-nav-btn" onclick="selectHistoryMonth(${m})">${monthNames[m]}</button>`).join('')}</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `<button class="history-back-btn" onclick="backToHistoryMonths()">← ${isEs?'Meses':'Months'}</button>
+    <div class="history-nav-label">${monthNames[historySelectedMonth]} ${historySelectedYear}</div>`;
+}
+
 function renderDashHistory(){
   const isEs = document.body.classList.contains('es');
-  const el = document.getElementById('dashTabHistory');
-  const reports = (dashData.reports||[]).slice().reverse();
+  const el = document.getElementById('historyList');
+  const allReports = (dashData.reports||[]).slice().reverse();
+
+  renderHistoryNav(allReports);
+
+  let reports;
+  const term = historySearchTerm.trim().toLowerCase();
+  if (term){
+    reports = allReports.filter(r =>
+      String(r.PO||'').toLowerCase().includes(term) ||
+      String(r.Product||'').toLowerCase().includes(term));
+  } else if (historySelectedYear && historySelectedMonth !== null){
+    reports = allReports.filter(r => {
+      if (!r.Timestamp) return false;
+      const d = new Date(r.Timestamp);
+      return d.getFullYear() === historySelectedYear && d.getMonth() === historySelectedMonth;
+    });
+  } else {
+    // Nothing selected yet and not searching — prompt instead of dumping
+    // every report ever sent in one long, unsorted list.
+    el.innerHTML = allReports.length
+      ? `<div class="dash-empty">${isEs?'Seleccione un año y mes arriba, o use la búsqueda.':'Select a year and month above, or use search.'}</div>`
+      : `<div class="dash-empty">${isEs?'Aún no hay reportes enviados.':'No reports sent yet.'}</div>`;
+    return;
+  }
+
   if (!reports.length){
-    el.innerHTML = `<div class="dash-empty">${isEs?'Aún no hay reportes enviados.':'No reports sent yet.'}</div>`;
+    el.innerHTML = `<div class="dash-empty">${isEs?'No se encontraron reportes.':'No reports found.'}</div>`;
     return;
   }
   el.innerHTML = reports.map((r,i) => {
