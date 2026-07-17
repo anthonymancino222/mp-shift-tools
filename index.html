@@ -524,7 +524,7 @@
         data-ph-en="Search by Job/PO or Product #…" data-ph-es="Buscar por Trabajo/OC o Producto…"
         placeholder="Search by Job/PO or Product #…">
       <div id="historyYearMonthNav"></div>
-      <div id="historyList"></div>
+      <div id="dashHistoryList"></div>
     </div>
     <div id="dashTabLive" style="display:none;"></div>
     <div id="dashTabData" style="display:none;"></div>
@@ -2129,7 +2129,7 @@ function renderHistoryNav(reports){
 
 function renderDashHistory(){
   const isEs = document.body.classList.contains('es');
-  const el = document.getElementById('historyList');
+  const el = document.getElementById('dashHistoryList');
   // Same top-level safety net as renderHistoryNav — show the real error
   // instead of a silent blank list.
   try {
