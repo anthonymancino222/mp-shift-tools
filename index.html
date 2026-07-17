@@ -676,7 +676,19 @@ function getNotesArray(scope, jobId, entryId){
 }
 
 function openNotesModal(scope, jobId, entryId){
-  notesModalContext = { scope, jobId, entryId };
+  notesModalContext = { scope, jobId, entryId, dashboardMode: false };
+  renderNotesModalContent();
+  document.getElementById('notesModalOverlay').classList.add('open');
+}
+
+/* Dashboard/Live Jobs version — a card there can represent a job that only
+   exists in some OTHER device's local storage, so this can't go through the
+   local jobs[] lookup the main app's notes modal uses. It reads dashData
+   (already-fetched server data) and posts directly instead. Job-level only —
+   entry-level notes need a real local entry object to attach to, which
+   Dashboard cards don't have. */
+function openDashNotesModal(po, pass, station){
+  notesModalContext = { scope: 'job', po, pass, station, dashboardMode: true };
   renderNotesModalContent();
   document.getElementById('notesModalOverlay').classList.add('open');
 }
@@ -689,13 +701,24 @@ function closeNotesModal(){
 function renderNotesModalContent(){
   if (!notesModalContext) return;
   const isEs = document.body.classList.contains('es');
-  const job = jobs[notesModalContext.jobId];
   const titleEl = document.getElementById('notesModalTitle');
-  titleEl.textContent = notesModalContext.scope === 'job'
-    ? (isEs?'Notas para: ':'Notes for: ') + (job ? job.po : '')
-    : (isEs?'Notas para este registro':'Notes for this entry');
+  let notes;
 
-  const notes = getNotesArray(notesModalContext.scope, notesModalContext.jobId, notesModalContext.entryId) || [];
+  if (notesModalContext.dashboardMode){
+    titleEl.textContent = (isEs?'Notas para: ':'Notes for: ') + notesModalContext.po;
+    const target = normalizePO(notesModalContext.po);
+    notes = (dashData && dashData.notes || []).filter(n =>
+      n.Scope === 'job' && normalizePO(n.PO) === target &&
+      (!notesModalContext.pass || String(n.Pass||'') === notesModalContext.pass)
+    ).map(n => ({ text: n.Text || '', loggedAt: n.Timestamp ? new Date(n.Timestamp).getTime() : Date.now() }));
+  } else {
+    const job = jobs[notesModalContext.jobId];
+    titleEl.textContent = notesModalContext.scope === 'job'
+      ? (isEs?'Notas para: ':'Notes for: ') + (job ? job.po : '')
+      : (isEs?'Notas para este registro':'Notes for this entry');
+    notes = getNotesArray(notesModalContext.scope, notesModalContext.jobId, notesModalContext.entryId) || [];
+  }
+
   const listEl = document.getElementById('notesModalList');
   listEl.innerHTML = notes.length
     ? notes.slice().sort((a,b)=>a.loggedAt-b.loggedAt).map(n => `
@@ -720,6 +743,30 @@ function submitNoteFromModal(){
     ? `¿Agregar esta nota? Quedará bloqueada permanentemente — no se podrá editar ni eliminar después.\n\n"${text}"`
     : `Add this note? It will be permanently locked — it cannot be edited or removed afterward.\n\n"${text}"`;
   if (!confirm(confirmMsg)) return;
+
+  if (notesModalContext.dashboardMode){
+    const noteId = 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    fetch(REPORT_ENDPOINT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'add_note', po: notesModalContext.po, station: notesModalContext.station || 'admin',
+        pass: notesModalContext.pass || '', scope: 'job', entryId: '', noteId, text
+      })
+    }).then(res => res.json()).then(res => {
+      if (res.result === 'success'){
+        // Reflect immediately instead of waiting on a manual Refresh.
+        dashData.notes = dashData.notes || [];
+        dashData.notes.push({ PO: notesModalContext.po, Pass: notesModalContext.pass || '', Scope: 'job', EntryId: '', NoteId: noteId, Text: text, Timestamp: new Date().toISOString() });
+        renderNotesModalContent();
+        renderDashboard();
+      } else {
+        alert((isEs ? 'Error: ' : 'Error: ') + (res.message || 'unknown error'));
+      }
+    }).catch(err => {
+      alert((isEs ? 'No se pudo conectar: ' : 'Could not connect: ') + err.message);
+    });
+    return;
+  }
 
   const job = jobs[notesModalContext.jobId];
   if (!job) return;
@@ -2041,6 +2088,10 @@ const MONTH_NAMES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','O
 function renderHistoryNav(reports){
   const isEs = document.body.classList.contains('es');
   const wrap = document.getElementById('historyYearMonthNav');
+  // Top-level try/catch so an unexpected error surfaces its actual message
+  // right in the UI — floor tablets have no console access, so silently
+  // failing here leaves no way to diagnose what actually went wrong.
+  try {
   const monthNames = isEs ? MONTH_NAMES_ES : MONTH_NAMES_EN;
 
   if (historySearchTerm.trim()){
@@ -2071,11 +2122,17 @@ function renderHistoryNav(reports){
 
   wrap.innerHTML = `<button class="history-back-btn" onclick="backToHistoryMonths()">← ${isEs?'Meses':'Months'}</button>
     <div class="history-nav-label">${monthNames[historySelectedMonth]} ${historySelectedYear}</div>`;
+  } catch (err) {
+    wrap.innerHTML = `<div class="dash-empty">Nav debug error: ${escapeHtml(err.message)}</div>`;
+  }
 }
 
 function renderDashHistory(){
   const isEs = document.body.classList.contains('es');
   const el = document.getElementById('historyList');
+  // Same top-level safety net as renderHistoryNav — show the real error
+  // instead of a silent blank list.
+  try {
   const allReports = (dashData.reports||[]).slice().reverse();
 
   renderHistoryNav(allReports);
@@ -2096,13 +2153,13 @@ function renderDashHistory(){
     // Nothing selected yet and not searching — prompt instead of dumping
     // every report ever sent in one long, unsorted list.
     el.innerHTML = allReports.length
-      ? `<div class="dash-empty">${isEs?'Seleccione un año y mes arriba, o use la búsqueda.':'Select a year and month above, or use search.'}</div>`
+      ? `<div class="dash-empty">${isEs?'Seleccione un año y mes arriba, o use la búsqueda.':'Select a year and month above, or use search.'} (${allReports.length} total)</div>`
       : `<div class="dash-empty">${isEs?'Aún no hay reportes enviados.':'No reports sent yet.'}</div>`;
     return;
   }
 
   if (!reports.length){
-    el.innerHTML = `<div class="dash-empty">${isEs?'No se encontraron reportes.':'No reports found.'}</div>`;
+    el.innerHTML = `<div class="dash-empty">${isEs?'No se encontraron reportes.':'No reports found.'} (0 of ${allReports.length} matched)</div>`;
     return;
   }
   el.innerHTML = reports.map((r,i) => {
@@ -2130,6 +2187,9 @@ function renderDashHistory(){
       return `<div class="dash-job-card"><div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span></div><div class="dash-empty">${isEs?'No se pudo mostrar este reporte (datos inesperados).':'Could not display this report (unexpected data).'}</div></div>`;
     }
   }).join('');
+  } catch (err) {
+    el.innerHTML = `<div class="dash-empty">List debug error: ${escapeHtml(err.message)}</div>`;
+  }
 }
 
 function renderDashLive(){
@@ -2187,6 +2247,14 @@ function renderDashLive(){
     const logId = 'livelog_' + i;
     const sortedEntries = j.entries.slice().sort((a,b) => (a.ts||0)-(b.ts||0));
     const startedLabel = sortedEntries.length ? [sortedEntries[0].date, sortedEntries[0].time].filter(Boolean).join(' ') : '—';
+    // Job-level notes for this PO+Pass, straight from the raw sheet data —
+    // this card may represent a job that only exists on some OTHER device's
+    // local storage, so this can't go through the local jobs[] lookup the
+    // main app's notes modal uses.
+    const jTarget = normalizePO(j.po);
+    const jobNoteCount = (dashData.notes||[]).filter(n =>
+      n.Scope === 'job' && normalizePO(n.PO) === jTarget && (!j.pass || String(n.Pass||'') === String(j.pass))
+    ).length;
     return `<div class="dash-job-card">
       <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}${j.pass ? ' · '+escapeHtml(passLabel(String(j.pass), isEs)) : ''}</span></div>
       <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'}<br><span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
@@ -2198,6 +2266,7 @@ function renderDashLive(){
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(sortedEntries)}</div>
+      <button class="notes-btn small" style="margin-top:10px;" onclick="openDashNotesModal('${escapeAttr(j.po)}','${escapeAttr(j.pass||'')}','${escapeAttr(j.station||'')}')">📝 ${isEs?'Notas':'Notes'}${jobNoteCount ? `<span class="notes-badge">${jobNoteCount}</span>` : ''}</button>
       <button class="dash-delete-job-btn" onclick="deleteJobPrompt('${escapeAttr(j.po)}','${escapeAttr(j.pass||'')}','${escapeAttr(j.station||'')}')">🗑 ${isEs?'Eliminar Trabajo':'Delete Job'}</button>
     </div>`;
   }).join('');
