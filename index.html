@@ -2283,7 +2283,8 @@ function renderDashData(){
     return;
   }
   el.innerHTML = `<div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Retenido por trabajo':'Target vs Good vs Hold by job'}</h3><canvas id="dashChartByJob" height="260"></canvas></div>
-    <div class="dash-chart-wrap"><h3>${isEs?'Totales por estación':'Totals by station'}</h3><canvas id="dashChartByStation" height="220"></canvas></div>`;
+    <div class="dash-chart-wrap"><h3>${isEs?'Totales por estación':'Totals by station'}</h3><canvas id="dashChartByStation" height="220"></canvas></div>
+    <div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Retenido a través del tiempo':'Target vs Good vs Hold over time'}</h3><canvas id="dashChartByDate" height="260"></canvas></div>`;
 
   const labels = reports.map(r => String(r.PO||'—'));
   const targets = reports.map(r => Number(r.Target)||0);
@@ -2308,7 +2309,8 @@ function renderDashData(){
   const byStation = {};
   reports.forEach(r => {
     const st = r.Station || (isEs?'Desconocido':'Unknown');
-    if (!byStation[st]) byStation[st] = { good: 0, reject: 0 };
+    if (!byStation[st]) byStation[st] = { target: 0, good: 0, reject: 0 };
+    byStation[st].target += Number(r.Target)||0;
     byStation[st].good += Number(r['Total Good'])||0;
     byStation[st].reject += Number(r['Total Reject'])||0;
   });
@@ -2318,8 +2320,35 @@ function renderDashData(){
     data: {
       labels: stLabels,
       datasets: [
+        { label: isEs?'Meta':'Target', data: stLabels.map(s=>byStation[s].target), backgroundColor: '#0a0a0a' },
         { label: isEs?'Bueno':'Good', data: stLabels.map(s=>byStation[s].good), backgroundColor: '#2e7d4f' },
         { label: isEs?'Retenido':'Hold', data: stLabels.map(s=>byStation[s].reject), backgroundColor: '#c8393a' }
+      ]
+    },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  }));
+
+  // Same three quantities, but plotted chronologically by the date each
+  // report was sent — multiple jobs finished on the same day get summed
+  // into one point rather than showing as separate overlapping entries.
+  const byDate = {};
+  reports.forEach(r => {
+    if (!r.Timestamp) return;
+    const dateKey = new Date(r.Timestamp).toISOString().slice(0,10);
+    if (!byDate[dateKey]) byDate[dateKey] = { target: 0, good: 0, reject: 0 };
+    byDate[dateKey].target += Number(r.Target)||0;
+    byDate[dateKey].good += Number(r['Total Good'])||0;
+    byDate[dateKey].reject += Number(r['Total Reject'])||0;
+  });
+  const dateLabels = Object.keys(byDate).sort();
+  dashCharts.push(new Chart(document.getElementById('dashChartByDate'), {
+    type: 'line',
+    data: {
+      labels: dateLabels,
+      datasets: [
+        { label: isEs?'Meta':'Target', data: dateLabels.map(d=>byDate[d].target), borderColor: '#0a0a0a', backgroundColor: '#0a0a0a', fill: false, tension: 0.2 },
+        { label: isEs?'Bueno':'Good', data: dateLabels.map(d=>byDate[d].good), borderColor: '#2e7d4f', backgroundColor: '#2e7d4f', fill: false, tension: 0.2 },
+        { label: isEs?'Retenido':'Hold', data: dateLabels.map(d=>byDate[d].reject), borderColor: '#c8393a', backgroundColor: '#c8393a', fill: false, tension: 0.2 }
       ]
     },
     options: { responsive: true, scales: { y: { beginAtZero: true } } }
