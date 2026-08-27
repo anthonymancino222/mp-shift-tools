@@ -243,6 +243,17 @@
   .modal-box button{margin-bottom:8px;}
   .modal-cancel-btn{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:1px solid var(--border);background:#fff;color:#666;cursor:pointer;}
 
+  /* Job schedule picker — pulls Anthony's exported job schedule (same
+     backend/data the QA Checklist app already uses) so a packer can tap a
+     job instead of typing PO/Product by hand. */
+  .schedule-pull-btn{width:100%;padding:10px;font-size:0.85rem;font-weight:700;border-radius:8px;border:2px dashed var(--navy);background:#fff;color:var(--navy);margin-top:8px;cursor:pointer;}
+  .job-picker-search{width:100%;padding:10px;font-size:0.95rem;border:2px solid var(--navy);border-radius:8px;margin-bottom:10px;}
+  .job-picker-status{font-size:0.8rem;color:#666;margin-bottom:8px;}
+  .job-picker-list{max-height:340px;overflow-y:auto;margin-bottom:14px;}
+  .job-picker-row{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;}
+  .job-picker-row:active{background:var(--pink-soft);}
+  .cust-no-results{text-align:center;color:#888;padding:16px;font-size:0.9rem;}
+
   /* Notes — a button + red count badge, never the notes themselves sitting
      permanently on-screen (see the modal below instead). */
   .notes-btn{
@@ -367,6 +378,7 @@
           <span data-en>Short Gluer</span><span data-es>Pegadora Corta</span>
         </button>
       </div>
+      <button type="button" class="schedule-pull-btn" onclick="openJobPicker()">📋 <span data-en>Pull Schedule</span><span data-es>Traer Programa</span></button>
 
       <label><span data-en>Pass (required)</span><span data-es>Pasada (obligatorio)</span></label>
       <div class="pass-hint" id="passSuggestHint" style="display:none;"></div>
@@ -498,6 +510,29 @@
   </div>
 </div>
 
+<!-- JOB SCHEDULE PICKER — pulls the job schedule Anthony exports (via the QA
+     Checklist app's existing backend, same data/feature) so PO/Product can be
+     tapped instead of typed. No quantity/target data is in the schedule, so
+     that field is always still typed by hand. -->
+<div class="modal-overlay" id="jobPickerOverlay">
+  <div class="modal-box notes-modal-box">
+    <h3><span data-en>📋 Select a Job</span><span data-es>📋 Seleccionar Trabajo</span></h3>
+    <div id="jobPickerJobPanel">
+      <input type="text" class="job-picker-search" id="jobPickerSearch" oninput="renderJobPickerList()"
+        data-ph-en="Search job #, customer, product…" data-ph-es="Buscar # de trabajo, cliente, producto…"
+        placeholder="Search job #, customer, product…">
+      <div class="job-picker-status" id="jobPickerStatus"></div>
+      <div class="job-picker-list" id="jobPickerList"></div>
+    </div>
+    <div id="jobPickerProductPanel" style="display:none;">
+      <button type="button" class="history-back-btn" onclick="_showJobPickerJobPanel()">← <span data-en>Back</span><span data-es>Atrás</span></button>
+      <div id="jobPickerProductTitle" style="font-weight:700;margin-bottom:10px;"></div>
+      <div class="job-picker-list" id="jobPickerProductList"></div>
+    </div>
+    <button class="modal-cancel-btn" onclick="closeJobPicker()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+  </div>
+</div>
+
 <!-- DASHBOARD — History (past sent reports), Live Jobs (active on any device), Data (charts) -->
 <div class="dash-overlay" id="dashOverlay">
   <div class="dash-header">
@@ -539,6 +574,13 @@ const QA_EMAIL = 'qualitygroup@moquinpress.com';
 
 // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW (see setup instructions)
 const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.dev/';
+
+// Job schedule pull — reuses the QA Checklist app's existing backend/data
+// (Anthony's manually-exported CERM schedule) instead of standing up a
+// second copy of the same Excel-reading logic. That app's Worker accepts
+// this API key alone (no Google Sign-In required) and has CORS wide open.
+const SCHEDULE_BACKEND_URL = 'https://qa-checklist-backend.anthony-mancino2.workers.dev';
+const SCHEDULE_API_KEY = 'MoquinQA2026SecureKeyAlpha7';
 
 // A PO typed as "45402" and "045402" is the same real job, but Google Sheets
 // itself strips leading zeros from anything that looks numeric once it lands
@@ -2355,10 +2397,181 @@ function renderDashData(){
   }));
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   JOB SCHEDULE PICKER — pulls Anthony's exported job schedule so PO/Product
+   can be tapped instead of typed. Only Long Gluer and Short Gluer exist in
+   this app, and both map to the schedule's "FolderGluer" tab (same mapping
+   the QA Checklist app uses), so the filter below is really just carrying
+   that one mapping over rather than hardcoding a skip.
+   NOTE: the schedule data has no quantity/target field at all — Quantity to
+   Produce is always still typed by hand, even after picking a job here. */
+let _scheduleData = null;
+let _schedulePullInFlight = null;
+
+function pullScheduleNow(){
+  if (_schedulePullInFlight) return _schedulePullInFlight;
+  _schedulePullInFlight = fetch(SCHEDULE_BACKEND_URL + '/admin/schedule-pull', {
+    method: 'GET',
+    headers: { 'X-API-Key': SCHEDULE_API_KEY },
+    cache: 'no-store'
+  }).then(res => res.json()).then(function(data){
+    if (data && data.ok) _scheduleData = data;
+    return data;
+  }).finally(function(){ _schedulePullInFlight = null; });
+  return _schedulePullInFlight;
+}
+
+const STATION_TO_SCHEDULE_SHEETS = {
+  'Long Gluer': ['FolderGluer'],
+  'Short Gluer': ['FolderGluer']
+};
+
+// Same 5am/5pm auto-refresh cadence as the QA Checklist app, tracked via a
+// persisted timestamp (not a long setTimeout, which wouldn't survive the
+// tablet's tab being backgrounded/reloaded).
+function _computeNextAutoPullAt(fromMs){
+  const d = new Date(fromMs);
+  for (let dayOffset = 0; dayOffset < 3; dayOffset++){
+    for (const hour of [5, 17]){
+      const candidate = new Date(d);
+      candidate.setDate(d.getDate() + dayOffset);
+      candidate.setHours(hour, 0, 0, 0);
+      if (candidate.getTime() > fromMs) return candidate.getTime();
+    }
+  }
+  return fromMs + 12*60*60*1000;
+}
+
+function _scheduleAutoPullCheck(){
+  const now = Date.now();
+  let nextAt = parseInt(localStorage.getItem('gluer_schedule_autopull_next_v1') || '0', 10);
+  if (!nextAt || now >= nextAt){
+    pullScheduleNow();
+    nextAt = _computeNextAutoPullAt(now);
+    localStorage.setItem('gluer_schedule_autopull_next_v1', String(nextAt));
+  }
+}
+
+function _initScheduleAutoPull(){
+  if (!_scheduleData) pullScheduleNow();
+  _scheduleAutoPullCheck();
+  setInterval(_scheduleAutoPullCheck, 60000);
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') _scheduleAutoPullCheck();
+  });
+}
+
+function openJobPicker(){
+  const isEs = document.body.classList.contains('es');
+  if (!newJobStation){
+    alert(isEs ? 'Seleccione Pegadora Larga o Pegadora Corta primero.' : 'Select Long Gluer or Short Gluer first.');
+    return;
+  }
+  document.getElementById('jobPickerSearch').value = '';
+  _showJobPickerJobPanel();
+  document.getElementById('jobPickerOverlay').classList.add('open');
+  const statusEl = document.getElementById('jobPickerStatus');
+  statusEl.textContent = isEs ? 'Actualizando…' : 'Pulling…';
+  pullScheduleNow().then(function(){
+    renderJobPickerList();
+  }).catch(function(){
+    statusEl.textContent = isEs ? 'Error al actualizar — intente de nuevo.' : 'Pull failed — try again.';
+  });
+}
+
+function closeJobPicker(){
+  document.getElementById('jobPickerOverlay').classList.remove('open');
+}
+
+function _showJobPickerJobPanel(){
+  document.getElementById('jobPickerJobPanel').style.display = 'block';
+  document.getElementById('jobPickerProductPanel').style.display = 'none';
+}
+
+function renderJobPickerList(){
+  const isEs = document.body.classList.contains('es');
+  const listEl = document.getElementById('jobPickerList');
+  const statusEl = document.getElementById('jobPickerStatus');
+  listEl.innerHTML = '';
+
+  if (!_scheduleData){
+    statusEl.textContent = isEs ? 'Nada cargado aún — intente de nuevo.' : 'Nothing loaded yet — try again.';
+    return;
+  }
+
+  const q = document.getElementById('jobPickerSearch').value.trim().toLowerCase();
+  const sheets = STATION_TO_SCHEDULE_SHEETS[newJobStation];
+  const entries = [];
+  for (const jobNumber in _scheduleData.jobs){
+    const entry = _scheduleData.jobs[jobNumber];
+    if (sheets && !(entry.sheets||[]).some(s => sheets.indexOf(s) !== -1)) continue;
+    if (q){
+      const hay = (jobNumber + ' ' + (entry.customer||'') + ' ' + entry.products.join(' ')).toLowerCase();
+      if (hay.indexOf(q) === -1) continue;
+    }
+    entries.push({ jobNumber, entry });
+  }
+  entries.sort((a,b) => a.jobNumber.localeCompare(b.jobNumber));
+
+  statusEl.textContent = entries.length + (isEs ? ' trabajo(s) programado(s) para esta estación' : (' job' + (entries.length===1?'':'s') + ' scheduled for this station')) +
+    ' — ' + _scheduleData.sourceFile;
+
+  if (!entries.length){
+    listEl.innerHTML = '<div class="cust-no-results">' + (isEs?'Sin coincidencias':'No matching jobs') + '</div>';
+    return;
+  }
+  entries.forEach(function(e){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'job-picker-row';
+    const subParts = [e.entry.customer];
+    if (e.entry.products.length === 1) subParts.push(e.entry.products[0]);
+    else if (e.entry.products.length === 2) subParts.push(e.entry.products.join(', '));
+    else if (e.entry.products.length > 2) subParts.push(e.entry.products.length + (isEs?' productos':' products'));
+    const sub = subParts.filter(Boolean).join(' — ');
+    b.innerHTML = '<div style="font-weight:700;">' + escapeHtml(e.jobNumber) + '</div>' +
+      (sub ? '<div style="font-size:12.5px;font-weight:400;color:#666;margin-top:2px;">' + escapeHtml(sub) + '</div>' : '');
+    b.onclick = function(){ _pickScheduleJob(e.jobNumber, e.entry); };
+    listEl.appendChild(b);
+  });
+}
+
+function _pickScheduleJob(jobNumber, entry){
+  if (entry.products && entry.products.length > 1){
+    _showJobPickerProductPanel(jobNumber, entry);
+    return;
+  }
+  _finalizeSchedulePick(jobNumber, entry.products && entry.products[0]);
+}
+
+function _showJobPickerProductPanel(jobNumber, entry){
+  const isEs = document.body.classList.contains('es');
+  document.getElementById('jobPickerJobPanel').style.display = 'none';
+  document.getElementById('jobPickerProductPanel').style.display = 'block';
+  document.getElementById('jobPickerProductTitle').textContent = (isEs ? 'Elija un producto para ' : 'Choose a product for ') + jobNumber;
+  const listEl = document.getElementById('jobPickerProductList');
+  listEl.innerHTML = '';
+  entry.products.forEach(function(p){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'job-picker-row';
+    b.textContent = p;
+    b.onclick = function(){ _finalizeSchedulePick(jobNumber, p); };
+    listEl.appendChild(b);
+  });
+}
+
+function _finalizeSchedulePick(jobNumber, product){
+  document.getElementById('njPO').value = jobNumber;
+  if (product) document.getElementById('njProduct').value = product;
+  closeJobPicker();
+}
+
 loadAll();
 refreshJobSelect();
 renderGlobalSyncStatus();
 _applyPrefillFromURL();
+_initScheduleAutoPull();
 
 // Automatic retry — weak tablet WiFi means a push routinely fails on the
 // first try. Retry whenever the browser regains connectivity, and on a
