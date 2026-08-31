@@ -128,22 +128,27 @@
 
   /* Packing setup — nested inside the Pallet card, lets the app compute
      pieces-per-pallet from Pieces/Box × Boxes/Pallet, so +1 Pallet can also
-     auto-add the right amount to Good Count. Collapsed by default so it
-     doesn't compete with the big pallet-count number for attention. */
-  .pallet-setup{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px;background:var(--pink-soft);}
-  .pallet-setup-toggle{width:100%;background:none;border:none;padding:0;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:0.9rem;color:var(--navy);cursor:pointer;}
-  .pallet-setup-body{display:none;margin-top:10px;}
+     auto-add the right amount to Good Count. Open by default (not tucked
+     behind a collapsed toggle) and sized to stand out, since it's easy to
+     miss otherwise. */
+  .pallet-setup{border:3px solid var(--navy);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--pink-soft);}
+  .pallet-setup-toggle{width:100%;background:none;border:none;padding:0;display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:1.15rem;color:var(--navy);cursor:pointer;}
+  .pallet-setup-toggle span:first-child{display:flex;align-items:center;gap:6px;}
+  #palletSetupCaret{font-size:1.3rem;}
+  .pallet-setup-body{display:none;margin-top:14px;}
   .pallet-setup-body.open{display:block;}
-  .pallet-setup-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .pallet-setup-field label{font-size:0.78rem;font-weight:700;color:#666;display:block;margin-bottom:3px;}
-  .pallet-setup-field input{width:100%;padding:9px;font-size:0.95rem;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;}
-  .pallet-setup-computed{font-size:0.85rem;font-weight:700;color:var(--good);margin-top:8px;display:none;}
-  .pallet-setup-btns{display:flex;gap:8px;margin-top:10px;}
-  .pallet-setup-btns .notes-btn.small{flex:1;justify-content:center;margin-bottom:0;}
+  .pallet-setup-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .pallet-setup-field label{font-size:0.9rem;font-weight:700;color:#444;display:block;margin-bottom:5px;}
+  .pallet-setup-field input{width:100%;padding:14px;font-size:1.15rem;font-weight:700;border:2px solid var(--navy);border-radius:10px;box-sizing:border-box;text-align:center;}
+  .pallet-setup-computed{font-size:1.05rem;font-weight:900;color:var(--good);margin-top:12px;text-align:center;display:none;}
+  .pallet-setup-btns{display:flex;gap:10px;margin-top:14px;}
+  .pallet-setup-btns .notes-btn.small{flex:1;justify-content:center;margin-bottom:0;padding:10px 8px;font-size:0.88rem;}
   .partial-pallet-row{margin-bottom:10px;}
-  .partial-pallet-row input{width:100%;padding:12px;font-size:1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:8px;box-sizing:border-box;}
+  .partial-pallet-row input{width:100%;padding:14px;font-size:1.1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:10px;box-sizing:border-box;}
   .partial-pallet-btns{display:flex;gap:8px;}
   .partial-pallet-btns button{flex:1;margin-bottom:0;}
+  .btn-partial-pallet{width:100%;padding:18px;font-size:1.15rem;font-weight:800;border-radius:12px;border:3px solid var(--warn);background:#fff8e6;color:#7a5b00;margin-bottom:10px;}
+  .btn-partial-pallet:active{background:var(--warn);color:#fff;}
   .pallet-preset-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .pallet-preset-row .job-picker-row{flex:1;margin-bottom:0;}
   .pallet-preset-del{background:none;border:none;color:var(--accent);font-size:1.1rem;font-weight:800;cursor:pointer;padding:6px 10px;}
@@ -460,9 +465,9 @@
     <div class="pallet-setup">
       <button type="button" class="pallet-setup-toggle" onclick="togglePalletSetup()">
         <span>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></span>
-        <span id="palletSetupCaret">▾</span>
+        <span id="palletSetupCaret">▴</span>
       </button>
-      <div class="pallet-setup-body" id="palletSetupBody">
+      <div class="pallet-setup-body open" id="palletSetupBody">
         <div class="pallet-setup-row">
           <div class="pallet-setup-field">
             <label><span data-en>Pieces per Box</span><span data-es>Piezas por Caja</span></label>
@@ -497,7 +502,7 @@
         <button class="btn-submit" onclick="confirmPartialPallet()"><span data-en>Add Partial Pallet</span><span data-es>Agregar Tarima Parcial</span></button>
       </div>
     </div>
-    <button class="btn-secondary" id="partialPalletToggleBtn" onclick="openPartialPallet()">➗ <span data-en>Partial Pallet (Split Shipment)</span><span data-es>Tarima Parcial (Envío Dividido)</span></button>
+    <button class="btn-partial-pallet" id="partialPalletToggleBtn" onclick="openPartialPallet()">➗ <span data-en>Partial Pallet (Split Shipment)</span><span data-es>Tarima Parcial (Envío Dividido)</span></button>
     <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
 
