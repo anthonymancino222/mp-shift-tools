@@ -121,9 +121,33 @@
   .pallet-display{text-align:center;margin-bottom:2px;}
   .pallet-total{font-size:3.6rem;font-weight:900;color:var(--navy);line-height:1;}
   .pallet-total-label{font-size:0.8rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
-  .pallet-shift-line{text-align:center;font-size:0.95rem;font-weight:700;color:#444;margin-bottom:14px;}
-  .btn-pallet{width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;background:var(--good);color:#fff;}
+  .pallet-shift-line{text-align:center;font-size:0.95rem;font-weight:700;color:#444;margin-bottom:4px;}
+  .pallet-progress-line{text-align:center;font-size:0.82rem;color:#888;margin-bottom:14px;}
+  .btn-pallet{width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;background:var(--good);color:#fff;margin-bottom:10px;}
   .btn-pallet:active{background:var(--good-light);}
+
+  /* Packing setup — nested inside the Pallet card, lets the app compute
+     pieces-per-pallet from Pieces/Box × Boxes/Pallet, so +1 Pallet can also
+     auto-add the right amount to Good Count. Collapsed by default so it
+     doesn't compete with the big pallet-count number for attention. */
+  .pallet-setup{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px;background:var(--pink-soft);}
+  .pallet-setup-toggle{width:100%;background:none;border:none;padding:0;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:0.9rem;color:var(--navy);cursor:pointer;}
+  .pallet-setup-body{display:none;margin-top:10px;}
+  .pallet-setup-body.open{display:block;}
+  .pallet-setup-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .pallet-setup-field label{font-size:0.78rem;font-weight:700;color:#666;display:block;margin-bottom:3px;}
+  .pallet-setup-field input{width:100%;padding:9px;font-size:0.95rem;border:1px solid var(--border);border-radius:8px;box-sizing:border-box;}
+  .pallet-setup-computed{font-size:0.85rem;font-weight:700;color:var(--good);margin-top:8px;display:none;}
+  .pallet-setup-btns{display:flex;gap:8px;margin-top:10px;}
+  .pallet-setup-btns .notes-btn.small{flex:1;justify-content:center;margin-bottom:0;}
+  .partial-pallet-row{margin-bottom:10px;}
+  .partial-pallet-row input{width:100%;padding:12px;font-size:1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:8px;box-sizing:border-box;}
+  .partial-pallet-btns{display:flex;gap:8px;}
+  .partial-pallet-btns button{flex:1;margin-bottom:0;}
+  .pallet-preset-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .pallet-preset-row .job-picker-row{flex:1;margin-bottom:0;}
+  .pallet-preset-del{background:none;border:none;color:var(--accent);font-size:1.1rem;font-weight:800;cursor:pointer;padding:6px 10px;}
+  .entry-pallet-tag{display:inline-block;font-size:0.75rem;font-weight:700;color:var(--navy);background:var(--pink-soft);border-radius:6px;padding:2px 8px;margin-top:4px;}
 
   /* Manual numeric count fields */
   .counter-block{margin-bottom:16px;}
@@ -428,12 +452,52 @@
   <!-- PALLET TRACKING -->
   <div class="card" id="palletCard" style="display:none;">
     <h2><span data-en>Pallets Ready for Shipping</span><span data-es>Tarimas Listas para Envío</span></h2>
+
+    <!-- Packing setup — can be entered/changed any time during the job, not
+         just at creation. When both fields are filled, +1 Pallet Complete
+         auto-adds that many pieces to Good Count; leave blank to keep
+         pallets as a plain tally like before. -->
+    <div class="pallet-setup">
+      <button type="button" class="pallet-setup-toggle" onclick="togglePalletSetup()">
+        <span>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></span>
+        <span id="palletSetupCaret">▾</span>
+      </button>
+      <div class="pallet-setup-body" id="palletSetupBody">
+        <div class="pallet-setup-row">
+          <div class="pallet-setup-field">
+            <label><span data-en>Pieces per Box</span><span data-es>Piezas por Caja</span></label>
+            <input id="palletPiecesPerBox" type="text" inputmode="numeric" oninput="onPalletConfigInput(this)">
+          </div>
+          <div class="pallet-setup-field">
+            <label><span data-en>Boxes per Pallet</span><span data-es>Cajas por Tarima</span></label>
+            <input id="palletBoxesPerPallet" type="text" inputmode="numeric" oninput="onPalletConfigInput(this)">
+          </div>
+        </div>
+        <div class="pallet-setup-computed" id="palletComputedLine"></div>
+        <div class="pallet-setup-btns">
+          <button type="button" class="notes-btn small" onclick="openPalletPresets()">📂 <span data-en>Saved Setups</span><span data-es>Configs Guardadas</span></button>
+          <button type="button" class="notes-btn small" onclick="savePalletPreset()">💾 <span data-en>Save This Setup</span><span data-es>Guardar Esta Config</span></button>
+        </div>
+      </div>
+    </div>
+
     <div class="pallet-display">
       <div class="pallet-total" id="palletTotal">0</div>
       <div class="pallet-total-label"><span data-en>Total Pallets</span><span data-es>Total de Tarimas</span></div>
     </div>
     <div class="pallet-shift-line" id="palletShiftLine"></div>
+    <div class="pallet-progress-line" id="palletProgressLine" style="display:none;"></div>
+
     <button class="btn-pallet" onclick="addPallet()">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
+
+    <div class="partial-pallet-row" id="partialPalletRow" style="display:none;">
+      <input id="partialPalletInput" type="text" inputmode="numeric" oninput="formatThousands(this)" data-ph-en="Pieces on this pallet" data-ph-es="Piezas en esta tarima" placeholder="Pieces on this pallet">
+      <div class="partial-pallet-btns">
+        <button class="modal-cancel-btn" onclick="cancelPartialPallet()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+        <button class="btn-submit" onclick="confirmPartialPallet()"><span data-en>Add Partial Pallet</span><span data-es>Agregar Tarima Parcial</span></button>
+      </div>
+    </div>
+    <button class="btn-secondary" id="partialPalletToggleBtn" onclick="openPartialPallet()">➗ <span data-en>Partial Pallet (Split Shipment)</span><span data-es>Tarima Parcial (Envío Dividido)</span></button>
     <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
 
@@ -530,6 +594,18 @@
       <div class="job-picker-list" id="jobPickerProductList"></div>
     </div>
     <button class="modal-cancel-btn" onclick="closeJobPicker()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+  </div>
+</div>
+
+<!-- SAVED PALLET COUNTS — lets a packer reuse a Pieces/Box × Boxes/Pallet
+     setup across future jobs instead of retyping it, since many jobs on the
+     same station share the same packing spec. Saved device-wide (not tied
+     to any one job), applied to whichever job is currently active. -->
+<div class="modal-overlay" id="palletPresetsOverlay">
+  <div class="modal-box notes-modal-box">
+    <h3><span data-en>📂 Saved Pallet Counts</span><span data-es>📂 Configs de Tarima Guardadas</span></h3>
+    <div class="job-picker-list" id="palletPresetsList"></div>
+    <button class="modal-cancel-btn" onclick="closePalletPresets()"><span data-en>Close</span><span data-es>Cerrar</span></button>
   </div>
 </div>
 
@@ -632,9 +708,17 @@ function loadAll(){
       if(e.originalGood === undefined){ e.originalGood = null; needsSave = true; }
       if(e.originalReject === undefined){ e.originalReject = null; needsSave = true; }
       if(!e.notes){ e.notes = []; needsSave = true; }
+      if(e.voided === undefined){ e.voided = false; needsSave = true; }
+      if(e.fromPallet === undefined){ e.fromPallet = false; needsSave = true; }
+    });
+    (job.pallets||[]).forEach(p=>{
+      if(p.pieces === undefined){ p.pieces = null; needsSave = true; }
+      if(p.linkedEntryId === undefined){ p.linkedEntryId = null; needsSave = true; }
+      if(p.partial === undefined){ p.partial = false; needsSave = true; }
     });
     if(!job.pallets){ job.pallets = []; needsSave = true; }
     if(!job.notes){ job.notes = []; needsSave = true; }
+    if(!job.palletConfig){ job.palletConfig = { piecesPerBox: null, boxesPerPallet: null }; needsSave = true; }
   });
   if(needsSave) saveAll();
 }
@@ -1100,7 +1184,7 @@ function createJob(){
   // the 2nd pass never inherits the 1st pass's running total.
   const id = po + '_p' + newJobPass;
   if (!jobs[id]) {
-    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [], notes: [] };
+    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null } };
     saveAll();
   }
   currentJobId = id;
@@ -1307,8 +1391,147 @@ function submitEntry(){
    re-push the corrected value) — it only flips a local `voided` flag so a
    stray tap can't resurrect via the next sync pull, and the final report
    totals from local non-voided pallets, which is the authoritative number. */
+// Packing setup — Pieces/Box × Boxes/Pallet lets the app know how many
+// pieces one full pallet holds, so a single +1 Pallet tap can also add that
+// many pieces to Good Count (see addPallet below). Per-job, since packing
+// specs vary by product — see the Saved Setups preset library further down
+// for reusing a common setup across jobs without retyping it.
+function getPalletConfig(job){
+  if(!job.palletConfig) job.palletConfig = { piecesPerBox: null, boxesPerPallet: null };
+  return job.palletConfig;
+}
+function piecesPerPalletFor(job){
+  const cfg = getPalletConfig(job);
+  const ppb = Number(cfg.piecesPerBox) || 0;
+  const bpp = Number(cfg.boxesPerPallet) || 0;
+  return (ppb > 0 && bpp > 0) ? ppb * bpp : 0;
+}
+
+/* Keeps the Packing Setup inputs and the computed/progress lines in sync
+   with the current job's config — called from renderJob() and whenever the
+   config itself changes. Safe to call even when the Pallet card is hidden. */
+function renderPalletSection(){
+  if(!currentJobId) return;
+  const pieceBoxEl = document.getElementById('palletPiecesPerBox');
+  if(!pieceBoxEl) return; // pallet card not in DOM yet on first paint
+  const isEs = document.body.classList.contains('es');
+  const job = jobs[currentJobId];
+  const cfg = getPalletConfig(job);
+  pieceBoxEl.value = cfg.piecesPerBox ? cfg.piecesPerBox.toLocaleString('en-US') : '';
+  document.getElementById('palletBoxesPerPallet').value = cfg.boxesPerPallet ? cfg.boxesPerPallet.toLocaleString('en-US') : '';
+  const ppp = piecesPerPalletFor(job);
+  const computedEl = document.getElementById('palletComputedLine');
+  const progressEl = document.getElementById('palletProgressLine');
+  if(ppp > 0){
+    computedEl.style.display = 'block';
+    computedEl.textContent = '= ' + ppp.toLocaleString() + (isEs ? ' piezas por tarima' : ' pieces per pallet');
+    const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+    const towardNext = totalGood % ppp;
+    progressEl.style.display = 'block';
+    progressEl.textContent = isEs
+      ? `${towardNext.toLocaleString()} / ${ppp.toLocaleString()} piezas hacia la siguiente tarima`
+      : `${towardNext.toLocaleString()} / ${ppp.toLocaleString()} pieces toward next pallet`;
+  } else {
+    computedEl.style.display = 'none';
+    progressEl.style.display = 'none';
+  }
+}
+
+function togglePalletSetup(){
+  const body = document.getElementById('palletSetupBody');
+  const caret = document.getElementById('palletSetupCaret');
+  const open = body.classList.toggle('open');
+  caret.textContent = open ? '▴' : '▾';
+}
+
+function onPalletConfigInput(el){
+  formatThousands(el);
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const cfg = getPalletConfig(job);
+  cfg.piecesPerBox = parseInt(document.getElementById('palletPiecesPerBox').value.replace(/,/g,''), 10) || null;
+  cfg.boxesPerPallet = parseInt(document.getElementById('palletBoxesPerPallet').value.replace(/,/g,''), 10) || null;
+  saveAll();
+  renderPalletSection();
+}
+
+/* Creates the auto Good Count entry a pallet action adds alongside the
+   pallet record itself — same shape as a manually-typed entry (so it syncs,
+   reports, and sums exactly like one), just tagged fromPallet for display. */
+function createAutoEntryFromPallet(job, good, partial){
+  const entry = {
+    id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    shift: currentShift,
+    date: new Date().toISOString().slice(0,10),
+    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+    good, reject: 0, flags: '',
+    loggedAt: Date.now(),
+    edited: false,
+    originalGood: null,
+    originalReject: null,
+    synced: false,
+    notes: [],
+    voided: false,
+    fromPallet: true,
+    partial: !!partial
+  };
+  job.entries.push(entry);
+  pushLiveEntry(job, entry);
+  return entry;
+}
+
+/* A single fast tap — no confirm dialog — since this is the common case
+   (a full, standard pallet). When a packing setup is configured, it also
+   auto-adds that many pieces to Good Count via a linked entry; undoPallet
+   reverses both together. With no setup, this is just a plain tally, same
+   as before the feature existed. */
 function addPallet(){
   if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const ppp = piecesPerPalletFor(job);
+  const pallet = {
+    id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    shift: currentShift,
+    date: new Date().toISOString().slice(0,10),
+    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+    loggedAt: Date.now(),
+    synced: false,
+    voided: false,
+    pieces: ppp || null,
+    linkedEntryId: null,
+    partial: false
+  };
+  job.pallets.push(pallet);
+  if(ppp > 0){
+    const entry = createAutoEntryFromPallet(job, ppp, false);
+    pallet.linkedEntryId = entry.id;
+  }
+  saveAll();
+  renderJob();
+  pushLivePallet(job, pallet);
+}
+
+/* Manual override for a pallet that isn't the standard full count — a
+   split-shipment's last pallet, or any job with no packing setup entered.
+   Always available regardless of whether Packing Setup is filled in. */
+function openPartialPallet(){
+  if(!currentJobId) return;
+  document.getElementById('partialPalletInput').value = '';
+  document.getElementById('partialPalletRow').style.display = 'block';
+  document.getElementById('partialPalletToggleBtn').style.display = 'none';
+}
+function cancelPartialPallet(){
+  document.getElementById('partialPalletRow').style.display = 'none';
+  document.getElementById('partialPalletToggleBtn').style.display = 'block';
+}
+function confirmPartialPallet(){
+  if(!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const pieces = parseInt(document.getElementById('partialPalletInput').value.replace(/,/g,''), 10) || 0;
+  if(pieces <= 0){
+    alert(isEs ? 'Ingrese la cantidad de piezas en esta tarima.' : 'Enter how many pieces are on this pallet.');
+    return;
+  }
   const job = jobs[currentJobId];
   const pallet = {
     id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
@@ -1317,14 +1540,26 @@ function addPallet(){
     time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
     loggedAt: Date.now(),
     synced: false,
-    voided: false
+    voided: false,
+    pieces,
+    linkedEntryId: null,
+    partial: true
   };
   job.pallets.push(pallet);
+  const entry = createAutoEntryFromPallet(job, pieces, true);
+  pallet.linkedEntryId = entry.id;
   saveAll();
+  cancelPartialPallet();
   renderJob();
   pushLivePallet(job, pallet);
 }
 
+/* Undo never calls the backend (same as editing a good/reject count doesn't
+   re-push the corrected value) — it only flips a local `voided` flag so a
+   stray tap can't resurrect via the next sync pull, and the final report
+   totals from local non-voided pallets/entries, which is the authoritative
+   number. Voiding a pallet also voids the Good Count entry it auto-created
+   (if any), so undoing a pallet correctly reverses the count it added. */
 function undoPallet(){
   if(!currentJobId) return;
   const job = jobs[currentJobId];
@@ -1332,8 +1567,109 @@ function undoPallet(){
   if(!active.length) return;
   const last = active.reduce((a,b)=> b.loggedAt > a.loggedAt ? b : a);
   last.voided = true;
+  if(last.linkedEntryId){
+    const linkedEntry = job.entries.find(e => e.id === last.linkedEntryId);
+    if(linkedEntry) linkedEntry.voided = true;
+  }
   saveAll();
   renderJob();
+}
+
+/* ── Saved Pallet Counts — a small device-wide preset library so a common
+   Pieces/Box × Boxes/Pallet setup can be reused across future jobs instead
+   of retyping it every time. Presets are just remembered numbers, not
+   shift data, so they live in localStorage only — never synced/pushed. ─── */
+const PALLET_PRESETS_KEY = 'gluer_pallet_presets_v1';
+function loadPalletPresets(){
+  try{ return JSON.parse(localStorage.getItem(PALLET_PRESETS_KEY)) || []; }
+  catch(e){ return []; }
+}
+function savePalletPresets(presets){
+  localStorage.setItem(PALLET_PRESETS_KEY, JSON.stringify(presets));
+}
+
+function savePalletPreset(){
+  if(!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const job = jobs[currentJobId];
+  const cfg = getPalletConfig(job);
+  const ppb = Number(cfg.piecesPerBox) || 0;
+  const bpp = Number(cfg.boxesPerPallet) || 0;
+  if(!ppb || !bpp){
+    alert(isEs ? 'Ingrese Piezas por Caja y Cajas por Tarima primero.' : 'Enter Pieces per Box and Boxes per Pallet first.');
+    return;
+  }
+  const label = prompt(
+    isEs ? 'Nombre para esta configuración guardada:' : 'Name for this saved setup:',
+    job.product || job.po || ''
+  );
+  if(label === null || !label.trim()) return;
+  const presets = loadPalletPresets();
+  presets.push({
+    id: 'preset_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    label: label.trim(),
+    piecesPerBox: ppb,
+    boxesPerPallet: bpp,
+    savedAt: Date.now()
+  });
+  savePalletPresets(presets);
+  alert(isEs ? '✅ Configuración guardada.' : '✅ Setup saved.');
+}
+
+function openPalletPresets(){
+  renderPalletPresetsList();
+  document.getElementById('palletPresetsOverlay').classList.add('open');
+}
+function closePalletPresets(){
+  document.getElementById('palletPresetsOverlay').classList.remove('open');
+}
+function renderPalletPresetsList(){
+  const isEs = document.body.classList.contains('es');
+  const listEl = document.getElementById('palletPresetsList');
+  const presets = loadPalletPresets();
+  if(!presets.length){
+    listEl.innerHTML = '<div class="cust-no-results">' + (isEs ? 'Sin configuraciones guardadas todavía.' : 'No saved setups yet.') + '</div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  presets.slice().sort((a,b)=>b.savedAt-a.savedAt).forEach(function(preset){
+    const row = document.createElement('div');
+    row.className = 'pallet-preset-row';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'job-picker-row';
+    const ppp = preset.piecesPerBox * preset.boxesPerPallet;
+    b.innerHTML = '<div style="font-weight:700;">' + escapeHtml(preset.label) + '</div>' +
+      '<div style="font-size:12.5px;font-weight:400;color:#666;margin-top:2px;">' +
+      preset.piecesPerBox.toLocaleString() + (isEs?' pzs/caja × ':' pcs/box × ') + preset.boxesPerPallet.toLocaleString() +
+      (isEs?' cajas/tarima = ':' boxes/pallet = ') + ppp.toLocaleString() + (isEs?' pzs/tarima':' pcs/pallet') + '</div>';
+    b.onclick = function(){ applyPalletPreset(preset); };
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'pallet-preset-del';
+    del.textContent = '✕';
+    del.title = isEs ? 'Eliminar' : 'Delete';
+    del.onclick = function(){ deletePalletPreset(preset.id); };
+    row.appendChild(b);
+    row.appendChild(del);
+    listEl.appendChild(row);
+  });
+}
+function applyPalletPreset(preset){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const cfg = getPalletConfig(job);
+  cfg.piecesPerBox = preset.piecesPerBox;
+  cfg.boxesPerPallet = preset.boxesPerPallet;
+  saveAll();
+  renderPalletSection();
+  closePalletPresets();
+}
+function deletePalletPreset(id){
+  const isEs = document.body.classList.contains('es');
+  if(!confirm(isEs ? '¿Eliminar esta configuración guardada?' : 'Delete this saved setup?')) return;
+  savePalletPresets(loadPalletPresets().filter(p => p.id !== id));
+  renderPalletPresetsList();
 }
 
 const palletPushesInFlight = new Map();
@@ -1622,8 +1958,8 @@ function sendReport(){
     : `Finish this job and send the report to Jayro?\n\nJob: ${job.po}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}`;
   if(!confirm(confirmMsg)) return;
 
-  const totalGood = job.entries.reduce((s,e)=>s+e.good,0);
-  const totalReject = job.entries.reduce((s,e)=>s+e.reject,0);
+  const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+  const totalReject = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
   const totalPallets = job.pallets.filter(p=>!p.voided).length;
 
   const subject = `Shift Count Report — ${job.po} (${job.machine}${passText ? ', '+passText : ''})`;
@@ -1802,8 +2138,8 @@ function renderJob(){
     deleteCard.style.display='none';
     // Preview only shows the banner counts — skip everything else (shift
     // toggle, entry form, pallets, history) since it isn't shown anyway.
-    const totalGoodPreview = job.entries.reduce((s,e)=>s+e.good,0);
-    const totalRejectPreview = job.entries.reduce((s,e)=>s+e.reject,0);
+    const totalGoodPreview = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+    const totalRejectPreview = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
     document.getElementById('bannerCount').textContent = totalGoodPreview.toLocaleString();
     document.getElementById('bannerHold').textContent = totalRejectPreview.toLocaleString();
     document.getElementById('bannerTarget').textContent = job.target ? job.target.toLocaleString() : '—';
@@ -1822,8 +2158,8 @@ function renderJob(){
   historyCard.style.display='block';
   deleteCard.style.display='block';
 
-  const totalGood = job.entries.reduce((s,e)=>s+e.good,0);
-  const totalReject = job.entries.reduce((s,e)=>s+e.reject,0);
+  const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+  const totalReject = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
 
   document.getElementById('bannerCount').textContent = totalGood.toLocaleString();
   document.getElementById('bannerHold').textContent = totalReject.toLocaleString();
@@ -1855,11 +2191,13 @@ function renderJob(){
   document.getElementById('palletShiftLine').textContent = isEs
     ? `Este turno: ${shiftPallets} — Total: ${totalPallets}`
     : `This shift: ${shiftPallets} — Total: ${totalPallets}`;
+  renderPalletSection();
+  const activeEntries = job.entries.filter(e=>!e.voided);
   const list = document.getElementById('historyList');
-  if(job.entries.length === 0){
+  if(activeEntries.length === 0){
     list.innerHTML = `<div class="empty-state">${isEs?'Aún no hay registros.':'No entries yet.'}</div>`;
   } else {
-    const sorted = [...job.entries].sort((a,b)=>b.loggedAt-a.loggedAt);
+    const sorted = [...activeEntries].sort((a,b)=>b.loggedAt-a.loggedAt);
     const goodLbl = isEs ? 'CONTEO BUENO' : 'GOOD COUNT';
     const rejLbl = isEs ? 'RETENIDO/REVISIÓN' : 'HOLD/REVIEW';
 
@@ -1917,6 +2255,7 @@ function renderJob(){
             </div>
           </div>
           <div class="entry-flags">${e.flags||''}</div>
+          ${e.fromPallet ? `<div class="entry-pallet-tag">📦 ${isEs?(e.partial?'Auto (Tarima Parcial)':'Auto (Tarima)'):(e.partial?'Auto (Partial Pallet)':'Auto (Pallet)')}</div>` : ''}
           ${e.synced !== true ? `<div class="entry-pending-tag">⚠ ${isEs?'No sincronizado':'Not synced'}</div>` : ''}
           <button class="notes-btn small" onclick="openNotesModal('entry','${currentJobId}','${e.id}')">📝 ${isEs?'Notas':'Notes'}${(e.notes&&e.notes.length) ? `<span class="notes-badge">${e.notes.length}</span>` : ''}</button>
           ${editRowHtml}
