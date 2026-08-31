@@ -140,7 +140,13 @@
   .pallet-setup-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .pallet-setup-field label{font-size:0.9rem;font-weight:700;color:#444;display:block;margin-bottom:5px;}
   .pallet-setup-field input{width:100%;padding:14px;font-size:1.15rem;font-weight:700;border:2px solid var(--navy);border-radius:10px;box-sizing:border-box;text-align:center;}
+  .pallet-setup-field input:disabled{background:#ececec;border-color:var(--border);color:#444;}
   .pallet-setup-computed{font-size:1.05rem;font-weight:900;color:var(--good);margin-top:12px;text-align:center;display:none;}
+  .btn-confirm-setup{width:100%;padding:14px;font-size:1.05rem;font-weight:800;border-radius:10px;border:none;background:var(--good);color:#fff;margin-top:12px;}
+  .btn-confirm-setup:active{background:var(--good-light);}
+  .btn-confirm-setup:disabled{background:#b9c9bf;cursor:not-allowed;}
+  .btn-edit-setup{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:2px solid var(--navy);background:#fff;color:var(--navy);margin-top:12px;}
+  .btn-edit-setup:active{background:var(--pink-soft);}
   .pallet-setup-btns{display:flex;gap:10px;margin-top:14px;}
   .pallet-setup-btns .notes-btn.small{flex:1;justify-content:center;margin-bottom:0;padding:10px 8px;font-size:0.88rem;}
   .partial-pallet-row{margin-bottom:10px;}
@@ -459,9 +465,11 @@
     <h2><span data-en>Pallets Ready for Shipping</span><span data-es>Tarimas Listas para Envío</span></h2>
 
     <!-- Packing setup — can be entered/changed any time during the job, not
-         just at creation. When both fields are filled, +1 Pallet Complete
-         auto-adds that many pieces to Good Count; leave blank to keep
-         pallets as a plain tally like before. -->
+         just at creation. Typing here doesn't take effect right away: it
+         only applies (and only then does +1 Pallet start auto-adding to
+         Good Count) once "Confirm Setup" is tapped, so an accidental typo
+         mid-edit can't silently change the count. Confirmed fields lock —
+         tap Edit to change them again. -->
     <div class="pallet-setup">
       <button type="button" class="pallet-setup-toggle" onclick="togglePalletSetup()">
         <span>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></span>
@@ -479,6 +487,8 @@
           </div>
         </div>
         <div class="pallet-setup-computed" id="palletComputedLine"></div>
+        <button type="button" class="btn-confirm-setup" id="palletConfirmBtn" onclick="confirmPalletSetup()">✓ <span data-en>Confirm Setup</span><span data-es>Confirmar Configuración</span></button>
+        <button type="button" class="btn-edit-setup" id="palletEditBtn" onclick="editPalletSetup()" style="display:none;">✏️ <span data-en>Edit</span><span data-es>Editar</span></button>
         <div class="pallet-setup-btns">
           <button type="button" class="notes-btn small" onclick="openPalletPresets()">📂 <span data-en>Saved Setups</span><span data-es>Configs Guardadas</span></button>
           <button type="button" class="notes-btn small" onclick="savePalletPreset()">💾 <span data-en>Save This Setup</span><span data-es>Guardar Esta Config</span></button>
@@ -1189,7 +1199,7 @@ function createJob(){
   // the 2nd pass never inherits the 1st pass's running total.
   const id = po + '_p' + newJobPass;
   if (!jobs[id]) {
-    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null } };
+    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false } };
     saveAll();
   }
   currentJobId = id;
@@ -1402,34 +1412,59 @@ function submitEntry(){
 // specs vary by product — see the Saved Setups preset library further down
 // for reusing a common setup across jobs without retyping it.
 function getPalletConfig(job){
-  if(!job.palletConfig) job.palletConfig = { piecesPerBox: null, boxesPerPallet: null };
+  if(!job.palletConfig) job.palletConfig = { piecesPerBox: null, boxesPerPallet: null, confirmed: false };
+  if(job.palletConfig.confirmed === undefined) job.palletConfig.confirmed = false;
   return job.palletConfig;
 }
+// Only a CONFIRMED setup drives +1 Pallet's auto-add and the progress line —
+// an in-progress edit (typed but not yet confirmed) never silently changes
+// Good Count, so a stray keystroke can't affect a real count.
 function piecesPerPalletFor(job){
   const cfg = getPalletConfig(job);
+  if(!cfg.confirmed) return 0;
   const ppb = Number(cfg.piecesPerBox) || 0;
   const bpp = Number(cfg.boxesPerPallet) || 0;
   return (ppb > 0 && bpp > 0) ? ppb * bpp : 0;
 }
 
-/* Keeps the Packing Setup inputs and the computed/progress lines in sync
-   with the current job's config — called from renderJob() and whenever the
-   config itself changes. Safe to call even when the Pallet card is hidden. */
+/* Keeps the Packing Setup inputs, lock state, and the computed/progress
+   lines in sync with the current job's config — called from renderJob() and
+   whenever the config itself changes. Safe to call even when the Pallet
+   card is hidden. */
 function renderPalletSection(){
   if(!currentJobId) return;
   const pieceBoxEl = document.getElementById('palletPiecesPerBox');
   if(!pieceBoxEl) return; // pallet card not in DOM yet on first paint
+  const boxesPalletEl = document.getElementById('palletBoxesPerPallet');
   const isEs = document.body.classList.contains('es');
   const job = jobs[currentJobId];
   const cfg = getPalletConfig(job);
   pieceBoxEl.value = cfg.piecesPerBox ? cfg.piecesPerBox.toLocaleString('en-US') : '';
-  document.getElementById('palletBoxesPerPallet').value = cfg.boxesPerPallet ? cfg.boxesPerPallet.toLocaleString('en-US') : '';
-  const ppp = piecesPerPalletFor(job);
+  boxesPalletEl.value = cfg.boxesPerPallet ? cfg.boxesPerPallet.toLocaleString('en-US') : '';
+  pieceBoxEl.disabled = cfg.confirmed;
+  boxesPalletEl.disabled = cfg.confirmed;
+
+  const confirmBtn = document.getElementById('palletConfirmBtn');
+  const editBtn = document.getElementById('palletEditBtn');
+  confirmBtn.style.display = cfg.confirmed ? 'none' : 'block';
+  editBtn.style.display = cfg.confirmed ? 'block' : 'none';
+  const ppbRaw = Number(cfg.piecesPerBox) || 0;
+  const bppRaw = Number(cfg.boxesPerPallet) || 0;
+  confirmBtn.disabled = !(ppbRaw > 0 && bppRaw > 0);
+
   const computedEl = document.getElementById('palletComputedLine');
   const progressEl = document.getElementById('palletProgressLine');
-  if(ppp > 0){
+  const rawPpp = (ppbRaw > 0 && bppRaw > 0) ? ppbRaw * bppRaw : 0;
+  if(rawPpp > 0){
     computedEl.style.display = 'block';
-    computedEl.textContent = '= ' + ppp.toLocaleString() + (isEs ? ' piezas por tarima' : ' pieces per pallet');
+    computedEl.textContent = (cfg.confirmed ? '✓ ' : (isEs ? 'Previsualización: ' : 'Preview: ')) +
+      '= ' + rawPpp.toLocaleString() + (isEs ? ' piezas por tarima' : ' pieces per pallet');
+  } else {
+    computedEl.style.display = 'none';
+  }
+
+  const ppp = piecesPerPalletFor(job);
+  if(ppp > 0){
     const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
     const towardNext = totalGood % ppp;
     progressEl.style.display = 'block';
@@ -1437,7 +1472,6 @@ function renderPalletSection(){
       ? `${towardNext.toLocaleString()} / ${ppp.toLocaleString()} piezas hacia la siguiente tarima`
       : `${towardNext.toLocaleString()} / ${ppp.toLocaleString()} pieces toward next pallet`;
   } else {
-    computedEl.style.display = 'none';
     progressEl.style.display = 'none';
   }
 }
@@ -1456,6 +1490,28 @@ function onPalletConfigInput(el){
   const cfg = getPalletConfig(job);
   cfg.piecesPerBox = parseInt(document.getElementById('palletPiecesPerBox').value.replace(/,/g,''), 10) || null;
   cfg.boxesPerPallet = parseInt(document.getElementById('palletBoxesPerPallet').value.replace(/,/g,''), 10) || null;
+  saveAll();
+  renderPalletSection();
+}
+
+/* Locks in the typed Pieces/Box × Boxes/Pallet — only from this point does
+   +1 Pallet start auto-adding to Good Count (see piecesPerPalletFor). */
+function confirmPalletSetup(){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const cfg = getPalletConfig(job);
+  if(!(Number(cfg.piecesPerBox) > 0 && Number(cfg.boxesPerPallet) > 0)) return;
+  cfg.confirmed = true;
+  saveAll();
+  renderPalletSection();
+}
+
+/* Unlocks the fields for a correction. Auto-add pauses again (piecesPerPalletFor
+   returns 0 while unconfirmed) until Confirm Setup is tapped again. */
+function editPalletSetup(){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  getPalletConfig(job).confirmed = false;
   saveAll();
   renderPalletSection();
 }
@@ -1666,6 +1722,7 @@ function applyPalletPreset(preset){
   const cfg = getPalletConfig(job);
   cfg.piecesPerBox = preset.piecesPerBox;
   cfg.boxesPerPallet = preset.boxesPerPallet;
+  cfg.confirmed = true; // a saved preset is already a known-good, previously-confirmed setup
   saveAll();
   renderPalletSection();
   closePalletPresets();
