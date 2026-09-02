@@ -98,6 +98,16 @@
   input, select{
     width:100%; padding:12px; font-size:1.1rem;
     border:1px solid var(--border); border-radius:8px; background:#fff;
+    color:var(--text); font-style:normal; font-weight:700;
+  }
+  /* Placeholder text needs to read as clearly NOT-yet-entered — packers were
+     mistaking the example digits for their own already-typed data. Real
+     typed values above are bold/upright/dark (see input,select above);
+     placeholders are the opposite on every axis (light gray, italic,
+     regular weight) so the difference is obvious at a glance, not just a
+     faint color shift. */
+  input::placeholder, textarea::placeholder{
+    color:#aaa; font-style:italic; font-weight:400; opacity:1;
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
@@ -456,10 +466,10 @@
     </button>
     <div id="newJobForm" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
       <label><span data-en>Job / PO Number</span><span data-es>Número de Trabajo / OC</span></label>
-      <input id="njPO" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="48213">
+      <input id="njPO" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Job Number Here" data-ph-en="Enter Job Number Here" data-ph-es="Ingrese el Número de Trabajo Aquí">
 
       <label><span data-en>Product Number</span><span data-es>Número de Producto</span></label>
-      <input id="njProduct" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="10234">
+      <input id="njProduct" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Product Number Here" data-ph-en="Enter Product Number Here" data-ph-es="Ingrese el Número de Producto Aquí">
 
       <label><span data-en>Station (required)</span><span data-es>Estación (obligatorio)</span></label>
       <div class="station-grid">
@@ -487,7 +497,7 @@
       </div>
 
       <label><span data-en>Quantity to Produce</span><span data-es>Cantidad a Producir</span></label>
-      <input id="njTarget" type="text" inputmode="numeric" placeholder="50,000" oninput="formatThousands(this)">
+      <input id="njTarget" type="text" inputmode="numeric" placeholder="Enter QTY to Produce" data-ph-en="Enter QTY to Produce" data-ph-es="Ingrese la Cantidad a Producir" oninput="formatThousands(this)">
       <button class="btn-submit" onclick="createJob()"><span data-en>Create Job</span><span data-es>Crear Trabajo</span></button>
     </div>
   </div>
@@ -745,10 +755,13 @@ let jobs = {};
 let drafts = {};
 let currentJobId = null;
 let currentShift = '1';
-// No defaults on station or pass — every field in "Start New Job" is now
+// Station still has no default — every field in "Start New Job" is
 // mandatory, and a pre-picked default would let someone create a job without
-// ever actually looking at that field. Both start unselected every time and
-// createJob() refuses to proceed without an explicit tap on each.
+// ever actually looking at that field; createJob() refuses to proceed
+// without an explicit tap. Pass is the one exception, at Anthony's request:
+// it defaults to Single Pass on open (see toggleNewJobForm()) since most
+// jobs are single-pass and re-tapping it every time added little value —
+// still fully changeable before Create Job is tapped.
 let newJobStation = null;
 let newJobPass = null;
 let selectedFlags = [];
@@ -1202,17 +1215,15 @@ function toggleNewJobForm(){
   const opening = f.style.display === 'none';
   if (!opening){ f.style.display = 'none'; return; }
   requireSyncBeforeAction(() => {
-    // Always force a fresh, explicit station and pass choice — never carry
-    // over whatever was selected for the last job created in this form.
+    // Station always forces a fresh, explicit choice — never carries over
+    // whatever was selected for the last job created in this form. Pass
+    // defaults to Single Pass (see the comment by newJobPass above) instead
+    // of also resetting to unselected — still a single tap away from 1st/2nd
+    // Pass if that's what this job actually needs.
     newJobStation = null;
-    newJobPass = null;
     document.getElementById('stLongBtn').classList.remove('selected');
     document.getElementById('stShortBtn').classList.remove('selected');
-    document.getElementById('pass1Btn').classList.remove('selected');
-    document.getElementById('pass2Btn').classList.remove('selected');
-    document.getElementById('passSBtn').classList.remove('selected');
-    ['pass1Btn','pass2Btn','passSBtn'].forEach(function(id){ document.getElementById(id).classList.remove('suggested'); });
-    document.getElementById('passSuggestHint').style.display = 'none';
+    selectPass('S');
     f.style.display = 'block';
   });
 }
@@ -1751,17 +1762,28 @@ function undoPallet(){
   renderJob();
 }
 
-/* ── Saved Pallet Counts — a small device-wide preset library so a common
-   Pieces/Box × Boxes/Pallet setup can be reused across future jobs instead
-   of retyping it every time. Presets are just remembered numbers, not
-   shift data, so they live in localStorage only — never synced/pushed. ─── */
-const PALLET_PRESETS_KEY = 'gluer_pallet_presets_v1';
-function loadPalletPresets(){
-  try{ return JSON.parse(localStorage.getItem(PALLET_PRESETS_KEY)) || []; }
-  catch(e){ return []; }
-}
-function savePalletPresets(presets){
-  localStorage.setItem(PALLET_PRESETS_KEY, JSON.stringify(presets));
+/* ── Saved Pallet Counts — a preset library shared globally across every
+   tablet via the same backend as entries/pallets/notes (see PalletPresets
+   in apps_script_backend.gs), so a setup saved on one device is immediately
+   usable on any other, not just the one that saved it. palletPresetsCache
+   holds the last pull; openPalletPresets() always refreshes it first so a
+   stale local view can't hide a setup a coworker just saved elsewhere. ─── */
+let palletPresetsCache = [];
+
+function pullPalletPresets(){
+  return fetchLive().then(function(res){
+    if (res.result === 'success' && Array.isArray(res.palletPresets)){
+      palletPresetsCache = res.palletPresets.map(function(p){
+        return {
+          id: p.PresetId, label: p.Label,
+          piecesPerBox: Number(p.PiecesPerBox) || 0,
+          boxesPerPallet: Number(p.BoxesPerPallet) || 0,
+          savedAt: p.Timestamp ? new Date(p.Timestamp).getTime() : 0
+        };
+      });
+    }
+    return palletPresetsCache;
+  });
 }
 
 function savePalletPreset(){
@@ -1780,21 +1802,31 @@ function savePalletPreset(){
     job.product || job.po || ''
   );
   if(label === null || !label.trim()) return;
-  const presets = loadPalletPresets();
-  presets.push({
+  const preset = {
     id: 'preset_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     label: label.trim(),
     piecesPerBox: ppb,
     boxesPerPallet: bpp,
     savedAt: Date.now()
-  });
-  savePalletPresets(presets);
-  alert(isEs ? '✅ Configuración guardada.' : '✅ Setup saved.');
+  };
+  palletPresetsCache.push(preset); // visible immediately, even before the push to the server confirms
+  fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'save_pallet_preset', presetId: preset.id,
+      label: preset.label, piecesPerBox: ppb, boxesPerPallet: bpp
+    })
+  }).catch(function(){}); // stays in the local cache regardless; next pull reconciles either way
+  alert(isEs ? '✅ Configuración guardada — disponible para todas las tabletas.' : '✅ Setup saved — available on every tablet.');
 }
 
 function openPalletPresets(){
-  renderPalletPresetsList();
+  const isEs = document.body.classList.contains('es');
+  document.getElementById('palletPresetsList').innerHTML = '<div class="cust-no-results">' + (isEs?'Cargando…':'Loading…') + '</div>';
   document.getElementById('palletPresetsOverlay').classList.add('open');
+  pullPalletPresets().then(renderPalletPresetsList).catch(function(){
+    document.getElementById('palletPresetsList').innerHTML = '<div class="cust-no-results">' + (isEs?'Error al cargar. Intente de nuevo.':'Failed to load. Try again.') + '</div>';
+  });
 }
 function closePalletPresets(){
   document.getElementById('palletPresetsOverlay').classList.remove('open');
@@ -1802,7 +1834,7 @@ function closePalletPresets(){
 function renderPalletPresetsList(){
   const isEs = document.body.classList.contains('es');
   const listEl = document.getElementById('palletPresetsList');
-  const presets = loadPalletPresets();
+  const presets = palletPresetsCache;
   if(!presets.length){
     listEl.innerHTML = '<div class="cust-no-results">' + (isEs ? 'Sin configuraciones guardadas todavía.' : 'No saved setups yet.') + '</div>';
     return;
@@ -1844,9 +1876,13 @@ function applyPalletPreset(preset){
 }
 function deletePalletPreset(id){
   const isEs = document.body.classList.contains('es');
-  if(!confirm(isEs ? '¿Eliminar esta configuración guardada?' : 'Delete this saved setup?')) return;
-  savePalletPresets(loadPalletPresets().filter(p => p.id !== id));
+  if(!confirm(isEs ? '¿Eliminar esta configuración guardada? Esto la quita para todas las tabletas.' : 'Delete this saved setup? This removes it for every tablet.')) return;
+  palletPresetsCache = palletPresetsCache.filter(p => p.id !== id);
   renderPalletPresetsList();
+  fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_pallet_preset', presetId: id })
+  }).catch(function(){});
 }
 
 const palletPushesInFlight = new Map();
