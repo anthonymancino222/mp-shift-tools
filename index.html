@@ -94,6 +94,13 @@
     padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.08);
   }
   .card h2{margin:0 0 12px;font-size:1.1rem;color:var(--navy);border-bottom:2px solid var(--border);padding-bottom:8px;}
+  .card h2.with-help{display:flex;justify-content:space-between;align-items:center;}
+  .help-icon-btn{
+    width:26px;height:26px;min-width:26px;border-radius:50%;border:2px solid var(--navy);
+    background:#fff;color:var(--navy);font-size:0.9rem;font-weight:900;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  }
+  .help-icon-btn:active{background:var(--navy);color:#fff;}
   label{display:block;font-size:0.85rem;font-weight:700;margin:10px 0 4px;color:#333;}
   input, select{
     width:100%; padding:12px; font-size:1.1rem;
@@ -529,7 +536,10 @@
 
   <!-- PALLET TRACKING -->
   <div class="card" id="palletCard" style="display:none;">
-    <h2><span data-en>Pallets Ready for Shipping</span><span data-es>Tarimas Listas para Envío</span></h2>
+    <h2 class="with-help">
+      <span><span data-en>Pallets Ready for Shipping</span><span data-es>Tarimas Listas para Envío</span></span>
+      <button type="button" class="help-icon-btn" onclick="showPalletHelp()" title="How this works">?</button>
+    </h2>
 
     <!-- Packing setup — can be entered/changed any time during the job, not
          just at creation. Typing here doesn't take effect right away: it
@@ -1607,6 +1617,32 @@ function togglePalletSetup(){
   const caret = document.getElementById('palletSetupCaret');
   const open = body.classList.toggle('open');
   caret.textContent = open ? '▴' : '▾';
+}
+
+function showPalletHelp(){
+  const isEs = document.body.classList.contains('es');
+  const msg = isEs
+    ? '⚙️ CONFIGURACIÓN DE EMPAQUE\n' +
+      'Ingrese Piezas por Caja y Cajas por Tarima, luego toque "Confirmar Configuración" para bloquearlo. Toque "Editar" para cambiarlo después.\n\n' +
+      '📦 +1 TARIMA COMPLETA\n' +
+      'Un toque registra una tarima. Si la Configuración de Empaque está confirmada, también suma esa cantidad de piezas al Conteo Bueno automáticamente.\n\n' +
+      '➗ TARIMA PARCIAL\n' +
+      'Para la última tarima de un envío dividido que no está completamente llena — escriba la cantidad real de piezas en esa tarima.\n\n' +
+      '↩ DESHACER ÚLTIMA TARIMA\n' +
+      'Quita la tarima más reciente y también revierte las piezas que haya sumado al Conteo Bueno.\n\n' +
+      '📂 CONFIGS GUARDADAS\n' +
+      'Guarde una configuración de empaque para reutilizarla en futuros trabajos — se comparte con todas las tabletas.'
+    : '⚙️ PACKING SETUP\n' +
+      'Enter Pieces per Box and Boxes per Pallet, then tap "Confirm Setup" to lock it in. Tap "Edit" to change it later.\n\n' +
+      '📦 +1 PALLET COMPLETE\n' +
+      'One tap logs a pallet. If Packing Setup is confirmed, it also adds that many pieces to Good Count automatically.\n\n' +
+      '➗ PARTIAL PALLET\n' +
+      'For a split shipment\'s last pallet that isn\'t completely full — type the actual piece count on that one pallet.\n\n' +
+      '↩ UNDO LAST PALLET\n' +
+      'Removes the most recent pallet and also reverses any pieces it added to Good Count.\n\n' +
+      '📂 SAVED SETUPS\n' +
+      'Save a packing setup to reuse on future jobs — shared with every tablet.';
+  alert(msg);
 }
 
 function onPalletConfigInput(el){
