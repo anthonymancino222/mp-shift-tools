@@ -88,7 +88,7 @@
     border-radius:50%;min-width:24px;height:24px;display:flex;align-items:center;
     justify-content:center;font-size:0.8rem;font-weight:800;padding:0 6px;
   }
-  #homeBtn, #dashBtnTop{display:none;}
+  #homeBtn, #dashBtnTop, #globalSyncBar{display:none;}
   .card{
     background:var(--card); border:1px solid var(--border); border-radius:12px;
     padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.08);
@@ -408,9 +408,11 @@
   <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
 </div>
 
-<!-- GLOBAL SYNC BAR — always visible, independent of which job is open, so
-     a weak-WiFi backlog of unsynced entries is never out of sight. -->
-<div class="global-sync-bar">
+<!-- GLOBAL SYNC BAR — visible whenever a job section is open, independent of
+     which job that is, so a weak-WiFi backlog of unsynced entries is never
+     out of sight. Hidden on the landing page itself (nothing to sync from
+     there — the Log Production Counts tile's own badge already covers it). -->
+<div class="global-sync-bar" id="globalSyncBar">
   <div class="global-sync-status" id="globalSyncStatus">
     <span data-en>All synced</span><span data-es>Todo sincronizado</span>
   </div>
@@ -827,6 +829,7 @@ function showLanding(){
   document.getElementById('mainContainer').classList.remove('open');
   document.getElementById('homeBtn').style.display = 'none';
   document.getElementById('dashBtnTop').style.display = 'none';
+  document.getElementById('globalSyncBar').style.display = 'none';
   renderLandingStatus();
 }
 
@@ -835,6 +838,7 @@ function enterLogScreen(){
   document.getElementById('mainContainer').classList.add('open');
   document.getElementById('homeBtn').style.display = 'inline-flex';
   document.getElementById('dashBtnTop').style.display = 'inline-flex';
+  document.getElementById('globalSyncBar').style.display = 'flex';
 }
 
 function _landingGreeting(isEs){
