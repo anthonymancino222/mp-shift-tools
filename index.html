@@ -59,7 +59,36 @@
     background:#fff; border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
   }
-  .container{max-width:760px;margin:0 auto;padding:12px;}
+  .container{max-width:760px;margin:0 auto;padding:12px;display:none;}
+  .container.open{display:block;}
+
+  /* Landing page — shown first instead of dropping straight into the
+     logging UI, so opening the app feels like choosing where to go rather
+     than being thrown into a form. Mirrors the "pick a section" pattern
+     from the SOP app (Moquin Document Control), in this app's own palette. */
+  #landingScreen{max-width:760px;margin:0 auto;padding:12px;}
+  .landing-hero{text-align:center;padding:26px 12px 6px;}
+  .landing-greeting{font-size:1.7rem;font-weight:900;color:var(--black);}
+  .landing-sub{font-size:0.95rem;color:#666;margin-top:6px;}
+  .landing-grid{display:grid;grid-template-columns:1fr;gap:14px;padding:18px 4px;}
+  @media (min-width:560px){ .landing-grid{grid-template-columns:1fr 1fr;} }
+  .landing-card{
+    text-align:left;background:var(--card);border:1px solid var(--border);
+    border-left:6px solid var(--tile-accent, var(--navy));border-radius:14px;
+    padding:22px 20px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.08);
+    font-family:inherit;position:relative;
+  }
+  .landing-card:active{background:var(--pink-soft);}
+  .landing-icon{font-size:1.9rem;margin-bottom:10px;}
+  .landing-title{font-size:1.2rem;font-weight:800;color:var(--black);margin-bottom:6px;}
+  .landing-desc{font-size:0.88rem;color:#666;line-height:1.4;}
+  .landing-status{font-size:0.82rem;font-weight:700;color:var(--navy);margin-top:10px;}
+  .landing-badge{
+    position:absolute;top:16px;right:16px;background:var(--accent);color:#fff;
+    border-radius:50%;min-width:24px;height:24px;display:flex;align-items:center;
+    justify-content:center;font-size:0.8rem;font-weight:800;padding:0 6px;
+  }
+  #homeBtn, #dashBtnTop{display:none;}
   .card{
     background:var(--card); border:1px solid var(--border); border-radius:12px;
     padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.08);
@@ -374,7 +403,8 @@
 </header>
 
 <div class="top-btn-row">
-  <button class="dash-btn" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
+  <button class="dash-btn" id="homeBtn" onclick="showLanding()">🏠 <span data-en>Home</span><span data-es>Inicio</span></button>
+  <button class="dash-btn" id="dashBtnTop" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
   <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
 </div>
 
@@ -387,7 +417,32 @@
   <button class="global-sync-btn" onclick="manualGlobalSync()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
 </div>
 
-<div class="container">
+<!-- LANDING PAGE — shown first, instead of dropping straight into the
+     logging form. Each section is its own big tappable tile, same idea as
+     the SOP app's hub page: easier to feel your way into than being thrown
+     straight into a form. -->
+<div id="landingScreen">
+  <div class="landing-hero">
+    <div class="landing-greeting" id="landingGreeting">Hello.</div>
+    <div class="landing-sub"><span data-en>Where would you like to go?</span><span data-es>¿A dónde le gustaría ir?</span></div>
+  </div>
+  <div class="landing-grid">
+    <button type="button" class="landing-card" style="--tile-accent:var(--navy);" onclick="enterLogScreen()">
+      <div class="landing-icon">📦</div>
+      <div class="landing-title"><span data-en>Log Production Counts</span><span data-es>Registrar Conteos de Producción</span></div>
+      <div class="landing-desc"><span data-en>Start or continue a job, track Good/Hold counts and pallets.</span><span data-es>Inicie o continúe un trabajo, registre conteos Bueno/Retenido y tarimas.</span></div>
+      <div class="landing-status" id="landingJobStatus"></div>
+      <div class="landing-badge" id="landingSyncBadge" style="display:none;"></div>
+    </button>
+    <button type="button" class="landing-card" style="--tile-accent:var(--info);" onclick="openDashboard()">
+      <div class="landing-icon">📊</div>
+      <div class="landing-title"><span data-en>Dashboard</span><span data-es>Panel</span></div>
+      <div class="landing-desc"><span data-en>History, live jobs across every tablet, and production charts.</span><span data-es>Historial, trabajos activos en cada tableta, y gráficos de producción.</span></div>
+    </button>
+  </div>
+</div>
+
+<div class="container" id="mainContainer">
 
   <!-- JOB SELECTOR -->
   <div class="card">
@@ -753,10 +808,64 @@ function toggleLang(){
   // language it happened to be set in.
   renderDraftNotice();
   renderGlobalSyncStatus();
+  renderLandingStatus();
   if (currentJobId && jobs[currentJobId] && !jobSectionsHidden) renderJob();
   // The History tab's year/month nav labels are JS-generated too (like the
   // above), so they'd stay stuck in the old language without this.
   if (dashData) renderDashboard();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LANDING PAGE — shown first instead of dropping straight into the logging
+   form, so opening the app feels like choosing where to go (same idea as
+   the SOP app's hub page). Just a visibility toggle between #landingScreen
+   and #mainContainer — nothing about job state changes, so tapping back in
+   always resumes exactly where it was left off.
+══════════════════════════════════════════════════════════════════ */
+function showLanding(){
+  document.getElementById('landingScreen').style.display = 'block';
+  document.getElementById('mainContainer').classList.remove('open');
+  document.getElementById('homeBtn').style.display = 'none';
+  document.getElementById('dashBtnTop').style.display = 'none';
+  renderLandingStatus();
+}
+
+function enterLogScreen(){
+  document.getElementById('landingScreen').style.display = 'none';
+  document.getElementById('mainContainer').classList.add('open');
+  document.getElementById('homeBtn').style.display = 'inline-flex';
+  document.getElementById('dashBtnTop').style.display = 'inline-flex';
+}
+
+function _landingGreeting(isEs){
+  const h = new Date().getHours();
+  if (isEs) return h < 12 ? 'Buenos días.' : h < 18 ? 'Buenas tardes.' : 'Buenas noches.';
+  return h < 12 ? 'Good morning.' : h < 18 ? 'Good afternoon.' : 'Good evening.';
+}
+
+/* Surfaces just enough of the current state on the Log Production Counts
+   tile that it's obvious there's something to come back to, without
+   requiring a tap first — mirrors the badge count on the SOP app's
+   Approvals tile. */
+function renderLandingStatus(){
+  const greetingEl = document.getElementById('landingGreeting');
+  if (!greetingEl) return; // landing not in DOM yet on first paint
+  const isEs = document.body.classList.contains('es');
+  greetingEl.textContent = _landingGreeting(isEs);
+
+  const statusEl = document.getElementById('landingJobStatus');
+  const job = currentJobId ? jobs[currentJobId] : null;
+  if (job){
+    const pass = passLabel(job.pass, isEs);
+    statusEl.textContent = (isEs ? '▸ Continuando: ' : '▸ Continuing: ') + job.po + (pass ? ' — '+pass : '') + ' — ' + job.machine;
+  } else {
+    statusEl.textContent = isEs ? 'Sin trabajo activo todavía.' : 'No active job yet.';
+  }
+
+  const badgeEl = document.getElementById('landingSyncBadge');
+  const pending = pendingSyncCount();
+  badgeEl.style.display = pending > 0 ? 'flex' : 'none';
+  badgeEl.textContent = pending;
 }
 
 function selectStation(name){
@@ -1066,11 +1175,13 @@ function _applyPrefillFromURL(){
   var existingId = normalizePO(po) + '_p' + passKey;
   if (jobs[existingId]) {
     // Already created (deep-linked before, or entered manually) — just switch to it.
+    enterLogScreen();
     currentJobId = existingId;
     activateCurrentJob();
     return;
   }
 
+  enterLogScreen();
   requireSyncBeforeAction(function(){
     document.getElementById('njPO').value = po;
     document.getElementById('njProduct').value = product;
@@ -2971,6 +3082,7 @@ function _finalizeSchedulePick(jobNumber, product){
 loadAll();
 refreshJobSelect();
 renderGlobalSyncStatus();
+showLanding();
 _applyPrefillFromURL();
 _initScheduleAutoPull();
 
