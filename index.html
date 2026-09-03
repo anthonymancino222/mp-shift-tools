@@ -490,6 +490,10 @@
       <span data-en>+ Start New Job</span><span data-es>+ Iniciar Nuevo Trabajo</span>
     </button>
     <div id="newJobForm" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+      <div class="section-label-row" style="margin-top:0;">
+        <span class="section-label"><span data-en>New Job Details</span><span data-es>Detalles del Nuevo Trabajo</span></span>
+        <button type="button" class="help-icon-btn" onclick="showNewJobHelp()" title="How this works">?</button>
+      </div>
       <label><span data-en>Job / PO Number</span><span data-es>Número de Trabajo / OC</span></label>
       <input id="njPO" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Job Number Here" data-ph-en="Enter Job Number Here" data-ph-es="Ingrese el Número de Trabajo Aquí">
 
@@ -1539,6 +1543,22 @@ function toggleQualityIssues(){
    language toggle (and the rest of the page) stays usable while it's open —
    see toggleLang(), which calls renderHelpModal() to re-render in place. ── */
 const HELP_TEXTS = {
+  newJob: {
+    en: {
+      title: '🆕 Start New Job',
+      body: 'Fill in Job/PO Number, Product Number, Station, Pass, and Quantity to Produce, then tap "Create Job." All of these are required.\n\n' +
+        '📋 PULL SCHEDULE\n' +
+        'Tap a job from Anthony\'s exported schedule instead of typing it — auto-fills Job Number and Product Number for you. Quantity to Produce is still always typed by hand, since the schedule doesn\'t include it.\n\n' +
+        'Pass defaults to Single Pass, but can be changed to 1st/2nd Pass before tapping Create Job.'
+    },
+    es: {
+      title: '🆕 Iniciar Nuevo Trabajo',
+      body: 'Llene Número de Trabajo/OC, Número de Producto, Estación, Pasada, y Cantidad a Producir, luego toque "Crear Trabajo." Todos estos son obligatorios.\n\n' +
+        '📋 TRAER PROGRAMA\n' +
+        'Toque un trabajo del programa que Anthony exportó en lugar de escribirlo — llena automáticamente el Número de Trabajo y el Número de Producto. La Cantidad a Producir siempre se escribe a mano, ya que el programa no la incluye.\n\n' +
+        'Pasada por defecto es Pasada Única, pero se puede cambiar a 1ra/2da Pasada antes de tocar Crear Trabajo.'
+    }
+  },
   pallet: {
     en: {
       title: '📦 Pallets Ready for Shipping',
@@ -1634,6 +1654,7 @@ function renderHelpModal(){
   document.getElementById('helpModalBody').textContent = entry.body;
 }
 
+function showNewJobHelp(){ openHelpModal('newJob'); }
 function showPalletHelp(){ openHelpModal('pallet'); }
 function showManualCountHelp(){ openHelpModal('manualCount'); }
 function showSubmitHelp(){ openHelpModal('submit'); }
