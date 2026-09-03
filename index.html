@@ -39,6 +39,55 @@
     --card:#ffffff;
     --border:#e0e0e0;
     --text:#1c232b;
+    /* Secondary/tertiary text and warning-tag colors used all over the file
+       as literal hex values — pulled into variables so dark mode (below)
+       can flip them too, instead of only the handful of colors that were
+       already using var(). */
+    --text-secondary:#666;
+    --text-tertiary:#888;
+    --text-strong-secondary:#444;
+    --label-color:#333;
+    --warn-soft-bg:#fff3cd;
+    --warn-soft-text:#5c4400;
+    --input-bg:#ffffff;
+    --good-soft-bg:#e7f6ec;
+    --good-soft-bg-strong:#d7f0df;
+    --accent-soft-bg:#fdeceb;
+    --row-bg:#f9fafc;
+    --row-bg-2:#f4f6fa;
+    --disabled-bg:#ececec;
+    --disabled-btn-bg:#b9c9bf;
+    --placeholder-color:#aaa;
+  }
+  /* Dark mode — same brand colors (pink/red/green/amber read fine on dark
+     backgrounds already), just the neutral surface/text colors invert.
+     Toggled via body.dark-mode (see toggleTheme()); persisted in
+     localStorage and applied by an inline script right after <body> opens,
+     so there's no flash of the light theme before JS finishes loading. */
+  body.dark-mode{
+    --bg:#16181b;
+    --card:#232629;
+    --border:#3a3e44;
+    --text:#e8e9eb;
+    --text-secondary:#a8acb3;
+    --text-tertiary:#82868d;
+    --text-strong-secondary:#c7cad0;
+    --label-color:#d5d8dc;
+    --pink-soft:#3a1428;
+    --warn-soft-bg:#4a3a12;
+    --warn-soft-text:#f5cf6b;
+    --input-bg:#2b2e33;
+    --good:#3fbf77;
+    --good-light:#59d491;
+    --accent:#e2605f;
+    --good-soft-bg:#16301f;
+    --good-soft-bg-strong:#1f3a28;
+    --accent-soft-bg:#3a1613;
+    --row-bg:#26292e;
+    --row-bg-2:#2b2e33;
+    --disabled-bg:#33373d;
+    --disabled-btn-bg:#3a453f;
+    --placeholder-color:#787d84;
   }
   *{box-sizing:border-box;}
   body{
@@ -56,7 +105,7 @@
      never gets covered regardless of screen width. */
   .top-btn-row{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;flex-wrap:wrap;}
   .lang-toggle{
-    background:#fff; border:3px solid var(--navy); border-radius:24px;
+    background:var(--card); border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
     /* Stays clickable even while a help/notes/etc. popup is open — every
        .modal-overlay in this app is z-index:200, so this just needs to sit
@@ -73,8 +122,8 @@
      from the SOP app (Moquin Document Control), in this app's own palette. */
   #landingScreen{max-width:760px;margin:0 auto;padding:12px;}
   .landing-hero{text-align:center;padding:26px 12px 6px;}
-  .landing-greeting{font-size:1.7rem;font-weight:900;color:var(--black);}
-  .landing-sub{font-size:0.95rem;color:#666;margin-top:6px;}
+  .landing-greeting{font-size:1.7rem;font-weight:900;color:var(--text);}
+  .landing-sub{font-size:0.95rem;color:var(--text-secondary);margin-top:6px;}
   .landing-grid{display:grid;grid-template-columns:1fr;gap:14px;padding:18px 4px;}
   @media (min-width:560px){ .landing-grid{grid-template-columns:1fr 1fr;} }
   .landing-card{
@@ -85,8 +134,8 @@
   }
   .landing-card:active{background:var(--pink-soft);}
   .landing-icon{font-size:1.9rem;margin-bottom:10px;}
-  .landing-title{font-size:1.2rem;font-weight:800;color:var(--black);margin-bottom:6px;}
-  .landing-desc{font-size:0.88rem;color:#666;line-height:1.4;}
+  .landing-title{font-size:1.2rem;font-weight:800;color:var(--text);margin-bottom:6px;}
+  .landing-desc{font-size:0.88rem;color:var(--text-secondary);line-height:1.4;}
   .landing-status{font-size:0.82rem;font-weight:700;color:var(--navy);margin-top:10px;}
   /* Log Production Counts is the app's main job — it stays the big, obvious
      tap target, with a clear call-to-action instead of just sitting there
@@ -117,14 +166,14 @@
   .card h2.with-help{display:flex;justify-content:space-between;align-items:center;}
   .help-icon-btn{
     width:26px;height:26px;min-width:26px;border-radius:50%;border:2px solid var(--navy);
-    background:#fff;color:var(--navy);font-size:0.9rem;font-weight:900;line-height:1;
+    background:var(--card);color:var(--navy);font-size:0.9rem;font-weight:900;line-height:1;
     display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
   }
   .help-icon-btn:active{background:var(--navy);color:#fff;}
-  label{display:block;font-size:0.85rem;font-weight:700;margin:10px 0 4px;color:#333;}
+  label{display:block;font-size:0.85rem;font-weight:700;margin:10px 0 4px;color:var(--label-color);}
   input, select{
     width:100%; padding:12px; font-size:1.1rem;
-    border:1px solid var(--border); border-radius:8px; background:#fff;
+    border:1px solid var(--border); border-radius:8px; background:var(--input-bg);
     color:var(--text); font-style:normal; font-weight:700;
   }
   /* Placeholder text needs to read as clearly NOT-yet-entered — packers were
@@ -134,7 +183,7 @@
      regular weight) so the difference is obvious at a glance, not just a
      faint color shift. */
   input::placeholder, textarea::placeholder{
-    color:#aaa; font-style:italic; font-weight:400; opacity:1;
+    color:var(--placeholder-color); font-style:italic; font-weight:400; opacity:1;
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
@@ -142,15 +191,15 @@
   .station-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
   .station-btn{
     padding:18px 8px;font-size:1.1rem;font-weight:800;border-radius:10px;
-    border:3px solid var(--navy);background:#fff;color:var(--navy);
+    border:3px solid var(--navy);background:var(--card);color:var(--navy);
   }
   .station-btn.selected{background:var(--navy);color:#fff;}
   /* Suggested-but-not-yet-confirmed (e.g. a Pass carried over from a QA-app
      deep link) — visually distinct from .selected so it's obvious this
      still needs an actual tap, not just a glance. */
-  .station-btn.suggested{background:#fff3cd;border-color:var(--warn);color:#5c4400;border-style:dashed;}
+  .station-btn.suggested{background:var(--warn-soft-bg);border-color:var(--warn);color:var(--warn-soft-text);border-style:dashed;}
   .pass-hint{
-    font-size:0.85rem;font-weight:700;color:#5c4400;background:#fff3cd;
+    font-size:0.85rem;font-weight:700;color:var(--warn-soft-text);background:var(--warn-soft-bg);
     border-radius:8px;padding:8px 12px;margin-bottom:6px;
   }
   /* Pass buttons — its own 3-up grid since Station stays 2-up */
@@ -175,20 +224,20 @@
   }
   .job-meta .jm-label{display:block;font-size:0.7rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#e0f6ff;margin-bottom:2px;}
   .preview-hint{
-    text-align:center;font-size:0.85rem;font-weight:700;color:#5c4400;
-    background:#fff3cd;border-radius:8px;padding:8px 12px;margin-top:-4px;margin-bottom:14px;
+    text-align:center;font-size:0.85rem;font-weight:700;color:var(--warn-soft-text);
+    background:var(--warn-soft-bg);border-radius:8px;padding:8px 12px;margin-top:-4px;margin-bottom:14px;
   }
 
   .shift-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
-  .shift-btn{padding:20px 10px;font-size:1.5rem;font-weight:800;border-radius:12px;border:3px solid var(--navy);background:#fff;color:var(--navy);}
+  .shift-btn{padding:20px 10px;font-size:1.5rem;font-weight:800;border-radius:12px;border:3px solid var(--navy);background:var(--card);color:var(--navy);}
   .shift-btn.active{background:var(--navy);color:#fff;}
 
   /* Pallet tracking */
   .pallet-display{text-align:center;margin-bottom:2px;}
   .pallet-total{font-size:3.6rem;font-weight:900;color:var(--navy);line-height:1;}
-  .pallet-total-label{font-size:0.8rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
-  .pallet-shift-line{text-align:center;font-size:0.95rem;font-weight:700;color:#444;margin-bottom:4px;}
-  .pallet-progress-line{text-align:center;font-size:0.82rem;color:#888;margin-bottom:14px;}
+  .pallet-total-label{font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+  .pallet-shift-line{text-align:center;font-size:0.95rem;font-weight:700;color:var(--text-strong-secondary);margin-bottom:4px;}
+  .pallet-progress-line{text-align:center;font-size:0.82rem;color:var(--text-tertiary);margin-bottom:14px;}
   .btn-pallet{width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;background:var(--good);color:#fff;margin-bottom:10px;}
   .btn-pallet:active{background:var(--good-light);}
 
@@ -209,16 +258,16 @@
   .collapsible-title-row{display:flex;align-items:center;gap:10px;}
   .collapsible-title-row .collapsible-toggle{flex:1;}
   .section-label-row{display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;}
-  .section-label{font-size:0.8rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
+  .section-label{font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;}
   .pallet-setup-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .pallet-setup-field label{font-size:0.9rem;font-weight:700;color:#444;display:block;margin-bottom:5px;}
+  .pallet-setup-field label{font-size:0.9rem;font-weight:700;color:var(--text-strong-secondary);display:block;margin-bottom:5px;}
   .pallet-setup-field input{width:100%;padding:14px;font-size:1.15rem;font-weight:700;border:2px solid var(--navy);border-radius:10px;box-sizing:border-box;text-align:center;}
-  .pallet-setup-field input:disabled{background:#ececec;border-color:var(--border);color:#444;}
+  .pallet-setup-field input:disabled{background:var(--disabled-bg);border-color:var(--border);color:var(--text-strong-secondary);}
   .pallet-setup-computed{font-size:1.05rem;font-weight:900;color:var(--good);margin-top:12px;text-align:center;display:none;}
   .btn-confirm-setup{width:100%;padding:14px;font-size:1.05rem;font-weight:800;border-radius:10px;border:none;background:var(--good);color:#fff;margin-top:12px;}
   .btn-confirm-setup:active{background:var(--good-light);}
-  .btn-confirm-setup:disabled{background:#b9c9bf;cursor:not-allowed;}
-  .btn-edit-setup{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:2px solid var(--navy);background:#fff;color:var(--navy);margin-top:12px;}
+  .btn-confirm-setup:disabled{background:var(--disabled-btn-bg);cursor:not-allowed;}
+  .btn-edit-setup{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:2px solid var(--navy);background:var(--card);color:var(--navy);margin-top:12px;}
   .btn-edit-setup:active{background:var(--pink-soft);}
   .pallet-setup-btns{display:flex;gap:10px;margin-top:14px;}
   .pallet-setup-btns .notes-btn.small{flex:1;justify-content:center;margin-bottom:0;padding:10px 8px;font-size:0.88rem;}
@@ -226,7 +275,7 @@
   .partial-pallet-row input{width:100%;padding:14px;font-size:1.1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:10px;box-sizing:border-box;}
   .partial-pallet-btns{display:flex;gap:8px;}
   .partial-pallet-btns button{flex:1;margin-bottom:0;}
-  .btn-partial-pallet{width:100%;padding:18px;font-size:1.15rem;font-weight:800;border-radius:12px;border:3px solid var(--warn);background:#fff8e6;color:#7a5b00;margin-bottom:10px;}
+  .btn-partial-pallet{width:100%;padding:18px;font-size:1.15rem;font-weight:800;border-radius:12px;border:3px solid var(--warn);background:var(--warn-soft-bg);color:var(--warn-soft-text);margin-bottom:10px;}
   .btn-partial-pallet:active{background:var(--warn);color:#fff;}
   .pallet-preset-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .pallet-preset-row .job-picker-row{flex:1;margin-bottom:0;}
@@ -242,21 +291,21 @@
     width:100%;padding:20px;font-size:2.4rem;font-weight:900;text-align:center;
     border-radius:12px;border:2px solid var(--border);
   }
-  .count-input.good{background:#e7f6ec;color:var(--good);border-color:var(--good-light);}
-  .count-input.reject{background:#fdeceb;color:var(--accent);border-color:var(--accent);}
+  .count-input.good{background:var(--good-soft-bg);color:var(--good);border-color:var(--good-light);}
+  .count-input.reject{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);}
 
   .chip-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;}
-  .chip{padding:14px 8px;font-size:1rem;font-weight:700;border-radius:10px;border:2px solid var(--border);background:#fff;color:#444;text-align:center;}
-  .chip.selected{background:#fff3cd;border-color:var(--warn);color:#5c4400;}
+  .chip{padding:14px 8px;font-size:1rem;font-weight:700;border-radius:10px;border:2px solid var(--border);background:var(--card);color:var(--text-strong-secondary);text-align:center;}
+  .chip.selected{background:var(--warn-soft-bg);border-color:var(--warn);color:var(--warn-soft-text);}
   .other-note{margin-top:6px;}
 
   .btn-submit{width:100%;padding:20px;font-size:1.4rem;font-weight:900;border-radius:12px;border:none;background:var(--navy);color:#fff;margin-top:8px;}
   .btn-submit:active{background:var(--navy-light);}
   .btn-secondary{width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:2px solid var(--navy);background:var(--pink-soft);color:var(--navy);margin-top:8px;box-shadow:0 1px 3px rgba(0,0,0,0.12);cursor:pointer;}
   .btn-secondary:active{background:var(--navy);color:#fff;}
-  .btn-danger{background:#fdeceb;color:var(--accent);border-color:var(--accent);}
+  .btn-danger{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);}
   .btn-danger:active{background:var(--accent);color:#fff;}
-  .btn-email{background:#e7f6ec;color:var(--good);border-color:var(--good);}
+  .btn-email{background:var(--good-soft-bg);color:var(--good);border-color:var(--good);}
   .btn-email:active{background:var(--good);color:#fff;}
 
   .day-group{margin-bottom:16px;}
@@ -268,41 +317,41 @@
   .day-header .day-subtotal{font-size:0.85rem;font-weight:700;}
   .day-header .day-subtotal .sg{color:#8fe0ab;}
   .day-header .day-subtotal .sr{color:#ff9b9b;}
-  .day-entries{border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:10px;background:#f4f6fa;}
+  .day-entries{border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:10px;background:var(--row-bg-2);}
   .day-entries .entry:last-child{margin-bottom:0;}
 
-  .entry{border-left:6px solid var(--navy);background:#f9fafc;border-radius:8px;padding:12px 14px;margin-bottom:8px;}
+  .entry{border-left:6px solid var(--navy);background:var(--row-bg);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
   .entry.shift2{border-left-color:var(--accent);}
   .entry-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800;color:var(--navy);font-size:1rem;margin-bottom:8px;}
-  .entry-date{color:#888;font-weight:700;}
+  .entry-date{color:var(--text-tertiary);font-weight:700;}
   .entry-time{color:var(--navy);font-weight:800;}
   .entry-datesep{display:inline-block;width:2px;height:12px;background:var(--border);margin:0 7px;vertical-align:middle;}
   .entry-delete-btn{
-    background:#fdeceb;color:var(--accent);border:1px solid var(--accent);
+    background:var(--accent-soft-bg);color:var(--accent);border:1px solid var(--accent);
     border-radius:8px;padding:4px 9px;font-size:0.9rem;line-height:1;cursor:pointer;
   }
   .entry-delete-btn:active{background:var(--accent);color:#fff;}
   .entry-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .ec-label{font-size:0.75rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
+  .ec-label{font-size:0.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;}
   .ec-original{font-size:0.95rem;font-weight:700;color:#9aa2b1;text-decoration:line-through;margin-bottom:2px;}
   .ec-value{font-size:1.6rem;font-weight:900;}
   .ec-value.good{color:var(--good);}
   .ec-value.reject{color:var(--accent);}
-  .entry-flags{margin-top:8px;font-size:0.9rem;color:#5c4400;background:#fff3cd;border-radius:6px;padding:6px 8px;}
+  .entry-flags{margin-top:8px;font-size:0.9rem;color:var(--warn-soft-text);background:var(--warn-soft-bg);border-radius:6px;padding:6px 8px;}
   .entry-flags:empty{display:none;}
   .entry-edit-row{margin-top:8px;text-align:right;}
   .edit-pencil-btn{
     background:var(--pink-soft);color:var(--navy);border:1px solid var(--border);
     border-radius:8px;padding:6px 12px;font-size:0.85rem;font-weight:700;
   }
-  .edited-tag{font-size:0.7rem;font-weight:700;color:var(--warn);background:#fff3cd;border-radius:6px;padding:3px 8px;}
+  .edited-tag{font-size:0.7rem;font-weight:700;color:var(--warn);background:var(--warn-soft-bg);border-radius:6px;padding:3px 8px;}
   .edit-form{margin-top:10px;background:var(--bg);border-radius:8px;padding:10px;}
   .edit-form label{margin:6px 0 2px;}
   .edit-form input{padding:10px;font-size:1.2rem;font-weight:800;text-align:center;}
   .edit-form-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
   .edit-save-btn{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:12px;font-weight:800;}
-  .edit-cancel-btn{background:#fff;color:#666;border:1px solid var(--border);border-radius:8px;padding:12px;font-weight:800;}
-  .empty-state{text-align:center;color:#888;padding:30px 10px;font-size:1rem;}
+  .edit-cancel-btn{background:var(--card);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;padding:12px;font-weight:800;}
+  .empty-state{text-align:center;color:var(--text-tertiary);padding:30px 10px;font-size:1rem;}
 
   /* Saved-job picker — a native <select> can't be styled enough to read as
      "these are resumable saved jobs," so each job is its own tappable card.
@@ -312,18 +361,18 @@
   .job-list-item{
     display:flex; justify-content:space-between; align-items:center; width:100%;
     padding:14px; margin-bottom:8px; border-radius:10px; border:2px solid var(--border);
-    background:#fff; font-size:1rem; font-weight:700; color:var(--text); text-align:left; cursor:pointer;
+    background:var(--card); font-size:1rem; font-weight:700; color:var(--text); text-align:left; cursor:pointer;
   }
-  .job-list-item.active{border-color:var(--good); background:#e7f6ec;}
+  .job-list-item.active{border-color:var(--good); background:var(--good-soft-bg);}
   .job-list-item.pending{border-color:var(--navy); background:var(--pink-soft);}
-  .job-item-tag{font-size:0.7rem; font-weight:800; color:#888; background:var(--bg); border-radius:20px; padding:4px 10px; flex-shrink:0; margin-left:10px; white-space:nowrap;}
-  .job-item-tag.active{color:var(--good); background:#d7f0df;}
+  .job-item-tag{font-size:0.7rem; font-weight:800; color:var(--text-tertiary); background:var(--bg); border-radius:20px; padding:4px 10px; flex-shrink:0; margin-left:10px; white-space:nowrap;}
+  .job-item-tag.active{color:var(--good); background:var(--good-soft-bg-strong);}
   .job-item-resume-btn{font-size:0.8rem; font-weight:800; color:#fff; background:var(--navy); border:none; border-radius:20px; padding:7px 14px; flex-shrink:0; margin-left:10px; cursor:pointer; white-space:nowrap;}
   .job-item-resume-btn:active{background:var(--navy-light);}
 
   /* Dashboard button (sits in .top-btn-row alongside .lang-toggle — see above) */
   .dash-btn{
-    background:#fff; border:3px solid var(--navy); border-radius:24px;
+    background:var(--card); border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer; color:var(--navy);
   }
   /* Global sync bar — always visible at the top, not tied to whichever job
@@ -339,13 +388,13 @@
     background:var(--navy);color:#fff;cursor:pointer;
   }
   .global-sync-btn:active{background:var(--navy-light);}
-  .entry-pending-tag{font-size:0.7rem;font-weight:700;color:var(--warn);background:#fff3cd;border-radius:6px;padding:3px 8px;display:inline-block;margin-top:6px;}
+  .entry-pending-tag{font-size:0.7rem;font-weight:700;color:var(--warn);background:var(--warn-soft-bg);border-radius:6px;padding:3px 8px;display:inline-block;margin-top:6px;}
 
   /* Sync gate — required tap before starting a new job, but never blocks
      on the OUTCOME of the sync attempt (see requireSyncBeforeAction). */
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;padding:16px;}
   .modal-overlay.open{display:flex;}
-  .modal-box{background:#fff;border-radius:14px;padding:22px;max-width:420px;width:100%;}
+  .modal-box{background:var(--card);border-radius:14px;padding:22px;max-width:420px;width:100%;}
   .modal-box h3{margin:0 0 10px;font-size:1.05rem;color:var(--navy);}
   /* Lets a modal put its own language toggle right in the popup itself
      (see #helpModalOverlay) instead of relying on the one in the top bar
@@ -353,16 +402,16 @@
   .modal-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;}
   .modal-header-row h3{margin:0;flex:1;}
   .lang-toggle.small{padding:6px 12px;font-size:0.8rem;white-space:nowrap;}
-  .modal-box p{font-size:0.9rem;color:#444;margin-bottom:16px;line-height:1.4;}
+  .modal-box p{font-size:0.9rem;color:var(--text-strong-secondary);margin-bottom:16px;line-height:1.4;}
   .modal-box button{margin-bottom:8px;}
-  .modal-cancel-btn{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:1px solid var(--border);background:#fff;color:#666;cursor:pointer;}
+  .modal-cancel-btn{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);cursor:pointer;}
 
   /* Job schedule picker — pulls Anthony's exported job schedule (same
      backend/data the QA Checklist app already uses) so a packer can tap a
      job instead of typing PO/Product by hand. */
-  .schedule-pull-btn{width:100%;padding:10px;font-size:0.85rem;font-weight:700;border-radius:8px;border:2px dashed var(--navy);background:#fff;color:var(--navy);margin-top:8px;cursor:pointer;}
+  .schedule-pull-btn{width:100%;padding:10px;font-size:0.85rem;font-weight:700;border-radius:8px;border:2px dashed var(--navy);background:var(--card);color:var(--navy);margin-top:8px;cursor:pointer;}
   .job-picker-search{width:100%;padding:10px;font-size:0.95rem;border:2px solid var(--navy);border-radius:8px;margin-bottom:10px;}
-  .job-picker-status{font-size:0.8rem;color:#666;margin-bottom:8px;}
+  .job-picker-status{font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px;}
   .job-picker-list{max-height:340px;overflow-y:auto;margin-bottom:14px;}
   .job-picker-row{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;}
   /* Typeahead dropdown under Job/PO Number — same idea as the QA Checklist
@@ -371,11 +420,11 @@
   .njpo-field-wrap{position:relative;}
   .njpo-drop{
     position:absolute;left:0;right:0;top:100%;margin-top:4px;margin-bottom:0;
-    background:#fff;border:2px solid var(--navy);border-radius:10px;
+    background:var(--card);border:2px solid var(--navy);border-radius:10px;
     box-shadow:0 4px 14px rgba(0,0,0,0.18);z-index:50;padding:8px;
   }
   .job-picker-row:active{background:var(--pink-soft);}
-  .cust-no-results{text-align:center;color:#888;padding:16px;font-size:0.9rem;}
+  .cust-no-results{text-align:center;color:var(--text-tertiary);padding:16px;font-size:0.9rem;}
 
   /* Notes — a button + red count badge, never the notes themselves sitting
      permanently on-screen (see the modal below instead). */
@@ -396,7 +445,7 @@
   .note-card{background:var(--bg);border-left:4px solid var(--warn);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:0.9rem;}
   .note-card .note-lock{font-size:0.75rem;font-weight:700;color:var(--warn);margin-bottom:4px;}
   .note-card .note-text{color:var(--text);white-space:pre-wrap;}
-  .notes-empty{text-align:center;color:#888;padding:16px;font-size:0.9rem;}
+  .notes-empty{text-align:center;color:var(--text-tertiary);padding:16px;font-size:0.9rem;}
   #notesModalInput{
     width:100%;padding:10px;font-size:1rem;border:1px solid var(--border);border-radius:8px;
     margin-top:4px;margin-bottom:10px;font-family:inherit;resize:vertical;
@@ -412,21 +461,21 @@
   .dash-header h2{margin:0;font-size:1.2rem;}
   .dash-close{background:transparent;border:2px solid #fff;color:#fff;border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer;}
   .dash-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px;max-width:900px;margin:0 auto;}
-  .dash-tab{padding:12px 8px;font-weight:800;border-radius:10px;border:3px solid var(--navy);background:#fff;color:var(--navy);font-size:0.95rem;cursor:pointer;}
+  .dash-tab{padding:12px 8px;font-weight:800;border-radius:10px;border:3px solid var(--navy);background:var(--card);color:var(--navy);font-size:0.95rem;cursor:pointer;}
   .dash-tab.active{background:var(--navy);color:#fff;}
   .dash-body{max-width:900px;margin:0 auto;padding:0 12px 24px;}
-  .dash-tab-explainer{font-size:0.82rem;color:#666;background:var(--pink-soft);border-radius:8px;padding:8px 12px;margin-bottom:10px;line-height:1.4;}
-  .dash-sync-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:0.85rem;color:#666;flex-wrap:wrap;gap:8px;}
+  .dash-tab-explainer{font-size:0.82rem;color:var(--text-secondary);background:var(--pink-soft);border-radius:8px;padding:8px 12px;margin-bottom:10px;line-height:1.4;}
+  .dash-sync-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:0.85rem;color:var(--text-secondary);flex-wrap:wrap;gap:8px;}
   .dash-refresh-btn{background:var(--pink-soft);color:var(--navy);border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:0.9rem;cursor:pointer;}
   .history-search-input{
     width:100%;padding:12px;font-size:1rem;border:2px solid var(--navy);border-radius:10px;
-    margin-bottom:12px;background:#fff;
+    margin-bottom:12px;background:var(--card);
   }
-  .history-nav-label{font-size:0.85rem;font-weight:700;color:#666;margin-bottom:8px;}
+  .history-nav-label{font-size:0.85rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px;}
   .history-btn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px;margin-bottom:14px;}
   .history-nav-btn{
     padding:16px 8px;font-size:1rem;font-weight:800;border-radius:10px;
-    border:3px solid var(--navy);background:#fff;color:var(--navy);cursor:pointer;
+    border:3px solid var(--navy);background:var(--card);color:var(--navy);cursor:pointer;
   }
   .history-nav-btn:active{background:var(--navy);color:#fff;}
   .history-back-btn{
@@ -435,20 +484,20 @@
   }
   .dash-job-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
   .dash-job-top{display:flex;justify-content:space-between;font-weight:800;color:var(--navy);margin-bottom:6px;}
-  .dash-job-meta{font-size:0.85rem;color:#666;margin-bottom:8px;}
+  .dash-job-meta{font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;}
   .dash-job-counts{display:flex;gap:18px;font-size:0.9rem;}
   .dash-job-counts b{display:block;font-size:1.3rem;}
   .dash-log-toggle{background:transparent;border:none;color:var(--navy);font-weight:700;font-size:0.85rem;margin-top:6px;padding:0;cursor:pointer;}
   .dash-delete-job-btn{
     display:block;width:100%;margin-top:10px;padding:8px 12px;font-size:0.85rem;font-weight:700;
-    background:#fdeceb;color:var(--accent);border:1px solid var(--accent);border-radius:8px;cursor:pointer;
+    background:var(--accent-soft-bg);color:var(--accent);border:1px solid var(--accent);border-radius:8px;cursor:pointer;
   }
   .dash-delete-job-btn:active{background:var(--accent);color:#fff;}
   .dash-log-body{margin-top:8px;display:none;}
   .dash-log-body.open{display:block;}
   .dash-chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;}
   .dash-chart-wrap h3{margin:0 0 10px;font-size:1rem;color:var(--navy);}
-  .dash-empty{text-align:center;color:#888;padding:30px 10px;}
+  .dash-empty{text-align:center;color:var(--text-tertiary);padding:30px 10px;}
 
   [data-es]{display:none;}
   body.es [data-en]{display:none;}
@@ -456,6 +505,14 @@
 </style>
 </head>
 <body>
+<script>
+  // Applied here (right after <body> opens, before anything renders) rather
+  // than in the main script block at the bottom — avoids a flash of the
+  // light theme on load for anyone who has dark mode saved.
+  try {
+    if (localStorage.getItem('gluer_theme_v1') === 'dark') document.body.classList.add('dark-mode');
+  } catch(e) {}
+</script>
 
 <header>
   <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
@@ -465,6 +522,7 @@
   <button class="dash-btn" id="homeBtn" onclick="showLanding()">🏠 <span data-en>Home</span><span data-es>Inicio</span></button>
   <button class="dash-btn" id="dashBtnTop" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
   <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
+  <button class="lang-toggle" id="themeToggleBtn" onclick="toggleTheme()">🌙 <span id="themeLabel"><span data-en>Dark</span><span data-es>Oscuro</span></span></button>
 </div>
 
 <!-- GLOBAL SYNC BAR — visible whenever a job section is open, independent of
@@ -507,7 +565,7 @@
 
   <!-- JOB SELECTOR -->
   <div class="card">
-    <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span> <span style="text-transform:none;font-weight:400;font-size:0.75rem;color:#888;letter-spacing:0;"><span data-en>(the job you're currently logging counts for)</span><span data-es>(el trabajo para el que está registrando conteos ahora)</span></span></h2>
+    <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span> <span style="text-transform:none;font-weight:400;font-size:0.75rem;color:var(--text-tertiary);letter-spacing:0;"><span data-en>(the job you're currently logging counts for)</span><span data-es>(el trabajo para el que está registrando conteos ahora)</span></span></h2>
     <div id="jobListWrap"></div>
     <button class="btn-submit" id="continueJobBtn" style="display:none;margin-bottom:8px;" onclick="confirmContinueJob()">▸ <span data-en>Continue Job?</span><span data-es>¿Continuar Trabajo?</span></button>
     <button class="btn-secondary" onclick="toggleNewJobForm()">
@@ -562,7 +620,7 @@
 
   <!-- Saved/restored draft confirmation — deliberately OUTSIDE logCard so it
        stays visible even when saveProgress() collapses the sections below. -->
-  <div id="draftNotice" style="display:none;text-align:center;font-size:0.95rem;font-weight:800;color:var(--good);margin-bottom:14px;padding:12px;border:2px solid var(--good);background:#e7f6ec;border-radius:10px;"></div>
+  <div id="draftNotice" style="display:none;text-align:center;font-size:0.95rem;font-weight:800;color:var(--good);margin-bottom:14px;padding:12px;border:2px solid var(--good);background:var(--good-soft-bg);border-radius:10px;"></div>
 
   <!-- BANNER -->
   <div id="bannerSection" style="display:none;">
@@ -916,6 +974,30 @@ function loadAll(){
 }
 function saveAll(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs)); }
 function saveDrafts(){ localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts)); }
+
+/* Dark mode toggle — the class itself is applied earlier (see the inline
+   script right after <body> opens, which reads the same localStorage key
+   before first paint to avoid a flash of the light theme). This just
+   handles the actual switch + keeping the button and any open charts
+   in sync with it. */
+function applyThemeButtonUI(){
+  const isDark = document.body.classList.contains('dark-mode');
+  const btn = document.getElementById('themeToggleBtn');
+  if (!btn) return;
+  btn.innerHTML = isDark
+    ? '☀️ <span id="themeLabel"><span data-en>Light</span><span data-es>Claro</span></span>'
+    : '🌙 <span id="themeLabel"><span data-en>Dark</span><span data-es>Oscuro</span></span>';
+}
+
+function toggleTheme(){
+  const isDark = document.body.classList.toggle('dark-mode');
+  try { localStorage.setItem('gluer_theme_v1', isDark ? 'dark' : 'light'); } catch(e) {}
+  applyThemeButtonUI();
+  // Chart.js bakes colors into each chart at creation time — rebuild
+  // whatever's currently drawn so the Data tab doesn't keep showing
+  // black bars/lines against a now-dark card.
+  if (dashData && dashTab === 'data') renderDashData();
+}
 
 function toggleLang(){
   document.body.classList.toggle('es');
@@ -2096,7 +2178,7 @@ function renderPalletPresetsList(){
     b.className = 'job-picker-row';
     const ppp = preset.piecesPerBox * preset.boxesPerPallet;
     b.innerHTML = '<div style="font-weight:700;">' + escapeHtml(preset.label) + '</div>' +
-      '<div style="font-size:12.5px;font-weight:400;color:#666;margin-top:2px;">' +
+      '<div style="font-size:12.5px;font-weight:400;color:var(--text-secondary);margin-top:2px;">' +
       preset.piecesPerBox.toLocaleString() + (isEs?' pzs/caja × ':' pcs/box × ') + preset.boxesPerPallet.toLocaleString() +
       (isEs?' cajas/tarima = ':' boxes/pallet = ') + ppp.toLocaleString() + (isEs?' pzs/tarima':' pcs/pallet') + '</div>';
     b.onclick = function(){ applyPalletPreset(preset); };
@@ -3128,6 +3210,24 @@ function renderDashData(){
     <div class="dash-chart-wrap"><h3>${isEs?'Totales por estación':'Totals by station'}</h3><canvas id="dashChartByStation" height="220"></canvas></div>
     <div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Retenido a través del tiempo':'Target vs Good vs Hold over time'}</h3><canvas id="dashChartByDate" height="260"></canvas></div>`;
 
+  // Chart.js bakes colors in at creation time, so the handful of colors that
+  // wouldn't otherwise read well against a dark card (mainly Target, which
+  // defaulted to near-black) need picking here rather than via CSS —
+  // toggleTheme() calls this function again on switch to rebuild with the
+  // right set.
+  const isDark = document.body.classList.contains('dark-mode');
+  const targetColor = isDark ? '#e8e9eb' : '#0a0a0a';
+  const axisColor = isDark ? '#c7cad0' : '#444';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  const chartOptions = {
+    responsive: true,
+    plugins: { legend: { labels: { color: axisColor } } },
+    scales: {
+      y: { beginAtZero: true, ticks: { color: axisColor }, grid: { color: gridColor } },
+      x: { ticks: { color: axisColor }, grid: { color: gridColor } }
+    }
+  };
+
   const labels = reports.map(r => String(r.PO||'—'));
   const targets = reports.map(r => Number(r.Target)||0);
   const goods = reports.map(r => Number(r['Total Good'])||0);
@@ -3139,13 +3239,13 @@ function renderDashData(){
     data: {
       labels,
       datasets: [
-        { label: isEs?'Meta':'Target', data: targets, backgroundColor: '#0a0a0a' },
+        { label: isEs?'Meta':'Target', data: targets, backgroundColor: targetColor },
         { label: isEs?'Bueno':'Good', data: goods, backgroundColor: '#2e7d4f' },
         { label: isEs?'Retenido':'Hold', data: rejects, backgroundColor: '#c8393a' },
         { label: isEs?'Tarimas':'Pallets', data: pallets, backgroundColor: '#ff1f8f' }
       ]
     },
-    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    options: chartOptions
   }));
 
   const byStation = {};
@@ -3162,12 +3262,12 @@ function renderDashData(){
     data: {
       labels: stLabels,
       datasets: [
-        { label: isEs?'Meta':'Target', data: stLabels.map(s=>byStation[s].target), backgroundColor: '#0a0a0a' },
+        { label: isEs?'Meta':'Target', data: stLabels.map(s=>byStation[s].target), backgroundColor: targetColor },
         { label: isEs?'Bueno':'Good', data: stLabels.map(s=>byStation[s].good), backgroundColor: '#2e7d4f' },
         { label: isEs?'Retenido':'Hold', data: stLabels.map(s=>byStation[s].reject), backgroundColor: '#c8393a' }
       ]
     },
-    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    options: chartOptions
   }));
 
   // Same three quantities, but plotted chronologically by the date each
@@ -3188,12 +3288,12 @@ function renderDashData(){
     data: {
       labels: dateLabels,
       datasets: [
-        { label: isEs?'Meta':'Target', data: dateLabels.map(d=>byDate[d].target), borderColor: '#0a0a0a', backgroundColor: '#0a0a0a', fill: false, tension: 0.2 },
+        { label: isEs?'Meta':'Target', data: dateLabels.map(d=>byDate[d].target), borderColor: targetColor, backgroundColor: targetColor, fill: false, tension: 0.2 },
         { label: isEs?'Bueno':'Good', data: dateLabels.map(d=>byDate[d].good), borderColor: '#2e7d4f', backgroundColor: '#2e7d4f', fill: false, tension: 0.2 },
         { label: isEs?'Retenido':'Hold', data: dateLabels.map(d=>byDate[d].reject), borderColor: '#c8393a', backgroundColor: '#c8393a', fill: false, tension: 0.2 }
       ]
     },
-    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    options: chartOptions
   }));
 }
 
@@ -3333,7 +3433,7 @@ function renderJobPickerList(){
     else if (e.entry.products.length > 2) subParts.push(e.entry.products.length + (isEs?' productos':' products'));
     const sub = subParts.filter(Boolean).join(' — ');
     b.innerHTML = '<div style="font-weight:700;">' + escapeHtml(e.jobNumber) + '</div>' +
-      (sub ? '<div style="font-size:12.5px;font-weight:400;color:#666;margin-top:2px;">' + escapeHtml(sub) + '</div>' : '');
+      (sub ? '<div style="font-size:12.5px;font-weight:400;color:var(--text-secondary);margin-top:2px;">' + escapeHtml(sub) + '</div>' : '');
     b.onclick = function(){ _pickScheduleJob(e.jobNumber, e.entry); };
     listEl.appendChild(b);
   });
@@ -3425,7 +3525,7 @@ function renderNjPODrop(matches, totalMatches){
     else if (m.entry.products.length > 2) subParts.push(m.entry.products.length + (isEs?' productos':' products'));
     const sub = subParts.filter(Boolean).join(' — ');
     b.innerHTML = '<div style="font-weight:700;">' + escapeHtml(m.jobNumber) + '</div>' +
-      (sub ? '<div style="font-size:12px;font-weight:400;color:#666;margin-top:2px;">' + escapeHtml(sub) + '</div>' : '');
+      (sub ? '<div style="font-size:12px;font-weight:400;color:var(--text-secondary);margin-top:2px;">' + escapeHtml(sub) + '</div>' : '');
     // mousedown (not click) fires before the input's blur closes the
     // dropdown on some mobile browsers — same fix the QA app uses.
     b.onmousedown = function(e){ e.preventDefault(); selectNjPOScheduleJob(m.jobNumber, m.entry); };
@@ -3484,6 +3584,7 @@ function closeNjPODropDelayed(){
 loadAll();
 refreshJobSelect();
 renderGlobalSyncStatus();
+applyThemeButtonUI();
 showLanding();
 _applyPrefillFromURL();
 _initScheduleAutoPull();
