@@ -365,6 +365,15 @@
   .job-picker-status{font-size:0.8rem;color:#666;margin-bottom:8px;}
   .job-picker-list{max-height:340px;overflow-y:auto;margin-bottom:14px;}
   .job-picker-row{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;}
+  /* Typeahead dropdown under Job/PO Number — same idea as the QA Checklist
+     app's typed job search, so a job can be found by typing without always
+     needing to open the full Pull Schedule picker. */
+  .njpo-field-wrap{position:relative;}
+  .njpo-drop{
+    position:absolute;left:0;right:0;top:100%;margin-top:4px;margin-bottom:0;
+    background:#fff;border:2px solid var(--navy);border-radius:10px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.18);z-index:50;padding:8px;
+  }
   .job-picker-row:active{background:var(--pink-soft);}
   .cust-no-results{text-align:center;color:#888;padding:16px;font-size:0.9rem;}
 
@@ -510,7 +519,12 @@
         <button type="button" class="help-icon-btn" onclick="showNewJobHelp()" title="How this works">?</button>
       </div>
       <label><span data-en>Job / PO Number</span><span data-es>Número de Trabajo / OC</span></label>
-      <input id="njPO" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Job Number Here" data-ph-en="Enter Job Number Here" data-ph-es="Ingrese el Número de Trabajo Aquí">
+      <div class="njpo-field-wrap">
+        <input id="njPO" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Job Number Here" data-ph-en="Enter Job Number Here" data-ph-es="Ingrese el Número de Trabajo Aquí"
+          oninput="filterJobScheduleForNewJob()" onfocus="filterJobScheduleForNewJob()" onblur="closeNjPODropDelayed()">
+        <div class="job-picker-list njpo-drop" id="njPODrop" style="display:none;"></div>
+      </div>
+      <div class="pass-hint" id="njPOScheduleHint" style="display:none;"></div>
 
       <label><span data-en>Product Number</span><span data-es>Número de Producto</span></label>
       <input id="njProduct" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Product Number Here" data-ph-en="Enter Product Number Here" data-ph-es="Ingrese el Número de Producto Aquí">
@@ -1320,6 +1334,8 @@ function toggleNewJobForm(){
     document.getElementById('stLongBtn').classList.remove('selected');
     document.getElementById('stShortBtn').classList.remove('selected');
     selectPass('S');
+    document.getElementById('njPODrop').style.display = 'none';
+    document.getElementById('njPOScheduleHint').style.display = 'none';
     f.style.display = 'block';
   });
 }
@@ -3349,6 +3365,118 @@ function _finalizeSchedulePick(jobNumber, product){
   document.getElementById('njPO').value = jobNumber;
   if (product) document.getElementById('njProduct').value = product;
   closeJobPicker();
+}
+
+/* ── Job/PO typeahead — same idea as the QA Checklist app's typed job
+   search: as you type into Job/PO Number, matching scheduled jobs show up
+   in a dropdown right under the field, no need to open the full Pull
+   Schedule picker just to find one job you already know the number of.
+   Filtered by station same as the picker (STATION_TO_SCHEDULE_SHEETS) when
+   Station has already been picked; unfiltered otherwise, since PO comes
+   before Station in this form. ── */
+let njPODropOpen = false;
+let njPODropAutoCloseTimer = null;
+
+function filterJobScheduleForNewJob(){
+  const jobEl = document.getElementById('njPO');
+  const q = jobEl.value.trim();
+  _applyNjPOScheduleHint(q);
+  const dropEl = document.getElementById('njPODrop');
+  if (!_scheduleData || !q){ dropEl.style.display = 'none'; njPODropOpen = false; return; }
+
+  const sheets = STATION_TO_SCHEDULE_SHEETS[newJobStation]; // no Station picked yet = show every job
+  let matches = [];
+  for (const jobNumber in _scheduleData.jobs){
+    if (jobNumber.indexOf(q) !== 0) continue;
+    const entry = _scheduleData.jobs[jobNumber];
+    if (sheets && !(entry.sheets||[]).some(s => sheets.indexOf(s) !== -1)) continue;
+    matches.push({ jobNumber, entry });
+  }
+  matches.sort((a,b) => a.jobNumber.localeCompare(b.jobNumber));
+  const totalMatches = matches.length;
+  if (matches.length > 50) matches = matches.slice(0, 50);
+  renderNjPODrop(matches, totalMatches);
+  njPODropOpen = true;
+
+  // Auto-dismiss even if blur never fires cleanly (matches the same pattern
+  // used by the QA app's typed job dropdown).
+  clearTimeout(njPODropAutoCloseTimer);
+  njPODropAutoCloseTimer = setTimeout(function(){
+    dropEl.style.display = 'none';
+    njPODropOpen = false;
+  }, 4000);
+}
+
+function renderNjPODrop(matches, totalMatches){
+  const isEs = document.body.classList.contains('es');
+  const dropEl = document.getElementById('njPODrop');
+  if (!matches.length){ dropEl.style.display = 'none'; return; }
+  dropEl.innerHTML = '';
+  matches.forEach(function(m){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'job-picker-row';
+    const subParts = [m.entry.customer];
+    if (m.entry.products.length === 1) subParts.push(m.entry.products[0]);
+    else if (m.entry.products.length === 2) subParts.push(m.entry.products.join(', '));
+    else if (m.entry.products.length > 2) subParts.push(m.entry.products.length + (isEs?' productos':' products'));
+    const sub = subParts.filter(Boolean).join(' — ');
+    b.innerHTML = '<div style="font-weight:700;">' + escapeHtml(m.jobNumber) + '</div>' +
+      (sub ? '<div style="font-size:12px;font-weight:400;color:#666;margin-top:2px;">' + escapeHtml(sub) + '</div>' : '');
+    // mousedown (not click) fires before the input's blur closes the
+    // dropdown on some mobile browsers — same fix the QA app uses.
+    b.onmousedown = function(e){ e.preventDefault(); selectNjPOScheduleJob(m.jobNumber, m.entry); };
+    dropEl.appendChild(b);
+  });
+  if (totalMatches > matches.length){
+    const more = document.createElement('div');
+    more.className = 'cust-no-results';
+    more.textContent = '+ ' + (totalMatches - matches.length) + (isEs ? ' más — siga escribiendo' : ' more — keep typing to narrow');
+    dropEl.appendChild(more);
+  }
+  dropEl.style.display = 'block';
+}
+
+// Shows what the schedule knows about a typed job number even before it's
+// actually selected — always shown so the info isn't hidden from view.
+function _applyNjPOScheduleHint(jobNumber){
+  const hint = document.getElementById('njPOScheduleHint');
+  const isEs = document.body.classList.contains('es');
+  const entry = _scheduleData && _scheduleData.jobs[jobNumber];
+  if (!entry){ hint.style.display = 'none'; hint.textContent = ''; return; }
+  const parts = [];
+  if (entry.customer) parts.push((isEs?'Cliente: ':'Customer: ') + entry.customer);
+  if (entry.products.length) parts.push((isEs?'Producto':'Product') + (entry.products.length>1 ? 's: ' : ': ') + entry.products.join(', '));
+  if (entry.dieNumbers.length) parts.push((isEs?'Troquel':'Die') + (entry.dieNumbers.length>1 ? 'es: ' : ': ') + entry.dieNumbers.join(', '));
+  if (!parts.length){ hint.style.display = 'none'; hint.textContent = ''; return; }
+  hint.textContent = (isEs ? 'Del programa — ' : 'From schedule — ') + parts.join(' · ');
+  hint.style.display = 'block';
+}
+
+function selectNjPOScheduleJob(jobNumber, entry){
+  document.getElementById('njPO').value = jobNumber;
+  document.getElementById('njPODrop').style.display = 'none';
+  njPODropOpen = false;
+  clearTimeout(njPODropAutoCloseTimer);
+  _applyNjPOScheduleHint(jobNumber);
+  if (entry && entry.products && entry.products.length > 1){
+    // Reuses the tap-picker's own product-choice panel rather than building
+    // a second one — opens straight to it, same as the QA app does when a
+    // multi-product job is reached by typing instead of tapping through.
+    _jobPickerStation = newJobStation; // keep the picker's own list (behind "Back") consistent if Station is already picked
+    document.getElementById('jobPickerOverlay').classList.add('open');
+    renderJobPickerList();
+    _showJobPickerProductPanel(jobNumber, entry);
+  } else if (entry) {
+    document.getElementById('njProduct').value = entry.products && entry.products[0] || '';
+  }
+}
+
+function closeNjPODropDelayed(){
+  setTimeout(function(){
+    document.getElementById('njPODrop').style.display = 'none';
+    njPODropOpen = false;
+  }, 200);
 }
 
 loadAll();
