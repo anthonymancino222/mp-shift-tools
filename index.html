@@ -58,6 +58,11 @@
   .lang-toggle{
     background:#fff; border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
+    /* Stays clickable even while a help/notes/etc. popup is open — every
+       .modal-overlay in this app is z-index:200, so this just needs to sit
+       above that in the same (root) stacking context. Lets someone switch
+       language mid-read instead of having to close the popup first. */
+    position:relative; z-index:250;
   }
   .container{max-width:760px;margin:0 auto;padding:12px;display:none;}
   .container.open{display:block;}
@@ -688,6 +693,19 @@
   </div>
 </div>
 
+<!-- HELP — shared by every "?" icon in the app (Pallets, Manual Count Entry,
+     Submit/Save Progress, Shift Log History). A custom modal rather than a
+     native alert() so it doesn't block the rest of the page — the language
+     toggle stays clickable and re-renders this in the new language instead
+     of forcing the popup closed first (see toggleLang() -> renderHelpModal()). -->
+<div class="modal-overlay" id="helpModalOverlay">
+  <div class="modal-box">
+    <h3 id="helpModalTitle"></h3>
+    <p id="helpModalBody" style="white-space:pre-wrap;"></p>
+    <button class="btn-submit" onclick="closeHelpModal()"><span data-en>OK</span><span data-es>Aceptar</span></button>
+  </div>
+</div>
+
 <!-- NOTES — job-level or entry-level, opened via a 📝 button so notes never
      sit permanently on-screen (a job with many notes would otherwise fill the
      whole page). Notes are append-only/locked: once added there is no edit or
@@ -871,6 +889,7 @@ function toggleLang(){
   renderDraftNotice();
   renderGlobalSyncStatus();
   renderLandingStatus();
+  renderHelpModal(); // no-op if no help popup is currently open
   if (currentJobId && jobs[currentJobId] && !jobSectionsHidden) renderJob();
   // The History tab's year/month nav labels are JS-generated too (like the
   // above), so they'd stay stuck in the old language without this.
@@ -1504,47 +1523,110 @@ function toggleQualityIssues(){
   caret.textContent = open ? '▴' : '▾';
 }
 
-function showManualCountHelp(){
+/* ── Help modal — shared by every "?" icon (see HELP_TEXTS below and the
+   #helpModalOverlay markup). A custom modal instead of alert() so the
+   language toggle (and the rest of the page) stays usable while it's open —
+   see toggleLang(), which calls renderHelpModal() to re-render in place. ── */
+const HELP_TEXTS = {
+  pallet: {
+    en: {
+      title: '📦 Pallets Ready for Shipping',
+      body: '⚙️ PACKING SETUP\n' +
+        'Enter Pieces per Box and Boxes per Pallet, then tap "Confirm Setup" to lock it in. Tap "Edit" to change it later.\n\n' +
+        '📦 +1 PALLET COMPLETE\n' +
+        'One tap logs a pallet. If Packing Setup is confirmed, it also adds that many pieces to Good Count automatically.\n\n' +
+        '➗ PARTIAL PALLET\n' +
+        'For a split shipment\'s last pallet that isn\'t completely full — type the actual piece count on that one pallet.\n\n' +
+        '↩ UNDO LAST PALLET\n' +
+        'Removes the most recent pallet and also reverses any pieces it added to Good Count.\n\n' +
+        '📂 SAVED SETUPS\n' +
+        'Save a packing setup to reuse on future jobs — shared with every tablet.'
+    },
+    es: {
+      title: '📦 Tarimas Listas para Envío',
+      body: '⚙️ CONFIGURACIÓN DE EMPAQUE\n' +
+        'Ingrese Piezas por Caja y Cajas por Tarima, luego toque "Confirmar Configuración" para bloquearlo. Toque "Editar" para cambiarlo después.\n\n' +
+        '📦 +1 TARIMA COMPLETA\n' +
+        'Un toque registra una tarima. Si la Configuración de Empaque está confirmada, también suma esa cantidad de piezas al Conteo Bueno automáticamente.\n\n' +
+        '➗ TARIMA PARCIAL\n' +
+        'Para la última tarima de un envío dividido que no está completamente llena — escriba la cantidad real de piezas en esa tarima.\n\n' +
+        '↩ DESHACER ÚLTIMA TARIMA\n' +
+        'Quita la tarima más reciente y también revierte las piezas que haya sumado al Conteo Bueno.\n\n' +
+        '📂 CONFIGS GUARDADAS\n' +
+        'Guarde una configuración de empaque para reutilizarla en futuros trabajos — se comparte con todas las tabletas.'
+    }
+  },
+  manualCount: {
+    en: {
+      title: '🔢 Manual Count Entry',
+      body: 'Type how many good pieces and how many hold/review pieces you counted this shift, then tap "Submit Shift Count" below.\n\n' +
+        'Good Count and Hold/Review Count are independent — you can submit one, the other, or both together.\n\n' +
+        'Each submission ADDS to this job\'s running totals — it doesn\'t replace the previous count.'
+    },
+    es: {
+      title: '🔢 Entrada Manual de Conteo',
+      body: 'Escriba cuántas piezas buenas y cuántas piezas de retenido/revisión contó en este turno, luego toque "Enviar Conteo de Turno" más abajo.\n\n' +
+        'Conteo Bueno y Retenido/Revisión son independientes — puede enviar uno, el otro, o ambos juntos.\n\n' +
+        'Cada envío se SUMA a los totales de este trabajo — no reemplaza el conteo anterior.'
+    }
+  },
+  submit: {
+    en: {
+      title: '📤 Submit / Save Progress',
+      body: 'SUBMIT SHIFT COUNT\n' +
+        'Saves whatever you typed above as a new entry in this job\'s log, adds it to the running totals, and clears the boxes so they\'re ready for the next count.\n\n' +
+        '💾 SAVE PROGRESS\n' +
+        'Use this if you need to jump to a different job without submitting a count yet — it remembers what you typed here so nothing is lost, and brings it back when you return.'
+    },
+    es: {
+      title: '📤 Enviar / Guardar Progreso',
+      body: 'ENVIAR CONTEO DE TURNO\n' +
+        'Guarda lo que escribió arriba como un nuevo registro en el historial de este trabajo, lo suma a los totales, y limpia las casillas para el próximo conteo.\n\n' +
+        '💾 GUARDAR PROGRESO\n' +
+        'Úselo si necesita cambiar a otro trabajo sin enviar un conteo todavía — recuerda lo que escribió aquí para que nada se pierda, y lo trae de vuelta cuando regrese.'
+    }
+  },
+  history: {
+    en: {
+      title: '📜 Shift Log History',
+      body: 'Every count you\'ve submitted for this job, grouped by day, with the running Good/Hold totals for each day.\n\n' +
+        'A count can be edited once (tap ✏️ Edit) if it was entered wrong — after that it\'s locked.\n\n' +
+        '📧 "Finish, Send Report" closes this job out for good: it emails the final totals to your manager and removes it from Live Jobs. Only tap this once the job is truly done.'
+    },
+    es: {
+      title: '📜 Historial de Turnos',
+      body: 'Cada conteo que ha enviado para este trabajo, agrupado por día, con los totales de Bueno/Retenido de cada día.\n\n' +
+        'Un conteo se puede editar una sola vez (toque ✏️ Editar) si se ingresó mal — después queda bloqueado.\n\n' +
+        '📧 "Terminar, Enviar Reporte" cierra este trabajo definitivamente: envía los totales finales por correo a su gerente y lo quita de Trabajos Activos. Solo toque esto cuando el trabajo esté realmente terminado.'
+    }
+  }
+};
+let currentHelpKey = null;
+
+function openHelpModal(key){
+  currentHelpKey = key;
+  renderHelpModal();
+  document.getElementById('helpModalOverlay').classList.add('open');
+}
+function closeHelpModal(){
+  document.getElementById('helpModalOverlay').classList.remove('open');
+  currentHelpKey = null;
+}
+// Called on open, and again by toggleLang() if the modal is currently open —
+// so switching language mid-read updates the text in place instead of
+// requiring the popup to be closed and reopened.
+function renderHelpModal(){
+  if (!currentHelpKey) return;
   const isEs = document.body.classList.contains('es');
-  alert(isEs
-    ? '🔢 ENTRADA MANUAL DE CONTEO\n' +
-      'Escriba cuántas piezas buenas y cuántas piezas de retenido/revisión contó en este turno, luego toque "Enviar Conteo de Turno" más abajo.\n\n' +
-      'Conteo Bueno y Retenido/Revisión son independientes — puede enviar uno, el otro, o ambos juntos.\n\n' +
-      'Cada envío se SUMA a los totales de este trabajo — no reemplaza el conteo anterior.'
-    : '🔢 MANUAL COUNT ENTRY\n' +
-      'Type how many good pieces and how many hold/review pieces you counted this shift, then tap "Submit Shift Count" below.\n\n' +
-      'Good Count and Hold/Review Count are independent — you can submit one, the other, or both together.\n\n' +
-      'Each submission ADDS to this job\'s running totals — it doesn\'t replace the previous count.'
-  );
+  const entry = HELP_TEXTS[currentHelpKey][isEs ? 'es' : 'en'];
+  document.getElementById('helpModalTitle').textContent = entry.title;
+  document.getElementById('helpModalBody').textContent = entry.body;
 }
 
-function showSubmitHelp(){
-  const isEs = document.body.classList.contains('es');
-  alert(isEs
-    ? '📤 ENVIAR CONTEO DE TURNO\n' +
-      'Guarda lo que escribió arriba como un nuevo registro en el historial de este trabajo, lo suma a los totales, y limpia las casillas para el próximo conteo.\n\n' +
-      '💾 GUARDAR PROGRESO\n' +
-      'Úselo si necesita cambiar a otro trabajo sin enviar un conteo todavía — recuerda lo que escribió aquí para que nada se pierda, y lo trae de vuelta cuando regrese.'
-    : '📤 SUBMIT SHIFT COUNT\n' +
-      'Saves whatever you typed above as a new entry in this job\'s log, adds it to the running totals, and clears the boxes so they\'re ready for the next count.\n\n' +
-      '💾 SAVE PROGRESS\n' +
-      'Use this if you need to jump to a different job without submitting a count yet — it remembers what you typed here so nothing is lost, and brings it back when you return.'
-  );
-}
-
-function showHistoryHelp(){
-  const isEs = document.body.classList.contains('es');
-  alert(isEs
-    ? '📜 HISTORIAL DE TURNOS\n' +
-      'Cada conteo que ha enviado para este trabajo, agrupado por día, con los totales de Bueno/Retenido de cada día.\n\n' +
-      'Un conteo se puede editar una sola vez (toque ✏️ Editar) si se ingresó mal — después queda bloqueado.\n\n' +
-      '📧 "Terminar, Enviar Reporte" cierra este trabajo definitivamente: envía los totales finales por correo a su gerente y lo quita de Trabajos Activos. Solo toque esto cuando el trabajo esté realmente terminado.'
-    : '📜 SHIFT LOG HISTORY\n' +
-      'Every count you\'ve submitted for this job, grouped by day, with the running Good/Hold totals for each day.\n\n' +
-      'A count can be edited once (tap ✏️ Edit) if it was entered wrong — after that it\'s locked.\n\n' +
-      '📧 "Finish, Send Report" closes this job out for good: it emails the final totals to your manager and removes it from Live Jobs. Only tap this once the job is truly done.'
-  );
-}
+function showPalletHelp(){ openHelpModal('pallet'); }
+function showManualCountHelp(){ openHelpModal('manualCount'); }
+function showSubmitHelp(){ openHelpModal('submit'); }
+function showHistoryHelp(){ openHelpModal('history'); }
 
 function toggleChip(el){
   const flag = el.dataset.flag;
@@ -1710,32 +1792,6 @@ function togglePalletSetup(){
   const caret = document.getElementById('palletSetupCaret');
   const open = body.classList.toggle('open');
   caret.textContent = open ? '▴' : '▾';
-}
-
-function showPalletHelp(){
-  const isEs = document.body.classList.contains('es');
-  const msg = isEs
-    ? '⚙️ CONFIGURACIÓN DE EMPAQUE\n' +
-      'Ingrese Piezas por Caja y Cajas por Tarima, luego toque "Confirmar Configuración" para bloquearlo. Toque "Editar" para cambiarlo después.\n\n' +
-      '📦 +1 TARIMA COMPLETA\n' +
-      'Un toque registra una tarima. Si la Configuración de Empaque está confirmada, también suma esa cantidad de piezas al Conteo Bueno automáticamente.\n\n' +
-      '➗ TARIMA PARCIAL\n' +
-      'Para la última tarima de un envío dividido que no está completamente llena — escriba la cantidad real de piezas en esa tarima.\n\n' +
-      '↩ DESHACER ÚLTIMA TARIMA\n' +
-      'Quita la tarima más reciente y también revierte las piezas que haya sumado al Conteo Bueno.\n\n' +
-      '📂 CONFIGS GUARDADAS\n' +
-      'Guarde una configuración de empaque para reutilizarla en futuros trabajos — se comparte con todas las tabletas.'
-    : '⚙️ PACKING SETUP\n' +
-      'Enter Pieces per Box and Boxes per Pallet, then tap "Confirm Setup" to lock it in. Tap "Edit" to change it later.\n\n' +
-      '📦 +1 PALLET COMPLETE\n' +
-      'One tap logs a pallet. If Packing Setup is confirmed, it also adds that many pieces to Good Count automatically.\n\n' +
-      '➗ PARTIAL PALLET\n' +
-      'For a split shipment\'s last pallet that isn\'t completely full — type the actual piece count on that one pallet.\n\n' +
-      '↩ UNDO LAST PALLET\n' +
-      'Removes the most recent pallet and also reverses any pieces it added to Good Count.\n\n' +
-      '📂 SAVED SETUPS\n' +
-      'Save a packing setup to reuse on future jobs — shared with every tablet.';
-  alert(msg);
 }
 
 function onPalletConfigInput(el){
