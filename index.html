@@ -332,6 +332,12 @@
   .modal-overlay.open{display:flex;}
   .modal-box{background:#fff;border-radius:14px;padding:22px;max-width:420px;width:100%;}
   .modal-box h3{margin:0 0 10px;font-size:1.05rem;color:var(--navy);}
+  /* Lets a modal put its own language toggle right in the popup itself
+     (see #helpModalOverlay) instead of relying on the one in the top bar
+     being reachable underneath — most obvious way to make it clickable. */
+  .modal-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;}
+  .modal-header-row h3{margin:0;flex:1;}
+  .lang-toggle.small{padding:6px 12px;font-size:0.8rem;white-space:nowrap;}
   .modal-box p{font-size:0.9rem;color:#444;margin-bottom:16px;line-height:1.4;}
   .modal-box button{margin-bottom:8px;}
   .modal-cancel-btn{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:1px solid var(--border);background:#fff;color:#666;cursor:pointer;}
@@ -700,7 +706,10 @@
      of forcing the popup closed first (see toggleLang() -> renderHelpModal()). -->
 <div class="modal-overlay" id="helpModalOverlay">
   <div class="modal-box">
-    <h3 id="helpModalTitle"></h3>
+    <div class="modal-header-row">
+      <h3 id="helpModalTitle"></h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span id="helpModalLangLabel">Español</span></button>
+    </div>
     <p id="helpModalBody" style="white-space:pre-wrap;"></p>
     <button class="btn-submit" onclick="closeHelpModal()"><span data-en>OK</span><span data-es>Aceptar</span></button>
   </div>
@@ -879,6 +888,8 @@ function toggleLang(){
   document.body.classList.toggle('es');
   const isEs = document.body.classList.contains('es');
   document.getElementById('langLabel').textContent = isEs ? 'English' : 'Español';
+  const helpLangLabel = document.getElementById('helpModalLangLabel');
+  if (helpLangLabel) helpLangLabel.textContent = isEs ? 'English' : 'Español';
   document.querySelectorAll('[data-ph-en]').forEach(el=>{
     el.placeholder = isEs ? el.dataset.phEs : el.dataset.phEn;
   });
