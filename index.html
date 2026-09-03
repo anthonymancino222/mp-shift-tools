@@ -525,6 +525,7 @@
         <div class="job-picker-list njpo-drop" id="njPODrop" style="display:none;"></div>
       </div>
       <div class="pass-hint" id="njPOScheduleHint" style="display:none;"></div>
+      <button type="button" class="schedule-pull-btn" onclick="openJobPicker()">📋 <span data-en>Pull Schedule</span><span data-es>Traer Programa</span></button>
 
       <label><span data-en>Product Number</span><span data-es>Número de Producto</span></label>
       <input id="njProduct" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Enter Product Number Here" data-ph-en="Enter Product Number Here" data-ph-es="Ingrese el Número de Producto Aquí">
@@ -538,7 +539,6 @@
           <span data-en>Short Gluer</span><span data-es>Pegadora Corta</span>
         </button>
       </div>
-      <button type="button" class="schedule-pull-btn" onclick="openJobPicker()">📋 <span data-en>Pull Schedule</span><span data-es>Traer Programa</span></button>
 
       <label><span data-en>Pass (required)</span><span data-es>Pasada (obligatorio)</span></label>
       <div class="pass-hint" id="passSuggestHint" style="display:none;"></div>
@@ -3263,10 +3263,10 @@ function _initScheduleAutoPull(){
 
 function openJobPicker(){
   const isEs = document.body.classList.contains('es');
-  if (!newJobStation){
-    alert(isEs ? 'Seleccione Pegadora Larga o Pegadora Corta primero.' : 'Select Long Gluer or Short Gluer first.');
-    return;
-  }
+  // Station is optional here now that Pull Schedule sits up by Job Number,
+  // ahead of Station in the form — renderJobPickerList() already falls back
+  // to showing every scheduled job (unfiltered) when Station isn't picked
+  // yet, same as the Job/PO typeahead does.
   document.getElementById('jobPickerSearch').value = '';
   _showJobPickerJobPanel();
   document.getElementById('jobPickerOverlay').classList.add('open');
@@ -3313,7 +3313,10 @@ function renderJobPickerList(){
   }
   entries.sort((a,b) => a.jobNumber.localeCompare(b.jobNumber));
 
-  statusEl.textContent = entries.length + (isEs ? ' trabajo(s) programado(s) para esta estación' : (' job' + (entries.length===1?'':'s') + ' scheduled for this station')) +
+  statusEl.textContent = entries.length +
+    (sheets
+      ? (isEs ? ' trabajo(s) programado(s) para esta estación' : (' job' + (entries.length===1?'':'s') + ' scheduled for this station'))
+      : (isEs ? ' trabajo(s) en el programa — seleccione una Estación para filtrar' : (' job' + (entries.length===1?'':'s') + ' in the schedule — pick a Station to filter'))) +
     ' — ' + _scheduleData.sourceFile;
 
   if (!entries.length){
@@ -3463,7 +3466,6 @@ function selectNjPOScheduleJob(jobNumber, entry){
     // Reuses the tap-picker's own product-choice panel rather than building
     // a second one — opens straight to it, same as the QA app does when a
     // multi-product job is reached by typing instead of tapping through.
-    _jobPickerStation = newJobStation; // keep the picker's own list (behind "Back") consistent if Station is already picked
     document.getElementById('jobPickerOverlay').classList.add('open');
     renderJobPickerList();
     _showJobPickerProductPanel(jobNumber, entry);
