@@ -88,6 +88,21 @@
   .landing-title{font-size:1.2rem;font-weight:800;color:var(--black);margin-bottom:6px;}
   .landing-desc{font-size:0.88rem;color:#666;line-height:1.4;}
   .landing-status{font-size:0.82rem;font-weight:700;color:var(--navy);margin-top:10px;}
+  /* Log Production Counts is the app's main job — it stays the big, obvious
+     tap target, with a clear call-to-action instead of just sitting there
+     as a plain card. Dashboard is secondary, so its tile is sized down
+     (roughly half) to read as the lesser option, not an equal choice. */
+  .landing-card-primary{padding:28px 22px;border-width:3px;}
+  .landing-card-primary .landing-icon{font-size:2.3rem;}
+  .landing-card-primary .landing-title{font-size:1.35rem;}
+  .landing-cta{
+    display:flex;align-items:center;gap:6px;margin-top:14px;
+    font-size:1rem;font-weight:900;color:var(--navy);
+  }
+  .landing-cta .arrow{font-size:1.2rem;}
+  .landing-card-secondary{padding:11px 10px;border-left-width:4px;box-shadow:none;align-self:start;}
+  .landing-card-secondary .landing-icon{font-size:1rem;margin-bottom:4px;}
+  .landing-card-secondary .landing-title{font-size:0.95rem;margin-bottom:0;}
   .landing-badge{
     position:absolute;top:16px;right:16px;background:var(--accent);color:#fff;
     border-radius:50%;min-width:24px;height:24px;display:flex;align-items:center;
@@ -464,17 +479,17 @@
     <div class="landing-sub"><span data-en>Where would you like to go?</span><span data-es>¿A dónde le gustaría ir?</span></div>
   </div>
   <div class="landing-grid">
-    <button type="button" class="landing-card" style="--tile-accent:var(--navy);" onclick="enterLogScreen()">
+    <button type="button" class="landing-card landing-card-primary" style="--tile-accent:var(--navy);" onclick="enterLogScreen()">
       <div class="landing-icon">📦</div>
       <div class="landing-title"><span data-en>Log Production Counts</span><span data-es>Registrar Conteos de Producción</span></div>
       <div class="landing-desc"><span data-en>Start or continue a job, track Good/Hold counts and pallets.</span><span data-es>Inicie o continúe un trabajo, registre conteos Bueno/Retenido y tarimas.</span></div>
       <div class="landing-status" id="landingJobStatus"></div>
+      <div class="landing-cta">👉 <span data-en>Tap here to start</span><span data-es>Toque aquí para empezar</span> <span class="arrow">→</span></div>
       <div class="landing-badge" id="landingSyncBadge" style="display:none;"></div>
     </button>
-    <button type="button" class="landing-card" style="--tile-accent:var(--info);" onclick="openDashboard()">
+    <button type="button" class="landing-card landing-card-secondary" style="--tile-accent:var(--info);" onclick="openDashboard()">
       <div class="landing-icon">📊</div>
       <div class="landing-title"><span data-en>Dashboard</span><span data-es>Panel</span></div>
-      <div class="landing-desc"><span data-en>History, live jobs across every tablet, and production charts.</span><span data-es>Historial, trabajos activos en cada tableta, y gráficos de producción.</span></div>
     </button>
   </div>
 </div>
