@@ -107,6 +107,10 @@
   .lang-toggle{
     background:var(--card); border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
+    /* Buttons don't inherit body's color by default (browser UA styles give
+       them their own text color) — without this it stayed dark-on-dark
+       once the background went dark in dark mode. */
+    color:var(--navy);
     /* Stays clickable even while a help/notes/etc. popup is open — every
        .modal-overlay in this app is z-index:200, so this just needs to sit
        above that in the same (root) stacking context. Lets someone switch
@@ -413,7 +417,7 @@
   .job-picker-search{width:100%;padding:10px;font-size:0.95rem;border:2px solid var(--navy);border-radius:8px;margin-bottom:10px;}
   .job-picker-status{font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px;}
   .job-picker-list{max-height:340px;overflow-y:auto;margin-bottom:14px;}
-  .job-picker-row{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;}
+  .job-picker-row{display:block;width:100%;text-align:left;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;}
   /* Typeahead dropdown under Job/PO Number — same idea as the QA Checklist
      app's typed job search, so a job can be found by typing without always
      needing to open the full Pull Schedule picker. */
