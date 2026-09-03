@@ -177,12 +177,19 @@
      auto-add the right amount to Good Count. Open by default (not tucked
      behind a collapsed toggle) and sized to stand out, since it's easy to
      miss otherwise. */
-  .pallet-setup{border:3px solid var(--navy);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--pink-soft);}
-  .pallet-setup-toggle{width:100%;background:none;border:none;padding:0;display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:1.15rem;color:var(--navy);cursor:pointer;}
-  .pallet-setup-toggle span:first-child{display:flex;align-items:center;gap:6px;}
-  #palletSetupCaret{font-size:1.3rem;}
-  .pallet-setup-body{display:none;margin-top:14px;}
-  .pallet-setup-body.open{display:block;}
+  .pallet-setup, .collapsible-section{border:3px solid var(--navy);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--pink-soft);}
+  .pallet-setup-toggle, .collapsible-toggle{width:100%;background:none;border:none;padding:0;display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:1.15rem;color:var(--navy);cursor:pointer;}
+  .pallet-setup-toggle span:first-child, .collapsible-toggle span:first-child{display:flex;align-items:center;gap:6px;}
+  #palletSetupCaret, .collapsible-caret{font-size:1.3rem;}
+  .pallet-setup-body, .collapsible-body{display:none;margin-top:14px;}
+  .pallet-setup-body.open, .collapsible-body.open{display:block;}
+  /* When a collapsible section also needs its own help icon, the toggle
+     button shares the row with a separate (non-nested) help button — a
+     button can't contain another button, so this sits beside it instead. */
+  .collapsible-title-row{display:flex;align-items:center;gap:10px;}
+  .collapsible-title-row .collapsible-toggle{flex:1;}
+  .section-label-row{display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;}
+  .section-label{font-size:0.8rem;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
   .pallet-setup-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .pallet-setup-field label{font-size:0.9rem;font-weight:700;color:#444;display:block;margin-bottom:5px;}
   .pallet-setup-field input{width:100%;padding:14px;font-size:1.15rem;font-weight:700;border:2px solid var(--navy);border-radius:10px;box-sizing:border-box;text-align:center;}
@@ -596,37 +603,67 @@
   <!-- ENTRY CARD -->
   <div class="card" id="logCard" style="display:none;">
 
-    <div class="counter-block">
-      <div class="counter-title good">✅ <span data-en>Good Count</span><span data-es>Conteo Bueno</span></div>
-      <input class="count-input good" id="entryGood" type="text" inputmode="numeric" placeholder="Type count here" data-ph-en="Type count here" data-ph-es="Escriba el conteo aquí" oninput="formatThousands(this)">
+    <!-- Manual Count Entry — collapsible, closed by default, so the big
+         card isn't dominated by input boxes before there's anything to type. -->
+    <div class="collapsible-section">
+      <div class="collapsible-title-row">
+        <button type="button" class="collapsible-toggle" onclick="toggleManualCount()">
+          <span>🔢 <span data-en>Manual Count Entry</span><span data-es>Entrada Manual de Conteo</span></span>
+          <span id="manualCountCaret" class="collapsible-caret">▾</span>
+        </button>
+        <button type="button" class="help-icon-btn" onclick="showManualCountHelp()" title="How this works">?</button>
+      </div>
+      <div class="collapsible-body" id="manualCountBody">
+        <div class="counter-block">
+          <div class="counter-title good">✅ <span data-en>Good Count</span><span data-es>Conteo Bueno</span></div>
+          <input class="count-input good" id="entryGood" type="text" inputmode="numeric" placeholder="Enter Good Count Here" data-ph-en="Enter Good Count Here" data-ph-es="Ingrese el Conteo Bueno Aquí" oninput="formatThousands(this)">
+        </div>
+
+        <div class="counter-block">
+          <div class="counter-title reject">⚠️ <span data-en>Hold / Review Count</span><span data-es>Retenido / Revisión</span></div>
+          <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Enter Hold / Review Count Here" data-ph-en="Enter Hold / Review Count Here" data-ph-es="Ingrese el Conteo de Retenido/Revisión Aquí" oninput="formatThousands(this)">
+        </div>
+      </div>
     </div>
 
-    <div class="counter-block">
-      <div class="counter-title reject">⚠️ <span data-en>Hold / Review Count</span><span data-es>Retenido / Revisión</span></div>
-      <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Type count here" data-ph-en="Type count here" data-ph-es="Escriba el conteo aquí" oninput="formatThousands(this)">
+    <!-- Quality Issues — collapsible, closed by default (optional flags,
+         not needed on most submissions). -->
+    <div class="collapsible-section">
+      <button type="button" class="collapsible-toggle" onclick="toggleQualityIssues()">
+        <span>⚠️ <span data-en>Quality Issues (Optional)</span><span data-es>Problemas de Calidad (Opcional)</span></span>
+        <span id="qualityIssuesCaret" class="collapsible-caret">▾</span>
+      </button>
+      <div class="collapsible-body" id="qualityIssuesBody">
+        <label><span data-en>Flag for Next Shift (optional — tap all that apply)</span><span data-es>Alerta para el Siguiente Turno (opcional)</span></label>
+        <div class="chip-grid" id="chipGrid">
+          <button class="chip" data-flag="overglue" onclick="toggleChip(this)"><span data-en>Over Glue</span><span data-es>Exceso de Pegamento</span></button>
+          <button class="chip" data-flag="noglue" onclick="toggleChip(this)"><span data-en>Insufficient / No Glue</span><span data-es>Pegamento Insuficiente</span></button>
+          <button class="chip" data-flag="misalign" onclick="toggleChip(this)"><span data-en>Glue Misalignment</span><span data-es>Desalineación de Pegamento</span></button>
+          <button class="chip" data-flag="fold" onclick="toggleChip(this)"><span data-en>Crooked Fold / Misfold</span><span data-es>Doblez Torcido / Mal Doblado</span></button>
+          <button class="chip" data-flag="scuff" onclick="toggleChip(this)"><span data-en>Scuffing</span><span data-es>Raspaduras</span></button>
+          <button class="chip" data-flag="kleenstick" onclick="toggleChip(this)"><span data-en>Kleenstick Issue</span><span data-es>Problema de Kleenstick</span></button>
+          <button class="chip" data-flag="tearstrip" onclick="toggleChip(this)"><span data-en>Tearstrip Issue</span><span data-es>Problema de Tira de Rasgado</span></button>
+          <button class="chip" data-flag="burst" onclick="toggleChip(this)"><span data-en>Bursting / Cracking</span><span data-es>Reventado / Agrietado</span></button>
+          <button class="chip" data-flag="other" onclick="toggleChip(this)"><span data-en>Other (see note)</span><span data-es>Otro (ver nota)</span></button>
+        </div>
+        <input class="other-note" id="otherNote" placeholder="Optional short note / Nota breve opcional" style="display:none;">
+      </div>
     </div>
 
-    <label><span data-en>Flag for Next Shift (optional — tap all that apply)</span><span data-es>Alerta para el Siguiente Turno (opcional)</span></label>
-    <div class="chip-grid" id="chipGrid">
-      <button class="chip" data-flag="overglue" onclick="toggleChip(this)"><span data-en>Over Glue</span><span data-es>Exceso de Pegamento</span></button>
-      <button class="chip" data-flag="noglue" onclick="toggleChip(this)"><span data-en>Insufficient / No Glue</span><span data-es>Pegamento Insuficiente</span></button>
-      <button class="chip" data-flag="misalign" onclick="toggleChip(this)"><span data-en>Glue Misalignment</span><span data-es>Desalineación de Pegamento</span></button>
-      <button class="chip" data-flag="fold" onclick="toggleChip(this)"><span data-en>Crooked Fold / Misfold</span><span data-es>Doblez Torcido / Mal Doblado</span></button>
-      <button class="chip" data-flag="scuff" onclick="toggleChip(this)"><span data-en>Scuffing</span><span data-es>Raspaduras</span></button>
-      <button class="chip" data-flag="kleenstick" onclick="toggleChip(this)"><span data-en>Kleenstick Issue</span><span data-es>Problema de Kleenstick</span></button>
-      <button class="chip" data-flag="tearstrip" onclick="toggleChip(this)"><span data-en>Tearstrip Issue</span><span data-es>Problema de Tira de Rasgado</span></button>
-      <button class="chip" data-flag="burst" onclick="toggleChip(this)"><span data-en>Bursting / Cracking</span><span data-es>Reventado / Agrietado</span></button>
-      <button class="chip" data-flag="other" onclick="toggleChip(this)"><span data-en>Other (see note)</span><span data-es>Otro (ver nota)</span></button>
+    <div class="section-label-row">
+      <span class="section-label"><span data-en>Submit / Save Progress</span><span data-es>Enviar / Guardar Progreso</span></span>
+      <button type="button" class="help-icon-btn" onclick="showSubmitHelp()" title="How this works">?</button>
     </div>
-    <input class="other-note" id="otherNote" placeholder="Optional short note / Nota breve opcional" style="display:none;">
-
     <button class="btn-submit" onclick="submitEntry()"><span data-en>Submit Shift Count</span><span data-es>Enviar Conteo de Turno</span></button>
     <button class="btn-secondary" onclick="saveProgress()">💾 <span data-en>Save Progress (jumping to another job)</span><span data-es>Guardar Progreso (cambiar a otro trabajo)</span></button>
   </div>
 
   <!-- HISTORY -->
   <div class="card" id="historyCard" style="display:none;">
-    <h2><span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></h2>
+    <h2 class="with-help">
+      <span><span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></span>
+      <button type="button" class="help-icon-btn" onclick="showHistoryHelp()" title="How this works">?</button>
+    </h2>
     <div id="historyList"></div>
     <button class="btn-secondary btn-email" id="reportBtn" onclick="sendReport()">📧 <span data-en>Finish, Send Report</span><span data-es>Terminar, Enviar Reporte</span></button>
   </div>
@@ -1451,6 +1488,62 @@ function setShift(s){
   currentShift = s;
   document.getElementById('shift1Btn').classList.toggle('active', s==='1');
   document.getElementById('shift2Btn').classList.toggle('active', s==='2');
+}
+
+function toggleManualCount(){
+  const body = document.getElementById('manualCountBody');
+  const caret = document.getElementById('manualCountCaret');
+  const open = body.classList.toggle('open');
+  caret.textContent = open ? '▴' : '▾';
+}
+
+function toggleQualityIssues(){
+  const body = document.getElementById('qualityIssuesBody');
+  const caret = document.getElementById('qualityIssuesCaret');
+  const open = body.classList.toggle('open');
+  caret.textContent = open ? '▴' : '▾';
+}
+
+function showManualCountHelp(){
+  const isEs = document.body.classList.contains('es');
+  alert(isEs
+    ? '🔢 ENTRADA MANUAL DE CONTEO\n' +
+      'Escriba cuántas piezas buenas y cuántas piezas de retenido/revisión contó en este turno, luego toque "Enviar Conteo de Turno" más abajo.\n\n' +
+      'Conteo Bueno y Retenido/Revisión son independientes — puede enviar uno, el otro, o ambos juntos.\n\n' +
+      'Cada envío se SUMA a los totales de este trabajo — no reemplaza el conteo anterior.'
+    : '🔢 MANUAL COUNT ENTRY\n' +
+      'Type how many good pieces and how many hold/review pieces you counted this shift, then tap "Submit Shift Count" below.\n\n' +
+      'Good Count and Hold/Review Count are independent — you can submit one, the other, or both together.\n\n' +
+      'Each submission ADDS to this job\'s running totals — it doesn\'t replace the previous count.'
+  );
+}
+
+function showSubmitHelp(){
+  const isEs = document.body.classList.contains('es');
+  alert(isEs
+    ? '📤 ENVIAR CONTEO DE TURNO\n' +
+      'Guarda lo que escribió arriba como un nuevo registro en el historial de este trabajo, lo suma a los totales, y limpia las casillas para el próximo conteo.\n\n' +
+      '💾 GUARDAR PROGRESO\n' +
+      'Úselo si necesita cambiar a otro trabajo sin enviar un conteo todavía — recuerda lo que escribió aquí para que nada se pierda, y lo trae de vuelta cuando regrese.'
+    : '📤 SUBMIT SHIFT COUNT\n' +
+      'Saves whatever you typed above as a new entry in this job\'s log, adds it to the running totals, and clears the boxes so they\'re ready for the next count.\n\n' +
+      '💾 SAVE PROGRESS\n' +
+      'Use this if you need to jump to a different job without submitting a count yet — it remembers what you typed here so nothing is lost, and brings it back when you return.'
+  );
+}
+
+function showHistoryHelp(){
+  const isEs = document.body.classList.contains('es');
+  alert(isEs
+    ? '📜 HISTORIAL DE TURNOS\n' +
+      'Cada conteo que ha enviado para este trabajo, agrupado por día, con los totales de Bueno/Retenido de cada día.\n\n' +
+      'Un conteo se puede editar una sola vez (toque ✏️ Editar) si se ingresó mal — después queda bloqueado.\n\n' +
+      '📧 "Terminar, Enviar Reporte" cierra este trabajo definitivamente: envía los totales finales por correo a su gerente y lo quita de Trabajos Activos. Solo toque esto cuando el trabajo esté realmente terminado.'
+    : '📜 SHIFT LOG HISTORY\n' +
+      'Every count you\'ve submitted for this job, grouped by day, with the running Good/Hold totals for each day.\n\n' +
+      'A count can be edited once (tap ✏️ Edit) if it was entered wrong — after that it\'s locked.\n\n' +
+      '📧 "Finish, Send Report" closes this job out for good: it emails the final totals to your manager and removes it from Live Jobs. Only tap this once the job is truly done.'
+  );
 }
 
 function toggleChip(el){
