@@ -311,6 +311,27 @@
   .btn-danger:active{background:var(--accent);color:#fff;}
   .btn-email{background:var(--good-soft-bg);color:var(--good);border-color:var(--good);}
   .btn-email:active{background:var(--good);color:#fff;}
+  /* Finish, Send Report was easy to miss — same soft-outline weight as every
+     other secondary button, at the bottom of a long scroll. Filled/bold like
+     the app's other primary actions (Submit Shift Count, +1 Pallet), plus a
+     gentle pulse once Good Count reaches Target so a truly-done job stands
+     out instead of quietly sitting in Live Jobs forever. */
+  .btn-finish-report{
+    width:100%;padding:22px;font-size:1.25rem;font-weight:900;border-radius:14px;
+    border:none;background:var(--good);color:#fff;margin-top:10px;cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,0.18);
+  }
+  .btn-finish-report:active{background:var(--good-light);}
+  .btn-finish-report.target-reached{animation:finishPulse 1.6s ease-in-out infinite;}
+  @keyframes finishPulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(46,125,79,0.55);}
+    50%{box-shadow:0 0 0 14px rgba(46,125,79,0);}
+  }
+  .target-reached-banner{
+    text-align:center;font-weight:800;font-size:0.95rem;color:var(--good);
+    background:var(--good-soft-bg);border:2px solid var(--good);border-radius:10px;
+    padding:12px 14px;margin-bottom:14px;
+  }
 
   .day-group{margin-bottom:16px;}
   .day-header{
@@ -771,7 +792,8 @@
       <button type="button" class="help-icon-btn" onclick="showHistoryHelp()" title="How this works">?</button>
     </h2>
     <div id="historyList"></div>
-    <button class="btn-secondary btn-email" id="reportBtn" onclick="sendReport()">📧 <span data-en>Finish, Send Report</span><span data-es>Terminar, Enviar Reporte</span></button>
+    <div class="target-reached-banner" id="targetReachedBanner" style="display:none;"></div>
+    <button class="btn-finish-report" id="reportBtn" onclick="sendReport()">📧 <span data-en>Finish, Send Report</span><span data-es>Terminar, Enviar Reporte</span></button>
   </div>
 
   <div class="card" id="deleteCard" style="display:none;">
@@ -1410,6 +1432,24 @@ function toggleNewJobForm(){
   const f = document.getElementById('newJobForm');
   const opening = f.style.display === 'none';
   if (!opening){ f.style.display = 'none'; return; }
+
+  // Catches the exact moment a job that already hit its target would
+  // otherwise get abandoned without ever tapping "Finish, Send Report" —
+  // that's how jobs were quietly piling up in Live Jobs even though they
+  // were really done. This is a nudge, not a hard block: Cancel just means
+  // "let me go finish that one first," not "you can't start a new job."
+  if (currentJobId && jobs[currentJobId]){
+    const curJob = jobs[currentJobId];
+    const curGood = curJob.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+    if (curJob.target > 0 && curGood >= curJob.target){
+      const isEs = document.body.classList.contains('es');
+      const proceed = confirm(isEs
+        ? `El trabajo "${curJob.po}" ya alcanzó su meta (${curGood.toLocaleString()} / ${curJob.target.toLocaleString()}) y no se ha enviado el reporte todavía.\n\n¿Iniciar un nuevo trabajo de todos modos?\n(Toque Cancelar para ir a "Terminar, Enviar Reporte" primero)`
+        : `Job "${curJob.po}" already reached its target (${curGood.toLocaleString()} / ${curJob.target.toLocaleString()}) and hasn't been finished/sent yet.\n\nStart a new job anyway?\n(Tap Cancel to go finish it with "Finish, Send Report" first)`);
+      if (!proceed) return;
+    }
+  }
+
   requireSyncBeforeAction(() => {
     // Station always forces a fresh, explicit choice — never carries over
     // whatever was selected for the last job created in this form. Pass
@@ -2711,6 +2751,25 @@ function renderJob(){
   document.getElementById('bannerCount').textContent = totalGood.toLocaleString();
   document.getElementById('bannerHold').textContent = totalReject.toLocaleString();
   document.getElementById('bannerTarget').textContent = job.target ? job.target.toLocaleString() : '—';
+
+  // Nudges a packer toward the one step that was quietly getting skipped —
+  // a job that reached its Quantity to Produce but was never actually
+  // finished/sent, sitting in Live Jobs indefinitely. Purely a visual
+  // reminder here; toggleNewJobForm() below is what actually interrupts.
+  {
+    const targetReached = job.target > 0 && totalGood >= job.target;
+    const banner = document.getElementById('targetReachedBanner');
+    const isEs2 = document.body.classList.contains('es');
+    if (targetReached){
+      banner.style.display = 'block';
+      banner.textContent = isEs2
+        ? `🎯 ¡Meta alcanzada! (${totalGood.toLocaleString()} / ${job.target.toLocaleString()}) — si este trabajo está terminado, toque "Terminar, Enviar Reporte" abajo.`
+        : `🎯 Target reached! (${totalGood.toLocaleString()} / ${job.target.toLocaleString()}) — if this job is done, tap "Finish, Send Report" below.`;
+    } else {
+      banner.style.display = 'none';
+    }
+    document.getElementById('reportBtn').classList.toggle('target-reached', targetReached);
+  }
   {
     const jmIsEs = document.body.classList.contains('es');
     const jmLabel = jmIsEs ? 'Ahora registrando conteos para:' : 'Now logging counts for:';
