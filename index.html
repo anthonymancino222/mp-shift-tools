@@ -431,7 +431,7 @@
   .modal-box button{margin-bottom:8px;}
   .modal-cancel-btn{width:100%;padding:12px;font-size:0.95rem;font-weight:700;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);cursor:pointer;}
 
-  /* Job schedule picker — pulls Anthony's exported job schedule (same
+  /* Job schedule picker — pulls QA's exported job schedule (same
      backend/data the QA Checklist app already uses) so a packer can tap a
      job instead of typing PO/Product by hand. */
   .schedule-pull-btn{width:100%;padding:10px;font-size:0.85rem;font-weight:700;border-radius:8px;border:2px dashed var(--navy);background:var(--card);color:var(--navy);margin-top:8px;cursor:pointer;}
@@ -847,7 +847,7 @@
   </div>
 </div>
 
-<!-- JOB SCHEDULE PICKER — pulls the job schedule Anthony exports (via the QA
+<!-- JOB SCHEDULE PICKER — pulls the job schedule QA exports (via the QA
      Checklist app's existing backend, same data/feature) so PO/Product can be
      tapped instead of typed. No quantity/target data is in the schedule, so
      that field is always still typed by hand. -->
@@ -925,7 +925,7 @@ const QA_EMAIL = 'qualitygroup@moquinpress.com';
 const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.dev/';
 
 // Job schedule pull — reuses the QA Checklist app's existing backend/data
-// (Anthony's manually-exported CERM schedule) instead of standing up a
+// (QA's manually-exported CERM schedule) instead of standing up a
 // second copy of the same Excel-reading logic. That app's Worker accepts
 // this API key alone (no Google Sign-In required) and has CORS wide open.
 const SCHEDULE_BACKEND_URL = 'https://qa-checklist-backend.anthony-mancino2.workers.dev';
@@ -1705,14 +1705,14 @@ const HELP_TEXTS = {
       title: '🆕 Start New Job',
       body: 'Fill in Job/PO Number, Product Number, Station, Pass, and Quantity to Produce, then tap "Create Job." All of these are required.\n\n' +
         '📋 PULL SCHEDULE\n' +
-        'Tap a job from Anthony\'s exported schedule instead of typing it — auto-fills Job Number and Product Number for you. Quantity to Produce is still always typed by hand, since the schedule doesn\'t include it.\n\n' +
+        'Tap a job from QA\'s exported schedule instead of typing it — auto-fills Job Number and Product Number for you. Quantity to Produce is still always typed by hand, since the schedule doesn\'t include it.\n\n' +
         'Pass defaults to Single Pass, but can be changed to 1st/2nd Pass before tapping Create Job.'
     },
     es: {
       title: '🆕 Iniciar Nuevo Trabajo',
       body: 'Llene Número de Trabajo/OC, Número de Producto, Estación, Pasada, y Cantidad a Producir, luego toque "Crear Trabajo." Todos estos son obligatorios.\n\n' +
         '📋 TRAER PROGRAMA\n' +
-        'Toque un trabajo del programa que Anthony exportó en lugar de escribirlo — llena automáticamente el Número de Trabajo y el Número de Producto. La Cantidad a Producir siempre se escribe a mano, ya que el programa no la incluye.\n\n' +
+        'Toque un trabajo del programa que QA exportó en lugar de escribirlo — llena automáticamente el Número de Trabajo y el Número de Producto. La Cantidad a Producir siempre se escribe a mano, ya que el programa no la incluye.\n\n' +
         'Pasada por defecto es Pasada Única, pero se puede cambiar a 1ra/2da Pasada antes de tocar Crear Trabajo.'
     }
   },
@@ -3361,7 +3361,7 @@ function renderDashData(){
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   JOB SCHEDULE PICKER — pulls Anthony's exported job schedule so PO/Product
+   JOB SCHEDULE PICKER — pulls QA's exported job schedule so PO/Product
    can be tapped instead of typed. Only Long Gluer and Short Gluer exist in
    this app, and both map to the schedule's "FolderGluer" tab (same mapping
    the QA Checklist app uses), so the filter below is really just carrying
