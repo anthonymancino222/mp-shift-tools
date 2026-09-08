@@ -294,6 +294,7 @@
   }
   .partial-pallet-box-input-row .btn-add-box:active{background:var(--navy);color:#fff;}
   .partial-pallet-computed{font-size:0.95rem;font-weight:800;color:var(--good);text-align:center;margin-bottom:10px;}
+  .partial-pallet-divider{font-size:0.8rem;font-weight:700;color:var(--text-tertiary);text-align:center;margin-bottom:10px;}
   .partial-pallet-btns{display:flex;gap:8px;}
   .partial-pallet-btns button{flex:1;margin-bottom:0;}
   .btn-partial-pallet{width:100%;padding:18px;font-size:1.15rem;font-weight:800;border-radius:12px;border:3px solid var(--warn);background:var(--warn-soft-bg);color:var(--warn-soft-text);margin-bottom:10px;}
@@ -730,7 +731,10 @@
     <div class="partial-pallet-row" id="partialPalletRow" style="display:none;">
       <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
            or type it), plus an optional leftover partial-box quantity for
-           whatever didn't make a full box. -->
+           whatever didn't make a full box. The manual "pieces on this
+           pallet" field below stays visible at the same time (not hidden
+           behind this), on purpose — a manual override in case +1 Box or
+           +1 Pallet ever glitches and miscounts, per Anthony. -->
       <div id="partialPalletBoxMode" style="display:none;">
         <label><span data-en>Full Boxes on This Pallet</span><span data-es>Cajas Completas en Esta Tarima</span></label>
         <div class="partial-pallet-box-input-row">
@@ -740,16 +744,17 @@
         <label><span data-en>Partial Box Quantity (if any)</span><span data-es>Cantidad de Caja Parcial (si aplica)</span></label>
         <input id="partialPalletBoxQty" type="text" inputmode="numeric" data-ph-en="Optional — pieces not making a full box" data-ph-es="Opcional — piezas que no completan una caja" placeholder="Optional — pieces not making a full box" oninput="onPartialPalletBoxesChange(this)">
         <div class="partial-pallet-computed" id="partialPalletComputed"></div>
+        <div class="partial-pallet-divider" id="partialPalletDivider"><span data-en>— or enter the total manually —</span><span data-es>— o ingrese el total manualmente —</span></div>
       </div>
-      <!-- Fallback when no confirmed Packing Setup — no known per-box count
-           to convert boxes into pieces, so just take the raw total. -->
+      <!-- Manual override — always available, not just when no Packing Setup
+           is confirmed. If this has a value, it wins over the box math. -->
       <input id="partialPalletInput" type="text" inputmode="numeric" oninput="formatThousands(this)" data-ph-en="Pieces on this pallet" data-ph-es="Piezas en esta tarima" placeholder="Pieces on this pallet">
       <div class="partial-pallet-btns">
         <button class="modal-cancel-btn" onclick="cancelPartialPallet()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
         <button class="btn-submit" onclick="confirmPartialPallet()"><span data-en>Add Partial Pallet</span><span data-es>Agregar Tarima Parcial</span></button>
       </div>
     </div>
-    <button class="btn-partial-pallet" id="partialPalletToggleBtn" onclick="openPartialPallet()">➗ <span data-en>Partial Pallet (Split Shipment)</span><span data-es>Tarima Parcial (Envío Dividido)</span></button>
+    <button class="btn-partial-pallet" id="partialPalletToggleBtn" onclick="openPartialPallet()">➗ <span data-en>Partial Pallet (For example: Split Shipment)</span><span data-es>Tarima Parcial (Por ejemplo: Envío Dividido)</span></button>
     <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
 
@@ -1946,9 +1951,12 @@ function openPartialPallet(){
   document.getElementById('partialPalletInput').value = '';
   document.getElementById('partialPalletBoxes').value = '';
   document.getElementById('partialPalletBoxQty').value = '';
+  // Box mode only shows when a Pieces per Box is actually known (can't do
+  // box math without it) — but the manual pieces field stays visible
+  // either way, as an always-available override/backup.
   const boxMode = ppb > 0;
   document.getElementById('partialPalletBoxMode').style.display = boxMode ? 'block' : 'none';
-  document.getElementById('partialPalletInput').style.display = boxMode ? 'none' : 'block';
+  document.getElementById('partialPalletDivider').style.display = boxMode ? 'block' : 'none';
   if (boxMode) updatePartialPalletComputed();
   document.getElementById('partialPalletRow').style.display = 'block';
   document.getElementById('partialPalletToggleBtn').style.display = 'none';
@@ -1984,16 +1992,23 @@ function confirmPartialPallet(){
   const isEs = document.body.classList.contains('es');
   const job = jobs[currentJobId];
   const ppb = confirmedPiecesPerBox(job);
+  // The manual field is a deliberate override — if it's filled in, it wins,
+  // even when box mode is also showing. That's the "just in case +1 Box or
+  // +1 Pallet glitches" safety net Anthony asked for: whatever was typed by
+  // hand always takes priority over the computed box math.
+  const manualPieces = parseInt(document.getElementById('partialPalletInput').value.replace(/,/g,''), 10) || 0;
   let pieces;
-  if (ppb > 0){
+  if (manualPieces > 0){
+    pieces = manualPieces;
+  } else if (ppb > 0){
     const boxes = parseInt(document.getElementById('partialPalletBoxes').value.replace(/,/g,''), 10) || 0;
     const partialQty = parseInt(document.getElementById('partialPalletBoxQty').value.replace(/,/g,''), 10) || 0;
     pieces = boxes * ppb + partialQty;
   } else {
-    pieces = parseInt(document.getElementById('partialPalletInput').value.replace(/,/g,''), 10) || 0;
+    pieces = 0;
   }
   if(pieces <= 0){
-    alert(isEs ? 'Ingrese cajas y/o cantidad de caja parcial (o piezas) para esta tarima.' : 'Enter boxes and/or a partial box quantity (or pieces) for this pallet.');
+    alert(isEs ? 'Ingrese cajas y/o cantidad de caja parcial, o el total de piezas, para esta tarima.' : 'Enter boxes and/or a partial box quantity, or the total pieces, for this pallet.');
     return;
   }
   const pallet = {
