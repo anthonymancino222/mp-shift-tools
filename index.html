@@ -286,6 +286,14 @@
   .pallet-setup-btns .notes-btn.small{flex:1;justify-content:center;margin-bottom:0;padding:10px 8px;font-size:0.88rem;}
   .partial-pallet-row{margin-bottom:10px;}
   .partial-pallet-row input{width:100%;padding:14px;font-size:1.1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:10px;box-sizing:border-box;}
+  .partial-pallet-box-input-row{display:flex;gap:8px;}
+  .partial-pallet-box-input-row input{margin-bottom:0;}
+  .partial-pallet-box-input-row .btn-add-box{
+    flex-shrink:0;padding:0 18px;font-size:0.95rem;font-weight:800;border-radius:10px;
+    border:2px solid var(--navy);background:var(--pink-soft);color:var(--navy);cursor:pointer;
+  }
+  .partial-pallet-box-input-row .btn-add-box:active{background:var(--navy);color:#fff;}
+  .partial-pallet-computed{font-size:0.95rem;font-weight:800;color:var(--good);text-align:center;margin-bottom:10px;}
   .partial-pallet-btns{display:flex;gap:8px;}
   .partial-pallet-btns button{flex:1;margin-bottom:0;}
   .btn-partial-pallet{width:100%;padding:18px;font-size:1.15rem;font-weight:800;border-radius:12px;border:3px solid var(--warn);background:var(--warn-soft-bg);color:var(--warn-soft-text);margin-bottom:10px;}
@@ -304,13 +312,7 @@
     width:100%;padding:20px;font-size:2.4rem;font-weight:900;text-align:center;
     border-radius:12px;border:2px solid var(--border);
   }
-  .count-input.good{background:var(--good-soft-bg);color:var(--good);border-color:var(--good-light);}
   .count-input.reject{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);}
-
-  .chip-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;}
-  .chip{padding:14px 8px;font-size:1rem;font-weight:700;border-radius:10px;border:2px solid var(--border);background:var(--card);color:var(--text-strong-secondary);text-align:center;}
-  .chip.selected{background:var(--warn-soft-bg);border-color:var(--warn);color:var(--warn-soft-text);}
-  .other-note{margin-top:6px;}
 
   .btn-submit{width:100%;padding:20px;font-size:1.4rem;font-weight:900;border-radius:12px;border:none;background:var(--navy);color:#fff;margin-top:8px;}
   .btn-submit:active{background:var(--navy-light);}
@@ -726,6 +728,21 @@
     <button class="btn-pallet" onclick="addPallet()">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
 
     <div class="partial-pallet-row" id="partialPalletRow" style="display:none;">
+      <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
+           or type it), plus an optional leftover partial-box quantity for
+           whatever didn't make a full box. -->
+      <div id="partialPalletBoxMode" style="display:none;">
+        <label><span data-en>Full Boxes on This Pallet</span><span data-es>Cajas Completas en Esta Tarima</span></label>
+        <div class="partial-pallet-box-input-row">
+          <input id="partialPalletBoxes" type="text" inputmode="numeric" placeholder="0" oninput="onPartialPalletBoxesChange(this)">
+          <button type="button" class="btn-add-box" onclick="incrementPartialPalletBoxes()">+1 <span data-en>Box</span><span data-es>Caja</span></button>
+        </div>
+        <label><span data-en>Partial Box Quantity (if any)</span><span data-es>Cantidad de Caja Parcial (si aplica)</span></label>
+        <input id="partialPalletBoxQty" type="text" inputmode="numeric" data-ph-en="Optional — pieces not making a full box" data-ph-es="Opcional — piezas que no completan una caja" placeholder="Optional — pieces not making a full box" oninput="onPartialPalletBoxesChange(this)">
+        <div class="partial-pallet-computed" id="partialPalletComputed"></div>
+      </div>
+      <!-- Fallback when no confirmed Packing Setup — no known per-box count
+           to convert boxes into pieces, so just take the raw total. -->
       <input id="partialPalletInput" type="text" inputmode="numeric" oninput="formatThousands(this)" data-ph-en="Pieces on this pallet" data-ph-es="Piezas en esta tarima" placeholder="Pieces on this pallet">
       <div class="partial-pallet-btns">
         <button class="modal-cancel-btn" onclick="cancelPartialPallet()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
@@ -739,36 +756,19 @@
   <!-- ENTRY CARD -->
   <div class="card" id="logCard" style="display:none;">
 
-    <!-- Manual Count Entry — collapsing this turned out to hide fields
-         people needed to see right away, so reverted to always-visible
-         (per Anthony, 2026-09-08). Keeping the help icon. -->
+    <!-- Good Count no longer has a manual entry — it comes entirely from
+         Pallet actions (+1 Pallet Complete / Partial Pallet) now. Hold/Review
+         is the only thing still typed by hand, since defects aren't tracked
+         via pallets. Quality Issues (flag chips) removed entirely, per
+         Anthony, 2026-09-08. -->
     <div class="section-label-row" style="margin-top:0;">
-      <span class="section-label">🔢 <span data-en>Manual Count Entry</span><span data-es>Entrada Manual de Conteo</span></span>
+      <span class="section-label">⚠️ <span data-en>Hold / Review Count Entry</span><span data-es>Entrada de Retenido / Revisión</span></span>
       <button type="button" class="help-icon-btn" onclick="showManualCountHelp()" title="How this works">?</button>
     </div>
-    <div class="counter-block">
-      <div class="counter-title good">✅ <span data-en>Good Count</span><span data-es>Conteo Bueno</span></div>
-      <input class="count-input good" id="entryGood" type="text" inputmode="numeric" placeholder="Enter Good Count Here" data-ph-en="Enter Good Count Here" data-ph-es="Ingrese el Conteo Bueno Aquí" oninput="formatThousands(this)">
-    </div>
-
     <div class="counter-block">
       <div class="counter-title reject">⚠️ <span data-en>Hold / Review Count</span><span data-es>Retenido / Revisión</span></div>
       <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Enter Hold / Review Count Here" data-ph-en="Enter Hold / Review Count Here" data-ph-es="Ingrese el Conteo de Retenido/Revisión Aquí" oninput="formatThousands(this)">
     </div>
-
-    <label><span data-en>Flag for Next Shift (optional — tap all that apply)</span><span data-es>Alerta para el Siguiente Turno (opcional)</span></label>
-    <div class="chip-grid" id="chipGrid">
-      <button class="chip" data-flag="overglue" onclick="toggleChip(this)"><span data-en>Over Glue</span><span data-es>Exceso de Pegamento</span></button>
-      <button class="chip" data-flag="noglue" onclick="toggleChip(this)"><span data-en>Insufficient / No Glue</span><span data-es>Pegamento Insuficiente</span></button>
-      <button class="chip" data-flag="misalign" onclick="toggleChip(this)"><span data-en>Glue Misalignment</span><span data-es>Desalineación de Pegamento</span></button>
-      <button class="chip" data-flag="fold" onclick="toggleChip(this)"><span data-en>Crooked Fold / Misfold</span><span data-es>Doblez Torcido / Mal Doblado</span></button>
-      <button class="chip" data-flag="scuff" onclick="toggleChip(this)"><span data-en>Scuffing</span><span data-es>Raspaduras</span></button>
-      <button class="chip" data-flag="kleenstick" onclick="toggleChip(this)"><span data-en>Kleenstick Issue</span><span data-es>Problema de Kleenstick</span></button>
-      <button class="chip" data-flag="tearstrip" onclick="toggleChip(this)"><span data-en>Tearstrip Issue</span><span data-es>Problema de Tira de Rasgado</span></button>
-      <button class="chip" data-flag="burst" onclick="toggleChip(this)"><span data-en>Bursting / Cracking</span><span data-es>Reventado / Agrietado</span></button>
-      <button class="chip" data-flag="other" onclick="toggleChip(this)"><span data-en>Other (see note)</span><span data-es>Otro (ver nota)</span></button>
-    </div>
-    <input class="other-note" id="otherNote" placeholder="Optional short note / Nota breve opcional" style="display:none;">
 
     <div class="section-label-row">
       <span class="section-label"><span data-en>Submit / Save Progress</span><span data-es>Enviar / Guardar Progreso</span></span>
@@ -948,7 +948,6 @@ let currentShift = '1';
 // still fully changeable before Create Job is tapped.
 let newJobStation = null;
 let newJobPass = null;
-let selectedFlags = [];
 let editingEntryId = null;
 // Which job/entry the Notes modal is currently open for — null when closed.
 let notesModalContext = null;
@@ -1616,10 +1615,7 @@ function saveProgress(){
   if(!currentJobId) return;
   drafts[currentJobId] = {
     shift: currentShift,
-    good: document.getElementById('entryGood').value,
     reject: document.getElementById('entryReject').value,
-    flags: [...selectedFlags],
-    otherNote: document.getElementById('otherNote').value,
     savedAt: Date.now()
   };
   saveDrafts();
@@ -1642,19 +1638,8 @@ function restoreDraft(){
   const d = drafts[currentJobId];
   if(!d) return;
   setShift(d.shift || '1');
-  document.getElementById('entryGood').value = d.good || '';
   document.getElementById('entryReject').value = d.reject || '';
-  formatThousands(document.getElementById('entryGood'));
   formatThousands(document.getElementById('entryReject'));
-  (d.flags||[]).forEach(f=>{
-    const chip = document.querySelector(`.chip[data-flag="${f}"]`);
-    if(chip){
-      chip.classList.add('selected');
-      selectedFlags.push(f);
-    }
-  });
-  document.getElementById('otherNote').value = d.otherNote || '';
-  if(selectedFlags.includes('other')) document.getElementById('otherNote').style.display = 'block';
 
   notice.dataset.kind = 'restored';
   notice.dataset.time = new Date(d.savedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
@@ -1725,16 +1710,16 @@ const HELP_TEXTS = {
   },
   manualCount: {
     en: {
-      title: '🔢 Manual Count Entry',
-      body: 'Type how many good pieces and how many hold/review pieces you counted this shift, then tap "Submit Shift Count" below.\n\n' +
-        'Good Count and Hold/Review Count are independent — you can submit one, the other, or both together.\n\n' +
-        'Each submission ADDS to this job\'s running totals — it doesn\'t replace the previous count.'
+      title: '⚠️ Hold / Review Count Entry',
+      body: 'Type how many hold/review (defect) pieces you found this shift, then tap "Submit Shift Count" below.\n\n' +
+        'Good Count is no longer typed here — it\'s added automatically whenever you tap "+1 Pallet Complete" or "Partial Pallet" in the Pallets section above.\n\n' +
+        'Each submission ADDS to this job\'s running Hold/Review total — it doesn\'t replace the previous count.'
     },
     es: {
-      title: '🔢 Entrada Manual de Conteo',
-      body: 'Escriba cuántas piezas buenas y cuántas piezas de retenido/revisión contó en este turno, luego toque "Enviar Conteo de Turno" más abajo.\n\n' +
-        'Conteo Bueno y Retenido/Revisión son independientes — puede enviar uno, el otro, o ambos juntos.\n\n' +
-        'Cada envío se SUMA a los totales de este trabajo — no reemplaza el conteo anterior.'
+      title: '⚠️ Entrada de Retenido / Revisión',
+      body: 'Escriba cuántas piezas de retenido/revisión (defecto) encontró en este turno, luego toque "Enviar Conteo de Turno" más abajo.\n\n' +
+        'El Conteo Bueno ya no se escribe aquí — se suma automáticamente cuando toca "+1 Tarima Completa" o "Tarima Parcial" en la sección de Tarimas arriba.\n\n' +
+        'Cada envío se SUMA al total de Retenido/Revisión de este trabajo — no reemplaza el conteo anterior.'
     }
   },
   submit: {
@@ -1796,72 +1781,37 @@ function showManualCountHelp(){ openHelpModal('manualCount'); }
 function showSubmitHelp(){ openHelpModal('submit'); }
 function showHistoryHelp(){ openHelpModal('history'); }
 
-function toggleChip(el){
-  const flag = el.dataset.flag;
-  el.classList.toggle('selected');
-  if(el.classList.contains('selected')){
-    selectedFlags.push(flag);
-  } else {
-    selectedFlags = selectedFlags.filter(f=>f!==flag);
-  }
-  document.getElementById('otherNote').style.display = selectedFlags.includes('other') ? 'block' : 'none';
-}
-
-const flagLabels = {
-  en:{overglue:'Over Glue',noglue:'Insufficient / No Glue',misalign:'Glue Misalignment',fold:'Crooked Fold / Misfold',scuff:'Scuffing',kleenstick:'Kleenstick Issue',tearstrip:'Tearstrip Issue',burst:'Bursting / Cracking',other:'Other'},
-  es:{overglue:'Exceso de Pegamento',noglue:'Pegamento Insuficiente',misalign:'Desalineación de Pegamento',fold:'Doblez Torcido / Mal Doblado',scuff:'Raspaduras',kleenstick:'Problema de Kleenstick',tearstrip:'Problema de Tira de Rasgado',burst:'Reventado / Agrietado',other:'Otro'}
-};
-
 function clearEntryForm(){
-  document.getElementById('entryGood').value='';
   document.getElementById('entryReject').value='';
-  selectedFlags = [];
-  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
-  document.getElementById('otherNote').style.display='none';
-  document.getElementById('otherNote').value='';
   const notice = document.getElementById('draftNotice');
   notice.style.display='none';
   delete notice.dataset.kind;
 }
 
+// Good Count has no manual entry anymore — it's entirely driven by Pallet
+// actions (+1 Pallet Complete / Partial Pallet, see createAutoEntryFromPallet).
+// This only ever submits a Hold/Review count by hand now.
 function submitEntry(){
   if(!currentJobId) return;
   const isEs = document.body.classList.contains('es');
-  const good = parseInt(document.getElementById('entryGood').value.replace(/,/g,'')) || 0;
   const reject = parseInt(document.getElementById('entryReject').value.replace(/,/g,'')) || 0;
 
-  if(good===0 && reject===0){
-    alert(isEs ? 'Ingrese al menos un conteo antes de enviar.' : 'Enter at least one count before submitting.');
+  if(reject===0){
+    alert(isEs ? 'Ingrese un conteo de retenido/revisión antes de enviar.' : 'Enter a hold/review count before submitting.');
     return;
   }
 
-  if(good > 0){
-    const goodMsg = isEs
-      ? `¿Confirmar Conteo Bueno?\n\n${good.toLocaleString()}`
-      : `Confirm Good Count?\n\n${good.toLocaleString()}`;
-    if(!confirm(goodMsg)) return;
-  }
-
-  if(reject > 0){
-    const rejectMsg = isEs
-      ? `¿Confirmar Conteo de Retenido/Revisión?\n\n${reject.toLocaleString()}`
-      : `Confirm Hold/Review Count?\n\n${reject.toLocaleString()}`;
-    if(!confirm(rejectMsg)) return;
-  }
-
-  const otherNote = document.getElementById('otherNote').value.trim();
-  const flagText = selectedFlags.map(f=>{
-    let lbl = isEs ? flagLabels.es[f] : flagLabels.en[f];
-    if(f==='other' && otherNote) lbl += ': ' + otherNote;
-    return lbl;
-  }).join(' • ');
+  const rejectMsg = isEs
+    ? `¿Confirmar Conteo de Retenido/Revisión?\n\n${reject.toLocaleString()}`
+    : `Confirm Hold/Review Count?\n\n${reject.toLocaleString()}`;
+  if(!confirm(rejectMsg)) return;
 
   const entry = {
     id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     shift: currentShift,
     date: new Date().toISOString().slice(0,10),
     time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
-    good, reject, flags: flagText,
+    good: 0, reject, flags: '',
     loggedAt: Date.now(),
     edited: false,
     originalGood: null,
@@ -1904,6 +1854,14 @@ function piecesPerPalletFor(job){
   const ppb = Number(cfg.piecesPerBox) || 0;
   const bpp = Number(cfg.boxesPerPallet) || 0;
   return (ppb > 0 && bpp > 0) ? ppb * bpp : 0;
+}
+// Just the per-box count (not the full pallet count) — Partial Pallet uses
+// this alone, since a split-shipment's last pallet is counted in boxes
+// (plus one leftover partial box), not as a fraction of a whole pallet.
+function confirmedPiecesPerBox(job){
+  const cfg = getPalletConfig(job);
+  if(!cfg.confirmed) return 0;
+  return Number(cfg.piecesPerBox) || 0;
 }
 
 /* Keeps the Packing Setup inputs, lock state, and the computed/progress
@@ -2056,7 +2014,15 @@ function addPallet(){
    Always available regardless of whether Packing Setup is filled in. */
 function openPartialPallet(){
   if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const ppb = confirmedPiecesPerBox(job);
   document.getElementById('partialPalletInput').value = '';
+  document.getElementById('partialPalletBoxes').value = '';
+  document.getElementById('partialPalletBoxQty').value = '';
+  const boxMode = ppb > 0;
+  document.getElementById('partialPalletBoxMode').style.display = boxMode ? 'block' : 'none';
+  document.getElementById('partialPalletInput').style.display = boxMode ? 'none' : 'block';
+  if (boxMode) updatePartialPalletComputed();
   document.getElementById('partialPalletRow').style.display = 'block';
   document.getElementById('partialPalletToggleBtn').style.display = 'none';
 }
@@ -2064,15 +2030,45 @@ function cancelPartialPallet(){
   document.getElementById('partialPalletRow').style.display = 'none';
   document.getElementById('partialPalletToggleBtn').style.display = 'block';
 }
+function incrementPartialPalletBoxes(){
+  const el = document.getElementById('partialPalletBoxes');
+  const cur = parseInt(el.value.replace(/,/g,''), 10) || 0;
+  el.value = (cur + 1).toLocaleString('en-US');
+  updatePartialPalletComputed();
+}
+function onPartialPalletBoxesChange(el){
+  formatThousands(el);
+  updatePartialPalletComputed();
+}
+function updatePartialPalletComputed(){
+  if(!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const job = jobs[currentJobId];
+  const ppb = confirmedPiecesPerBox(job);
+  const boxes = parseInt(document.getElementById('partialPalletBoxes').value.replace(/,/g,''), 10) || 0;
+  const partialQty = parseInt(document.getElementById('partialPalletBoxQty').value.replace(/,/g,''), 10) || 0;
+  const total = boxes * ppb + partialQty;
+  document.getElementById('partialPalletComputed').textContent = isEs
+    ? `= ${total.toLocaleString()} piezas en total`
+    : `= ${total.toLocaleString()} pieces total`;
+}
 function confirmPartialPallet(){
   if(!currentJobId) return;
   const isEs = document.body.classList.contains('es');
-  const pieces = parseInt(document.getElementById('partialPalletInput').value.replace(/,/g,''), 10) || 0;
+  const job = jobs[currentJobId];
+  const ppb = confirmedPiecesPerBox(job);
+  let pieces;
+  if (ppb > 0){
+    const boxes = parseInt(document.getElementById('partialPalletBoxes').value.replace(/,/g,''), 10) || 0;
+    const partialQty = parseInt(document.getElementById('partialPalletBoxQty').value.replace(/,/g,''), 10) || 0;
+    pieces = boxes * ppb + partialQty;
+  } else {
+    pieces = parseInt(document.getElementById('partialPalletInput').value.replace(/,/g,''), 10) || 0;
+  }
   if(pieces <= 0){
-    alert(isEs ? 'Ingrese la cantidad de piezas en esta tarima.' : 'Enter how many pieces are on this pallet.');
+    alert(isEs ? 'Ingrese cajas y/o cantidad de caja parcial (o piezas) para esta tarima.' : 'Enter boxes and/or a partial box quantity (or pieces) for this pallet.');
     return;
   }
-  const job = jobs[currentJobId];
   const pallet = {
     id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     shift: currentShift,
