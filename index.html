@@ -756,25 +756,14 @@
   <!-- ENTRY CARD -->
   <div class="card" id="logCard" style="display:none;">
 
-    <!-- Good Count no longer has a manual entry — it comes entirely from
-         Pallet actions (+1 Pallet Complete / Partial Pallet) now. Hold/Review
-         is the only thing still typed by hand, since defects aren't tracked
-         via pallets. Quality Issues (flag chips) removed entirely, per
-         Anthony, 2026-09-08. -->
+    <!-- Good Count comes entirely from Pallet actions (+1 Pallet Complete /
+         Partial Pallet). Hold/Review Count entry, Quality Issues, and manual
+         Submit Shift Count have all been removed — per Anthony, 2026-09-08.
+         Save Progress stays since it also remembers which shift is active. -->
     <div class="section-label-row" style="margin-top:0;">
-      <span class="section-label">⚠️ <span data-en>Hold / Review Count Entry</span><span data-es>Entrada de Retenido / Revisión</span></span>
-      <button type="button" class="help-icon-btn" onclick="showManualCountHelp()" title="How this works">?</button>
-    </div>
-    <div class="counter-block">
-      <div class="counter-title reject">⚠️ <span data-en>Hold / Review Count</span><span data-es>Retenido / Revisión</span></div>
-      <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Enter Hold / Review Count Here" data-ph-en="Enter Hold / Review Count Here" data-ph-es="Ingrese el Conteo de Retenido/Revisión Aquí" oninput="formatThousands(this)">
-    </div>
-
-    <div class="section-label-row">
-      <span class="section-label"><span data-en>Submit / Save Progress</span><span data-es>Enviar / Guardar Progreso</span></span>
+      <span class="section-label"><span data-en>Save Progress</span><span data-es>Guardar Progreso</span></span>
       <button type="button" class="help-icon-btn" onclick="showSubmitHelp()" title="How this works">?</button>
     </div>
-    <button class="btn-submit" onclick="submitEntry()"><span data-en>Submit Shift Count</span><span data-es>Enviar Conteo de Turno</span></button>
     <button class="btn-secondary" onclick="saveProgress()">💾 <span data-en>Save Progress (jumping to another job)</span><span data-es>Guardar Progreso (cambiar a otro trabajo)</span></button>
   </div>
 
@@ -1615,7 +1604,6 @@ function saveProgress(){
   if(!currentJobId) return;
   drafts[currentJobId] = {
     shift: currentShift,
-    reject: document.getElementById('entryReject').value,
     savedAt: Date.now()
   };
   saveDrafts();
@@ -1638,8 +1626,6 @@ function restoreDraft(){
   const d = drafts[currentJobId];
   if(!d) return;
   setShift(d.shift || '1');
-  document.getElementById('entryReject').value = d.reject || '';
-  formatThousands(document.getElementById('entryReject'));
 
   notice.dataset.kind = 'restored';
   notice.dataset.time = new Date(d.savedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
@@ -1708,34 +1694,16 @@ const HELP_TEXTS = {
         'Guarde una configuración de empaque para reutilizarla en futuros trabajos — se comparte con todas las tabletas.'
     }
   },
-  manualCount: {
-    en: {
-      title: '⚠️ Hold / Review Count Entry',
-      body: 'Type how many hold/review (defect) pieces you found this shift, then tap "Submit Shift Count" below.\n\n' +
-        'Good Count is no longer typed here — it\'s added automatically whenever you tap "+1 Pallet Complete" or "Partial Pallet" in the Pallets section above.\n\n' +
-        'Each submission ADDS to this job\'s running Hold/Review total — it doesn\'t replace the previous count.'
-    },
-    es: {
-      title: '⚠️ Entrada de Retenido / Revisión',
-      body: 'Escriba cuántas piezas de retenido/revisión (defecto) encontró en este turno, luego toque "Enviar Conteo de Turno" más abajo.\n\n' +
-        'El Conteo Bueno ya no se escribe aquí — se suma automáticamente cuando toca "+1 Tarima Completa" o "Tarima Parcial" en la sección de Tarimas arriba.\n\n' +
-        'Cada envío se SUMA al total de Retenido/Revisión de este trabajo — no reemplaza el conteo anterior.'
-    }
-  },
   submit: {
     en: {
-      title: '📤 Submit / Save Progress',
-      body: 'SUBMIT SHIFT COUNT\n' +
-        'Saves whatever you typed above as a new entry in this job\'s log, adds it to the running totals, and clears the boxes so they\'re ready for the next count.\n\n' +
-        '💾 SAVE PROGRESS\n' +
-        'Use this if you need to jump to a different job without submitting a count yet — it remembers what you typed here so nothing is lost, and brings it back when you return.'
+      title: '💾 Save Progress',
+      body: 'Use this if you need to jump to a different job without finishing this one — it remembers which shift you were on and brings you back to this job\'s full view when you return, instead of losing your place.\n\n' +
+        'Good Count keeps coming from Pallet actions (+1 Pallet Complete / Partial Pallet) regardless of whether you\'ve saved progress or not.'
     },
     es: {
-      title: '📤 Enviar / Guardar Progreso',
-      body: 'ENVIAR CONTEO DE TURNO\n' +
-        'Guarda lo que escribió arriba como un nuevo registro en el historial de este trabajo, lo suma a los totales, y limpia las casillas para el próximo conteo.\n\n' +
-        '💾 GUARDAR PROGRESO\n' +
-        'Úselo si necesita cambiar a otro trabajo sin enviar un conteo todavía — recuerda lo que escribió aquí para que nada se pierda, y lo trae de vuelta cuando regrese.'
+      title: '💾 Guardar Progreso',
+      body: 'Úselo si necesita cambiar a otro trabajo sin terminar este — recuerda en qué turno estaba y lo trae de vuelta a la vista completa de este trabajo cuando regrese, en vez de perder su lugar.\n\n' +
+        'El Conteo Bueno sigue viniendo de las acciones de Tarima (+1 Tarima Completa / Tarima Parcial) sin importar si guardó progreso o no.'
     }
   },
   history: {
@@ -1777,54 +1745,13 @@ function renderHelpModal(){
 
 function showNewJobHelp(){ openHelpModal('newJob'); }
 function showPalletHelp(){ openHelpModal('pallet'); }
-function showManualCountHelp(){ openHelpModal('manualCount'); }
 function showSubmitHelp(){ openHelpModal('submit'); }
 function showHistoryHelp(){ openHelpModal('history'); }
 
 function clearEntryForm(){
-  document.getElementById('entryReject').value='';
   const notice = document.getElementById('draftNotice');
   notice.style.display='none';
   delete notice.dataset.kind;
-}
-
-// Good Count has no manual entry anymore — it's entirely driven by Pallet
-// actions (+1 Pallet Complete / Partial Pallet, see createAutoEntryFromPallet).
-// This only ever submits a Hold/Review count by hand now.
-function submitEntry(){
-  if(!currentJobId) return;
-  const isEs = document.body.classList.contains('es');
-  const reject = parseInt(document.getElementById('entryReject').value.replace(/,/g,'')) || 0;
-
-  if(reject===0){
-    alert(isEs ? 'Ingrese un conteo de retenido/revisión antes de enviar.' : 'Enter a hold/review count before submitting.');
-    return;
-  }
-
-  const rejectMsg = isEs
-    ? `¿Confirmar Conteo de Retenido/Revisión?\n\n${reject.toLocaleString()}`
-    : `Confirm Hold/Review Count?\n\n${reject.toLocaleString()}`;
-  if(!confirm(rejectMsg)) return;
-
-  const entry = {
-    id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-    shift: currentShift,
-    date: new Date().toISOString().slice(0,10),
-    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
-    good: 0, reject, flags: '',
-    loggedAt: Date.now(),
-    edited: false,
-    originalGood: null,
-    originalReject: null,
-    synced: false,
-    notes: []
-  };
-  jobs[currentJobId].entries.push(entry);
-  saveAll();
-  clearDraft(currentJobId);
-  clearEntryForm();
-  renderJob();
-  pushLiveEntry(jobs[currentJobId], entry);
 }
 
 /* Pallet tracking — a single tap logs one pallet leaving the gluer line as
@@ -2269,7 +2196,7 @@ function fetchLive(){
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   LIVE SYNC — every entry is saved locally FIRST (submitEntry, above),
+   LIVE SYNC — every entry is saved locally FIRST (createAutoEntryFromPallet, above),
    so a failed push here never loses data; it only delays other devices
    seeing it. entry.synced tracks whether the backend has confirmed it.
    Weak WiFi on the tablets means pushes routinely fail on the first try,
@@ -2333,7 +2260,7 @@ function renderGlobalSyncStatus(){
    (submit, retry loop, manual sync) can all await/react to the result. */
 // Tracks pushes currently in flight, keyed by entry id — NOT stored on the
 // entry object itself (would get pointlessly serialized by saveAll()).
-// Without this, the initial push from submitEntry() and a background retry
+// Without this, the initial push from createAutoEntryFromPallet() and a background retry
 // (30s timer / online event / manual sync) can race on the same not-yet-
 // confirmed entry and both fire a POST — the backend is now idempotent on
 // entryId too (belt and suspenders), but this avoids the redundant network
