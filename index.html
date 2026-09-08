@@ -739,52 +739,36 @@
   <!-- ENTRY CARD -->
   <div class="card" id="logCard" style="display:none;">
 
-    <!-- Manual Count Entry — collapsible, closed by default, so the big
-         card isn't dominated by input boxes before there's anything to type. -->
-    <div class="collapsible-section">
-      <div class="collapsible-title-row">
-        <button type="button" class="collapsible-toggle" onclick="toggleManualCount()">
-          <span>🔢 <span data-en>Manual Count Entry</span><span data-es>Entrada Manual de Conteo</span></span>
-          <span id="manualCountCaret" class="collapsible-caret">▾</span>
-        </button>
-        <button type="button" class="help-icon-btn" onclick="showManualCountHelp()" title="How this works">?</button>
-      </div>
-      <div class="collapsible-body" id="manualCountBody">
-        <div class="counter-block">
-          <div class="counter-title good">✅ <span data-en>Good Count</span><span data-es>Conteo Bueno</span></div>
-          <input class="count-input good" id="entryGood" type="text" inputmode="numeric" placeholder="Enter Good Count Here" data-ph-en="Enter Good Count Here" data-ph-es="Ingrese el Conteo Bueno Aquí" oninput="formatThousands(this)">
-        </div>
-
-        <div class="counter-block">
-          <div class="counter-title reject">⚠️ <span data-en>Hold / Review Count</span><span data-es>Retenido / Revisión</span></div>
-          <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Enter Hold / Review Count Here" data-ph-en="Enter Hold / Review Count Here" data-ph-es="Ingrese el Conteo de Retenido/Revisión Aquí" oninput="formatThousands(this)">
-        </div>
-      </div>
+    <!-- Manual Count Entry — collapsing this turned out to hide fields
+         people needed to see right away, so reverted to always-visible
+         (per Anthony, 2026-09-08). Keeping the help icon. -->
+    <div class="section-label-row" style="margin-top:0;">
+      <span class="section-label">🔢 <span data-en>Manual Count Entry</span><span data-es>Entrada Manual de Conteo</span></span>
+      <button type="button" class="help-icon-btn" onclick="showManualCountHelp()" title="How this works">?</button>
+    </div>
+    <div class="counter-block">
+      <div class="counter-title good">✅ <span data-en>Good Count</span><span data-es>Conteo Bueno</span></div>
+      <input class="count-input good" id="entryGood" type="text" inputmode="numeric" placeholder="Enter Good Count Here" data-ph-en="Enter Good Count Here" data-ph-es="Ingrese el Conteo Bueno Aquí" oninput="formatThousands(this)">
     </div>
 
-    <!-- Quality Issues — collapsible, closed by default (optional flags,
-         not needed on most submissions). -->
-    <div class="collapsible-section">
-      <button type="button" class="collapsible-toggle" onclick="toggleQualityIssues()">
-        <span>⚠️ <span data-en>Quality Issues (Optional)</span><span data-es>Problemas de Calidad (Opcional)</span></span>
-        <span id="qualityIssuesCaret" class="collapsible-caret">▾</span>
-      </button>
-      <div class="collapsible-body" id="qualityIssuesBody">
-        <label><span data-en>Flag for Next Shift (optional — tap all that apply)</span><span data-es>Alerta para el Siguiente Turno (opcional)</span></label>
-        <div class="chip-grid" id="chipGrid">
-          <button class="chip" data-flag="overglue" onclick="toggleChip(this)"><span data-en>Over Glue</span><span data-es>Exceso de Pegamento</span></button>
-          <button class="chip" data-flag="noglue" onclick="toggleChip(this)"><span data-en>Insufficient / No Glue</span><span data-es>Pegamento Insuficiente</span></button>
-          <button class="chip" data-flag="misalign" onclick="toggleChip(this)"><span data-en>Glue Misalignment</span><span data-es>Desalineación de Pegamento</span></button>
-          <button class="chip" data-flag="fold" onclick="toggleChip(this)"><span data-en>Crooked Fold / Misfold</span><span data-es>Doblez Torcido / Mal Doblado</span></button>
-          <button class="chip" data-flag="scuff" onclick="toggleChip(this)"><span data-en>Scuffing</span><span data-es>Raspaduras</span></button>
-          <button class="chip" data-flag="kleenstick" onclick="toggleChip(this)"><span data-en>Kleenstick Issue</span><span data-es>Problema de Kleenstick</span></button>
-          <button class="chip" data-flag="tearstrip" onclick="toggleChip(this)"><span data-en>Tearstrip Issue</span><span data-es>Problema de Tira de Rasgado</span></button>
-          <button class="chip" data-flag="burst" onclick="toggleChip(this)"><span data-en>Bursting / Cracking</span><span data-es>Reventado / Agrietado</span></button>
-          <button class="chip" data-flag="other" onclick="toggleChip(this)"><span data-en>Other (see note)</span><span data-es>Otro (ver nota)</span></button>
-        </div>
-        <input class="other-note" id="otherNote" placeholder="Optional short note / Nota breve opcional" style="display:none;">
-      </div>
+    <div class="counter-block">
+      <div class="counter-title reject">⚠️ <span data-en>Hold / Review Count</span><span data-es>Retenido / Revisión</span></div>
+      <input class="count-input reject" id="entryReject" type="text" inputmode="numeric" placeholder="Enter Hold / Review Count Here" data-ph-en="Enter Hold / Review Count Here" data-ph-es="Ingrese el Conteo de Retenido/Revisión Aquí" oninput="formatThousands(this)">
     </div>
+
+    <label><span data-en>Flag for Next Shift (optional — tap all that apply)</span><span data-es>Alerta para el Siguiente Turno (opcional)</span></label>
+    <div class="chip-grid" id="chipGrid">
+      <button class="chip" data-flag="overglue" onclick="toggleChip(this)"><span data-en>Over Glue</span><span data-es>Exceso de Pegamento</span></button>
+      <button class="chip" data-flag="noglue" onclick="toggleChip(this)"><span data-en>Insufficient / No Glue</span><span data-es>Pegamento Insuficiente</span></button>
+      <button class="chip" data-flag="misalign" onclick="toggleChip(this)"><span data-en>Glue Misalignment</span><span data-es>Desalineación de Pegamento</span></button>
+      <button class="chip" data-flag="fold" onclick="toggleChip(this)"><span data-en>Crooked Fold / Misfold</span><span data-es>Doblez Torcido / Mal Doblado</span></button>
+      <button class="chip" data-flag="scuff" onclick="toggleChip(this)"><span data-en>Scuffing</span><span data-es>Raspaduras</span></button>
+      <button class="chip" data-flag="kleenstick" onclick="toggleChip(this)"><span data-en>Kleenstick Issue</span><span data-es>Problema de Kleenstick</span></button>
+      <button class="chip" data-flag="tearstrip" onclick="toggleChip(this)"><span data-en>Tearstrip Issue</span><span data-es>Problema de Tira de Rasgado</span></button>
+      <button class="chip" data-flag="burst" onclick="toggleChip(this)"><span data-en>Bursting / Cracking</span><span data-es>Reventado / Agrietado</span></button>
+      <button class="chip" data-flag="other" onclick="toggleChip(this)"><span data-en>Other (see note)</span><span data-es>Otro (ver nota)</span></button>
+    </div>
+    <input class="other-note" id="otherNote" placeholder="Optional short note / Nota breve opcional" style="display:none;">
 
     <div class="section-label-row">
       <span class="section-label"><span data-en>Submit / Save Progress</span><span data-es>Enviar / Guardar Progreso</span></span>
@@ -1688,20 +1672,6 @@ function setShift(s){
   currentShift = s;
   document.getElementById('shift1Btn').classList.toggle('active', s==='1');
   document.getElementById('shift2Btn').classList.toggle('active', s==='2');
-}
-
-function toggleManualCount(){
-  const body = document.getElementById('manualCountBody');
-  const caret = document.getElementById('manualCountCaret');
-  const open = body.classList.toggle('open');
-  caret.textContent = open ? '▴' : '▾';
-}
-
-function toggleQualityIssues(){
-  const body = document.getElementById('qualityIssuesBody');
-  const caret = document.getElementById('qualityIssuesCaret');
-  const open = body.classList.toggle('open');
-  caret.textContent = open ? '▴' : '▾';
 }
 
 /* ── Help modal — shared by every "?" icon (see HELP_TEXTS below and the
