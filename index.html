@@ -176,6 +176,15 @@
     padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.08);
   }
   .card h2{margin:0 0 12px;font-size:1.1rem;color:var(--navy);border-bottom:2px solid var(--border);padding-bottom:8px;}
+  /* Shrinks a card/button to half its normal width, centered — per Anthony,
+     for Active Job, Save Progress, Start Over, and the global Sync Now
+     button specifically, not a general layout rule. */
+  .half-width-centered{max-width:50%;margin-left:auto;margin-right:auto;}
+  /* Sync Now sits in the full-bleed sync bar (not inside .container), so a
+     plain 50% would be half of the whole screen, not half of the app's own
+     760px content column like the other three. 368px matches that same
+     column's half-width (760px container minus its 12px×2 padding, halved). */
+  .global-sync-btn-half{max-width:368px;margin-left:auto;margin-right:auto;}
   .card h2.with-help{display:flex;justify-content:space-between;align-items:center;}
   .help-icon-btn{
     width:26px;height:26px;min-width:26px;border-radius:50%;border:2px solid var(--navy);
@@ -581,7 +590,7 @@
   <div class="global-sync-status" id="globalSyncStatus">
     <span data-en>All synced</span><span data-es>Todo sincronizado</span>
   </div>
-  <button class="global-sync-btn" onclick="manualGlobalSync()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
+  <button class="global-sync-btn global-sync-btn-half" onclick="manualGlobalSync()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
 </div>
 
 <!-- LANDING PAGE — shown first, instead of dropping straight into the
@@ -612,7 +621,7 @@
 <div class="container" id="mainContainer">
 
   <!-- JOB SELECTOR -->
-  <div class="card">
+  <div class="card half-width-centered">
     <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span> <span style="text-transform:none;font-weight:400;font-size:0.75rem;color:var(--text-tertiary);letter-spacing:0;"><span data-en>(the job you're currently logging counts for)</span><span data-es>(el trabajo para el que está registrando conteos ahora)</span></span></h2>
     <div id="jobListWrap"></div>
     <button class="btn-submit" id="continueJobBtn" style="display:none;margin-bottom:8px;" onclick="confirmContinueJob()">▸ <span data-en>Continue Job?</span><span data-es>¿Continuar Trabajo?</span></button>
@@ -785,7 +794,7 @@
   </div>
 
   <!-- ENTRY CARD -->
-  <div class="card" id="logCard" style="display:none;">
+  <div class="card half-width-centered" id="logCard" style="display:none;">
 
     <!-- Good Count comes entirely from Pallet actions (+1 Pallet Complete /
          Partial Pallet). Hold/Review Count entry, Quality Issues, and manual
@@ -798,7 +807,7 @@
     <button class="btn-secondary" onclick="saveProgress()">💾 <span data-en>Save Progress (jumping to another job)</span><span data-es>Guardar Progreso (cambiar a otro trabajo)</span></button>
   </div>
 
-  <div class="card" id="deleteCard" style="display:none;">
+  <div class="card half-width-centered" id="deleteCard" style="display:none;">
     <button class="btn-secondary btn-danger" onclick="startOver()"><span data-en>Start Over (Clear This Job)</span><span data-es>Empezar de Nuevo (Borrar Trabajo)</span></button>
   </div>
 
