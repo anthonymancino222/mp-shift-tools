@@ -258,6 +258,7 @@
   .pallet-progress-line{text-align:center;font-size:0.82rem;color:var(--text-tertiary);margin-bottom:14px;}
   .btn-pallet{width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;background:var(--good);color:#fff;margin-bottom:10px;}
   .btn-pallet:active{background:var(--good-light);}
+  .btn-pallet:disabled{background:var(--disabled-btn-bg);cursor:not-allowed;}
 
   /* Packing setup — nested inside the Pallet card, lets the app compute
      pieces-per-pallet from Pieces/Box × Boxes/Pallet, so +1 Pallet can also
@@ -302,6 +303,7 @@
     border-color:var(--accent);background:var(--accent-soft-bg);color:var(--accent);
   }
   .partial-pallet-box-input-row .btn-remove-box:active{background:var(--accent);color:#fff;}
+  .partial-pallet-box-input-row .btn-add-box:disabled{background:var(--disabled-bg);border-color:var(--border);color:var(--text-tertiary);cursor:not-allowed;}
   .partial-pallet-computed{font-size:0.95rem;font-weight:800;color:var(--good);text-align:center;margin-bottom:10px;}
   .partial-pallet-divider{font-size:0.8rem;font-weight:700;color:var(--text-tertiary);text-align:center;margin-bottom:10px;}
   .partial-pallet-btns{display:flex;gap:8px;}
@@ -735,7 +737,7 @@
     <div class="pallet-shift-line" id="palletShiftLine"></div>
     <div class="pallet-progress-line" id="palletProgressLine" style="display:none;"></div>
 
-    <button class="btn-pallet" onclick="addPallet()">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
+    <button class="btn-pallet" id="palletCompleteBtn" onclick="addPallet()" title="Confirm Packing Setup above first">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
 
     <div class="partial-pallet-row" id="partialPalletRow" style="display:none;">
       <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
@@ -750,9 +752,9 @@
           <button type="button" class="help-icon-btn" onclick="showBoxCountHelp()" title="How this works">?</button>
         </div>
         <div class="partial-pallet-box-input-row">
-          <button type="button" class="btn-add-box btn-remove-box" onclick="decrementPartialPalletBoxes()">−1 <span data-en>Box</span><span data-es>Caja</span></button>
+          <button type="button" class="btn-add-box btn-remove-box" id="decBoxBtn" onclick="decrementPartialPalletBoxes()" title="Enter Pieces per Box above first">−1 <span data-en>Box</span><span data-es>Caja</span></button>
           <input id="partialPalletBoxes" type="text" inputmode="numeric" placeholder="0" oninput="onPartialPalletBoxesChange(this)">
-          <button type="button" class="btn-add-box" onclick="incrementPartialPalletBoxes()">+1 <span data-en>Box</span><span data-es>Caja</span></button>
+          <button type="button" class="btn-add-box" id="incBoxBtn" onclick="incrementPartialPalletBoxes()" title="Enter Pieces per Box above first">+1 <span data-en>Box</span><span data-es>Caja</span></button>
         </div>
         <label><span data-en>Partial Box Quantity (if any)</span><span data-es>Cantidad de Caja Parcial (si aplica)</span></label>
         <input id="partialPalletBoxQty" type="text" inputmode="numeric" data-ph-en="Optional — pieces not making a full box" data-ph-es="Opcional — piezas que no completan una caja" placeholder="Optional — pieces not making a full box" oninput="onPartialPalletBoxesChange(this)">
@@ -1867,6 +1869,17 @@ function renderPalletSection(){
   } else {
     progressEl.style.display = 'none';
   }
+
+  // +1 Pallet needs a full confirmed setup (both fields) since it's meant
+  // to log a whole pallet; +1/-1 Box only needs Pieces per Box, since a box
+  // count doesn't depend on how many boxes make a pallet.
+  const palletBtn = document.getElementById('palletCompleteBtn');
+  if (palletBtn) palletBtn.disabled = !(ppp > 0);
+  const boxesKnown = confirmedPiecesPerBox(job) > 0;
+  const incBtn = document.getElementById('incBoxBtn');
+  const decBtn = document.getElementById('decBoxBtn');
+  if (incBtn) incBtn.disabled = !boxesKnown;
+  if (decBtn) decBtn.disabled = !boxesKnown;
 }
 
 function togglePalletSetup(){
@@ -1943,6 +1956,14 @@ function addPallet(){
   if(!currentJobId) return;
   const job = jobs[currentJobId];
   const ppp = piecesPerPalletFor(job);
+  // Button is disabled in the UI whenever this is 0 (see renderPalletSection)
+  // — this is just the same guard at the data layer, in case it's ever
+  // triggered another way.
+  if(ppp <= 0){
+    const isEs = document.body.classList.contains('es');
+    alert(isEs ? 'Confirme la Configuración de Empaque (Piezas por Caja y Cajas por Tarima) primero.' : 'Confirm Packing Setup (Pieces per Box and Boxes per Pallet) first.');
+    return;
+  }
   const pallet = {
     id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     shift: currentShift,
