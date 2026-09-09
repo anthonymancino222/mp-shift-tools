@@ -258,12 +258,6 @@
   .pallet-progress-line{text-align:center;font-size:0.82rem;color:var(--text-tertiary);margin-bottom:14px;}
   .btn-pallet{width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;background:var(--good);color:#fff;margin-bottom:10px;}
   .btn-pallet:active{background:var(--good-light);}
-  /* Smaller/different color than +1 Pallet on purpose — same one-tap
-     immediacy (adds straight to Good Count, no review step), but visually
-     a distinct, lesser action so it doesn't get mistaken for completing an
-     actual pallet ready to ship. */
-  .btn-box{width:100%;padding:18px;font-size:1.15rem;font-weight:900;border-radius:12px;border:none;background:var(--info);color:#fff;margin-bottom:10px;}
-  .btn-box:active{background:#0c8bc7;}
 
   /* Packing setup — nested inside the Pallet card, lets the app compute
      pieces-per-pallet from Pieces/Box × Boxes/Pallet, so +1 Pallet can also
@@ -304,6 +298,10 @@
     border:2px solid var(--navy);background:var(--pink-soft);color:var(--navy);cursor:pointer;
   }
   .partial-pallet-box-input-row .btn-add-box:active{background:var(--navy);color:#fff;}
+  .partial-pallet-box-input-row .btn-remove-box{
+    border-color:var(--accent);background:var(--accent-soft-bg);color:var(--accent);
+  }
+  .partial-pallet-box-input-row .btn-remove-box:active{background:var(--accent);color:#fff;}
   .partial-pallet-computed{font-size:0.95rem;font-weight:800;color:var(--good);text-align:center;margin-bottom:10px;}
   .partial-pallet-divider{font-size:0.8rem;font-weight:700;color:var(--text-tertiary);text-align:center;margin-bottom:10px;}
   .partial-pallet-btns{display:flex;gap:8px;}
@@ -738,7 +736,6 @@
     <div class="pallet-progress-line" id="palletProgressLine" style="display:none;"></div>
 
     <button class="btn-pallet" onclick="addPallet()">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
-    <button class="btn-box" onclick="addBox()">📤 <span data-en>+1 BOX COMPLETE</span><span data-es>+1 CAJA COMPLETA</span></button>
 
     <div class="partial-pallet-row" id="partialPalletRow" style="display:none;">
       <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
@@ -748,8 +745,12 @@
            behind this), on purpose — a manual override in case +1 Box or
            +1 Pallet ever glitches and miscounts, per Anthony. -->
       <div id="partialPalletBoxMode" style="display:none;">
-        <label><span data-en>Full Boxes on This Pallet</span><span data-es>Cajas Completas en Esta Tarima</span></label>
+        <div class="section-label-row" style="margin-top:0;">
+          <label style="margin:0;"><span data-en>Full Boxes on This Pallet</span><span data-es>Cajas Completas en Esta Tarima</span></label>
+          <button type="button" class="help-icon-btn" onclick="showBoxCountHelp()" title="How this works">?</button>
+        </div>
         <div class="partial-pallet-box-input-row">
+          <button type="button" class="btn-add-box btn-remove-box" onclick="decrementPartialPalletBoxes()">−1 <span data-en>Box</span><span data-es>Caja</span></button>
           <input id="partialPalletBoxes" type="text" inputmode="numeric" placeholder="0" oninput="onPartialPalletBoxesChange(this)">
           <button type="button" class="btn-add-box" onclick="incrementPartialPalletBoxes()">+1 <span data-en>Box</span><span data-es>Caja</span></button>
         </div>
@@ -1667,6 +1668,16 @@ function setShift(s){
    language toggle (and the rest of the page) stays usable while it's open —
    see toggleLang(), which calls renderHelpModal() to re-render in place. ── */
 const HELP_TEXTS = {
+  boxCount: {
+    en: {
+      title: '📦 Full Boxes on This Pallet',
+      body: 'Count the full boxes stacked on this partial pallet. Tap +1 Box each time you add one, −1 Box if you tap by mistake. Add any leftover pieces below (Partial Box Quantity), then tap "Add Partial Pallet" when done.'
+    },
+    es: {
+      title: '📦 Cajas Completas en Esta Tarima',
+      body: 'Cuente las cajas completas apiladas en esta tarima parcial. Toque +1 Caja cada vez que agregue una, −1 Caja si toca por error. Agregue las piezas sobrantes abajo (Cantidad de Caja Parcial), luego toque "Agregar Tarima Parcial" cuando termine.'
+    }
+  },
   newJob: {
     en: {
       title: '🆕 Start New Job',
@@ -1690,12 +1701,10 @@ const HELP_TEXTS = {
         'Enter Pieces per Box and Boxes per Pallet, then tap "Confirm Setup" to lock it in. Tap "Edit" to change it later.\n\n' +
         '📦 +1 PALLET COMPLETE\n' +
         'One tap logs a pallet. If Packing Setup is confirmed, it also adds that many pieces to Good Count automatically.\n\n' +
-        '📤 +1 BOX COMPLETE\n' +
-        'One tap adds a single box\'s worth of pieces to Good Count, right when you finish it — no need to wait and tally boxes later. Needs Packing Setup confirmed (Pieces per Box).\n\n' +
         '➗ PARTIAL PALLET\n' +
-        'For a split shipment\'s last pallet that isn\'t completely full — count in full boxes (tap +1 Box there, or type it) plus any partial box quantity, or just type the total pieces manually. The manual field always overrides the box math if you type in it.\n\n' +
+        'For a split shipment\'s last pallet that isn\'t completely full — count in full boxes (tap +1 Box, or type it) plus any partial box quantity, or just type the total pieces manually. The manual field always overrides the box math if you type in it.\n\n' +
         '↩ UNDO LAST PALLET\n' +
-        'Removes the most recent pallet OR box tap (whichever was more recent) and also reverses any pieces it added to Good Count.\n\n' +
+        'Removes the most recent pallet and also reverses any pieces it added to Good Count.\n\n' +
         '📂 SAVED SETUPS\n' +
         'Save a packing setup to reuse on future jobs — shared with every tablet.'
     },
@@ -1705,12 +1714,10 @@ const HELP_TEXTS = {
         'Ingrese Piezas por Caja y Cajas por Tarima, luego toque "Confirmar Configuración" para bloquearlo. Toque "Editar" para cambiarlo después.\n\n' +
         '📦 +1 TARIMA COMPLETA\n' +
         'Un toque registra una tarima. Si la Configuración de Empaque está confirmada, también suma esa cantidad de piezas al Conteo Bueno automáticamente.\n\n' +
-        '📤 +1 CAJA COMPLETA\n' +
-        'Un toque suma las piezas de una sola caja al Conteo Bueno, apenas la termine — sin esperar a contar cajas después. Necesita la Configuración de Empaque confirmada (Piezas por Caja).\n\n' +
         '➗ TARIMA PARCIAL\n' +
-        'Para la última tarima de un envío dividido que no está completamente llena — cuente en cajas completas (toque +1 Caja ahí, o escríbalo) más cualquier cantidad de caja parcial, o simplemente escriba el total de piezas manualmente. El campo manual siempre tiene prioridad sobre el cálculo de cajas si escribe en él.\n\n' +
+        'Para la última tarima de un envío dividido que no está completamente llena — cuente en cajas completas (toque +1 Caja, o escríbalo) más cualquier cantidad de caja parcial, o simplemente escriba el total de piezas manualmente. El campo manual siempre tiene prioridad sobre el cálculo de cajas si escribe en él.\n\n' +
         '↩ DESHACER ÚLTIMA TARIMA\n' +
-        'Quita la tarima o caja más reciente (lo que se haya registrado último) y también revierte las piezas que haya sumado al Conteo Bueno.\n\n' +
+        'Quita la tarima más reciente y también revierte las piezas que haya sumado al Conteo Bueno.\n\n' +
         '📂 CONFIGS GUARDADAS\n' +
         'Guarde una configuración de empaque para reutilizarla en futuros trabajos — se comparte con todas las tabletas.'
     }
@@ -1766,6 +1773,7 @@ function renderHelpModal(){
 
 function showNewJobHelp(){ openHelpModal('newJob'); }
 function showPalletHelp(){ openHelpModal('pallet'); }
+function showBoxCountHelp(){ openHelpModal('boxCount'); }
 function showSubmitHelp(){ openHelpModal('submit'); }
 function showHistoryHelp(){ openHelpModal('history'); }
 
@@ -1957,44 +1965,6 @@ function addPallet(){
   pushLivePallet(job, pallet);
 }
 
-/* One tap = one box's worth of pieces added to Good Count, same immediacy
-   as +1 Pallet Complete — for logging boxes as they're finished rather than
-   waiting to tally them up in the Partial Pallet panel. Needs a confirmed
-   Pieces per Box to know how much a box is worth. Stored in job.pallets
-   (marked isBox) purely so it shares the exact same Undo Last Pallet code
-   path — but it's deliberately NEVER pushed to the server as a pallet
-   (only its linked Good Count entry syncs), since a box isn't a pallet
-   that's actually ready for shipping; counting it in Total Pallets or the
-   server's Pallets sheet would be wrong. */
-function addBox(){
-  if(!currentJobId) return;
-  const job = jobs[currentJobId];
-  const ppb = confirmedPiecesPerBox(job);
-  if(ppb <= 0){
-    const isEs = document.body.classList.contains('es');
-    alert(isEs ? 'Confirme la Configuración de Empaque (Piezas por Caja) primero.' : 'Confirm Packing Setup (Pieces per Box) first.');
-    return;
-  }
-  const box = {
-    id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-    shift: currentShift,
-    date: new Date().toISOString().slice(0,10),
-    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
-    loggedAt: Date.now(),
-    synced: true, // never pushed — nothing to sync, and this keeps it out of pending-sync counts
-    voided: false,
-    pieces: ppb,
-    linkedEntryId: null,
-    partial: false,
-    isBox: true
-  };
-  job.pallets.push(box);
-  const entry = createAutoEntryFromPallet(job, ppb, false);
-  box.linkedEntryId = entry.id;
-  saveAll();
-  renderJob();
-}
-
 /* Manual override for a pallet that isn't the standard full count — a
    split-shipment's last pallet, or any job with no packing setup entered.
    Always available regardless of whether Packing Setup is filled in. */
@@ -2023,6 +1993,12 @@ function incrementPartialPalletBoxes(){
   const el = document.getElementById('partialPalletBoxes');
   const cur = parseInt(el.value.replace(/,/g,''), 10) || 0;
   el.value = (cur + 1).toLocaleString('en-US');
+  updatePartialPalletComputed();
+}
+function decrementPartialPalletBoxes(){
+  const el = document.getElementById('partialPalletBoxes');
+  const cur = parseInt(el.value.replace(/,/g,''), 10) || 0;
+  el.value = Math.max(0, cur - 1).toLocaleString('en-US');
   updatePartialPalletComputed();
 }
 function onPartialPalletBoxesChange(el){
