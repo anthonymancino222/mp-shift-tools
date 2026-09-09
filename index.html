@@ -185,6 +185,9 @@
      760px content column like the other three. 368px matches that same
      column's half-width (760px container minus its 12px×2 padding, halved). */
   .global-sync-btn-half{max-width:368px;margin-left:auto;margin-right:auto;}
+  /* Sizes a card to hug its own content (one line of text/button) instead of
+     a fixed fraction — per Anthony, for Active Job and Save Progress only. */
+  .fit-content-centered{width:fit-content;max-width:100%;margin-left:auto;margin-right:auto;}
   .card h2.with-help{display:flex;justify-content:space-between;align-items:center;}
   .help-icon-btn{
     width:26px;height:26px;min-width:26px;border-radius:50%;border:2px solid var(--navy);
@@ -621,7 +624,7 @@
 <div class="container" id="mainContainer">
 
   <!-- JOB SELECTOR -->
-  <div class="card half-width-centered">
+  <div class="card fit-content-centered">
     <h2><span data-en>Active Job</span><span data-es>Trabajo Activo</span> <span style="text-transform:none;font-weight:400;font-size:0.75rem;color:var(--text-tertiary);letter-spacing:0;"><span data-en>(the job you're currently logging counts for)</span><span data-es>(el trabajo para el que está registrando conteos ahora)</span></span></h2>
     <div id="jobListWrap"></div>
     <button class="btn-submit" id="continueJobBtn" style="display:none;margin-bottom:8px;" onclick="confirmContinueJob()">▸ <span data-en>Continue Job?</span><span data-es>¿Continuar Trabajo?</span></button>
@@ -794,7 +797,7 @@
   </div>
 
   <!-- ENTRY CARD -->
-  <div class="card half-width-centered" id="logCard" style="display:none;">
+  <div class="card fit-content-centered" id="logCard" style="display:none;">
 
     <!-- Good Count comes entirely from Pallet actions (+1 Pallet Complete /
          Partial Pallet). Hold/Review Count entry, Quality Issues, and manual
