@@ -769,7 +769,7 @@
         <button class="btn-submit" onclick="confirmPartialPallet()"><span data-en>Add Partial Pallet</span><span data-es>Agregar Tarima Parcial</span></button>
       </div>
     </div>
-    <button class="btn-partial-pallet" id="partialPalletToggleBtn" onclick="openPartialPallet()">➗ <span data-en>Partial Pallet (For example: Split Shipment)</span><span data-es>Tarima Parcial (Por ejemplo: Envío Dividido)</span></button>
+    <button class="btn-partial-pallet" id="partialPalletToggleBtn" onclick="togglePartialPallet()">➗ <span data-en>Partial Pallet (For example: Split Shipment)</span><span data-es>Tarima Parcial (Por ejemplo: Envío Dividido)</span></button>
     <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
 
@@ -1988,7 +1988,19 @@ function addPallet(){
 
 /* Manual override for a pallet that isn't the standard full count — a
    split-shipment's last pallet, or any job with no packing setup entered.
-   Always available regardless of whether Packing Setup is filled in. */
+   Always available regardless of whether Packing Setup is filled in. The
+   toggle button itself opens AND closes this now (tap again to collapse
+   whenever you want), instead of only being closeable via Cancel. */
+function togglePartialPallet(){
+  const row = document.getElementById('partialPalletRow');
+  if (row.style.display === 'block') cancelPartialPallet();
+  else openPartialPallet();
+}
+function setPartialPalletToggleLabel(isOpen){
+  document.getElementById('partialPalletToggleBtn').innerHTML = isOpen
+    ? '▲ <span data-en>Close Partial Pallet</span><span data-es>Cerrar Tarima Parcial</span>'
+    : '➗ <span data-en>Partial Pallet (For example: Split Shipment)</span><span data-es>Tarima Parcial (Por ejemplo: Envío Dividido)</span>';
+}
 function openPartialPallet(){
   if(!currentJobId) return;
   const job = jobs[currentJobId];
@@ -2004,11 +2016,11 @@ function openPartialPallet(){
   document.getElementById('partialPalletDivider').style.display = boxMode ? 'block' : 'none';
   if (boxMode) updatePartialPalletComputed();
   document.getElementById('partialPalletRow').style.display = 'block';
-  document.getElementById('partialPalletToggleBtn').style.display = 'none';
+  setPartialPalletToggleLabel(true);
 }
 function cancelPartialPallet(){
   document.getElementById('partialPalletRow').style.display = 'none';
-  document.getElementById('partialPalletToggleBtn').style.display = 'block';
+  setPartialPalletToggleLabel(false);
 }
 function incrementPartialPalletBoxes(){
   const el = document.getElementById('partialPalletBoxes');
