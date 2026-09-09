@@ -228,6 +228,11 @@
   .banner-grid div{background:rgba(255,255,255,0.14);border-radius:10px;padding:10px;}
   .banner-grid .n{font-size:1.8rem;font-weight:800;}
   .banner-grid .l{font-size:0.8rem;color:#dde5f5;font-weight:600;}
+  .banner-edit-btn{
+    background:none;border:none;color:#dde5f5;font-size:0.8rem;cursor:pointer;
+    padding:0 0 0 4px;vertical-align:middle;opacity:0.85;
+  }
+  .banner-edit-btn:active{opacity:1;}
   /* Sits directly above the giant Good Count number — has to be unmistakable
      about WHICH job that number belongs to, since it's the one thing standing
      between "reading the right job's count" and "reading the wrong one." */
@@ -674,7 +679,7 @@
       <div class="count" id="bannerCount">0</div>
       <div class="banner-grid">
         <div><div class="n" id="bannerHold">0</div><div class="l"><span data-en>HOLD / REVIEW</span><span data-es>RETENIDO / REVISIÓN</span></div></div>
-        <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span></div></div>
+        <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span><button type="button" class="banner-edit-btn" onclick="editJobTarget()" title="Edit">✏️</button></div></div>
       </div>
     </div>
     <div class="preview-hint" id="previewHint" style="display:none;">👆 <span data-en>This is a preview — tap "Continue Job?" above to start logging for this job.</span><span data-es>Esto es una vista previa — toca "¿Continuar Trabajo?" arriba para empezar a registrar este trabajo.</span></div>
@@ -765,6 +770,17 @@
     <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
 
+  <!-- HISTORY -->
+  <div class="card" id="historyCard" style="display:none;">
+    <h2 class="with-help">
+      <span><span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></span>
+      <button type="button" class="help-icon-btn" onclick="showHistoryHelp()" title="How this works">?</button>
+    </h2>
+    <div id="historyList"></div>
+    <div class="target-reached-banner" id="targetReachedBanner" style="display:none;"></div>
+    <button class="btn-finish-report" id="reportBtn" onclick="sendReport()">📧 <span data-en>Finish, Send Report</span><span data-es>Terminar, Enviar Reporte</span></button>
+  </div>
+
   <!-- ENTRY CARD -->
   <div class="card" id="logCard" style="display:none;">
 
@@ -777,17 +793,6 @@
       <button type="button" class="help-icon-btn" onclick="showSubmitHelp()" title="How this works">?</button>
     </div>
     <button class="btn-secondary" onclick="saveProgress()">💾 <span data-en>Save Progress (jumping to another job)</span><span data-es>Guardar Progreso (cambiar a otro trabajo)</span></button>
-  </div>
-
-  <!-- HISTORY -->
-  <div class="card" id="historyCard" style="display:none;">
-    <h2 class="with-help">
-      <span><span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></span>
-      <button type="button" class="help-icon-btn" onclick="showHistoryHelp()" title="How this works">?</button>
-    </h2>
-    <div id="historyList"></div>
-    <div class="target-reached-banner" id="targetReachedBanner" style="display:none;"></div>
-    <button class="btn-finish-report" id="reportBtn" onclick="sendReport()">📧 <span data-en>Finish, Send Report</span><span data-es>Terminar, Enviar Reporte</span></button>
   </div>
 
   <div class="card" id="deleteCard" style="display:none;">
@@ -2500,6 +2505,35 @@ function manualGlobalSync(){
   });
 }
 
+/* Quantity to Produce is only ever set once, at Create Job — this is the
+   one place to correct it afterward (a mis-typed target, or a legitimate
+   change mid-job). Native prompt()/confirm() match the same PIN-entry
+   pattern already used elsewhere in this app. */
+function editJobTarget(){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const isEs = document.body.classList.contains('es');
+  const current = job.target || 0;
+  const input = prompt(
+    isEs ? 'Nueva Cantidad a Producir:' : 'New Quantity to Produce:',
+    current ? current.toLocaleString('en-US') : ''
+  );
+  if(input === null) return; // cancelled
+  const newTarget = parseInt(String(input).replace(/,/g,''), 10) || 0;
+  if(newTarget <= 0){
+    alert(isEs ? 'Ingrese una cantidad válida.' : 'Enter a valid quantity.');
+    return;
+  }
+  if(newTarget === current) return; // no actual change — skip the confirm
+  const confirmMsg = isEs
+    ? `¿Confirmar el cambio de Cantidad a Producir de ${current.toLocaleString()} a ${newTarget.toLocaleString()}?`
+    : `Confirm changing Quantity to Produce from ${current.toLocaleString()} to ${newTarget.toLocaleString()}?`;
+  if(!confirm(confirmMsg)) return;
+  job.target = newTarget;
+  saveAll();
+  renderJob();
+}
+
 function sendReport(){
   if(!currentJobId) return;
   const job = jobs[currentJobId];
@@ -2667,6 +2701,7 @@ function renderJob(){
     banner.style.display='none';
     previewHint.style.display='none';
     document.getElementById('jobNotesBtn').style.display='none';
+    document.querySelector('.banner-edit-btn').style.display='none';
     shiftSec.style.display='none';
     palletCard.style.display='none';
     logCard.style.display='none';
@@ -2684,6 +2719,7 @@ function renderJob(){
     // the rest of the interactive section: nothing should be addable to a
     // job that hasn't actually been confirmed/switched to yet.
     document.getElementById('jobNotesBtn').style.display='none';
+    document.querySelector('.banner-edit-btn').style.display='none';
     shiftSec.style.display='none';
     palletCard.style.display='none';
     logCard.style.display='none';
@@ -2743,6 +2779,8 @@ function renderJob(){
     document.getElementById('jobMetaLine').innerHTML =
       `<span class="jm-label">${jmLabel}</span>${escapeHtml(job.po)}${job.product ? ' — '+escapeHtml(job.product) : ''} — ${escapeHtml(job.machine)}${jmPass ? ' — '+escapeHtml(jmPass) : ''}`;
   }
+
+  document.querySelector('.banner-edit-btn').style.display = 'inline';
 
   {
     const notesBtn = document.getElementById('jobNotesBtn');
