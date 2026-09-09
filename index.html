@@ -107,12 +107,20 @@
     padding-bottom:40px;
     -webkit-tap-highlight-color:transparent;
   }
+  /* Header + button row are wrapped in .sticky-top-bar (see body) and pinned
+     together via position:sticky, so both stay on screen as the page
+     scrolls instead of disappearing under the job's log/pallet cards.
+     No z-index here on purpose — .lang-toggle below still needs its own
+     z-index:250 to out-rank .modal-overlay (z:200) in the ROOT stacking
+     context, and giving this wrapper its own z-index would trap that
+     comparison inside a new local stacking context instead. */
+  .sticky-top-bar{position:sticky;top:0;}
   header{background:var(--black);color:#fff;padding:16px;text-align:center;border-top:5px solid var(--navy);}
   header h1{margin:0;font-size:1.4rem;}
-  /* Row of top-level buttons — sits in normal flow right below the header,
-     not fixed over it, so a longer title (e.g. the Spanish translation)
-     never gets covered regardless of screen width. */
-  .top-btn-row{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;flex-wrap:wrap;}
+  /* Row of top-level buttons — sits right below the header (inside the same
+     sticky wrapper), with its own opaque background so scrolled-past cards
+     never show through the gaps between buttons. */
+  .top-btn-row{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;flex-wrap:wrap;background:var(--bg);}
   .lang-toggle{
     background:var(--card); border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
@@ -435,11 +443,13 @@
     background:var(--card); border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer; color:var(--navy);
   }
-  /* Global sync bar — always visible at the top, not tied to whichever job
-     happens to be open, so a weak-WiFi backlog is never out of sight. */
+  /* Global sync bar — always visible, not tied to whichever job happens to
+     be open, so a weak-WiFi backlog is never out of sight. It no longer
+     needs its own position:sticky — it now lives inside .sticky-top-bar,
+     which handles staying on screen for the whole group. */
   .global-sync-bar{
     background:var(--card);border-bottom:3px solid var(--navy);padding:12px 16px;
-    display:flex;flex-direction:column;gap:8px;position:sticky;top:0;z-index:40;
+    display:flex;flex-direction:column;gap:8px;
   }
   .global-sync-status{font-size:0.95rem;font-weight:800;text-align:center;color:var(--good);}
   .global-sync-status.pending{color:var(--warn);}
@@ -574,26 +584,31 @@
   } catch(e) {}
 </script>
 
-<header>
-  <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
-</header>
+<div class="sticky-top-bar">
+  <header>
+    <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
+  </header>
 
-<div class="top-btn-row">
-  <button class="dash-btn" id="homeBtn" onclick="showLanding()">🏠 <span data-en>Home</span><span data-es>Inicio</span></button>
-  <button class="dash-btn" id="dashBtnTop" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
-  <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
-  <button class="lang-toggle" id="themeToggleBtn" onclick="toggleTheme()">🌙 <span id="themeLabel"><span data-en>Dark</span><span data-es>Oscuro</span></span></button>
-</div>
-
-<!-- GLOBAL SYNC BAR — visible whenever a job section is open, independent of
-     which job that is, so a weak-WiFi backlog of unsynced entries is never
-     out of sight. Hidden on the landing page itself (nothing to sync from
-     there — the Log Production Counts tile's own badge already covers it). -->
-<div class="global-sync-bar" id="globalSyncBar">
-  <div class="global-sync-status" id="globalSyncStatus">
-    <span data-en>All synced</span><span data-es>Todo sincronizado</span>
+  <div class="top-btn-row">
+    <button class="dash-btn" id="homeBtn" onclick="showLanding()">🏠 <span data-en>Home</span><span data-es>Inicio</span></button>
+    <button class="dash-btn" id="dashBtnTop" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
+    <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
+    <button class="lang-toggle" id="themeToggleBtn" onclick="toggleTheme()">🌙 <span id="themeLabel"><span data-en>Dark</span><span data-es>Oscuro</span></span></button>
   </div>
-  <button class="global-sync-btn global-sync-btn-half" onclick="manualGlobalSync()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
+
+  <!-- GLOBAL SYNC BAR — visible whenever a job section is open, independent
+       of which job that is, so a weak-WiFi backlog of unsynced entries is
+       never out of sight. Hidden on the landing page itself (nothing to
+       sync from there — the Log Production Counts tile's own badge already
+       covers it). Lives inside .sticky-top-bar (not sticky on its own
+       anymore) so it stacks right under the button row instead of both
+       fighting over top:0 and overlapping. -->
+  <div class="global-sync-bar" id="globalSyncBar">
+    <div class="global-sync-status" id="globalSyncStatus">
+      <span data-en>All synced</span><span data-es>Todo sincronizado</span>
+    </div>
+    <button class="global-sync-btn global-sync-btn-half" onclick="manualGlobalSync()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
+  </div>
 </div>
 
 <!-- LANDING PAGE — shown first, instead of dropping straight into the
@@ -1620,6 +1635,7 @@ function startOver(){
 /* draftNotice's text is regenerated from these two data attributes rather
    than baked in once — toggleLang() calls this too, so the message can't
    get stuck in whichever language happened to be active when it was set. */
+let draftNoticeTimer = null;
 function renderDraftNotice(){
   const notice = document.getElementById('draftNotice');
   const kind = notice.dataset.kind;
@@ -1630,6 +1646,13 @@ function renderDraftNotice(){
     ? (isEs ? '✅ Progreso guardado a las ' : '✅ Progress saved at ') + time + (isEs ? '. Seguro para cambiar de trabajo.' : '. Safe to jump to another job.')
     : (isEs ? '↩︎ Progreso restaurado de las ' : '↩︎ Restored draft from ') + time;
   notice.style.display = 'block';
+  // Auto-dismiss after 10s — per Anthony, this is a passing confirmation,
+  // not something that should sit on screen indefinitely.
+  clearTimeout(draftNoticeTimer);
+  draftNoticeTimer = setTimeout(() => {
+    notice.style.display = 'none';
+    delete notice.dataset.kind;
+  }, 10000);
 }
 
 function saveProgress(){
