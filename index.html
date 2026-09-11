@@ -248,11 +248,15 @@
   .banner-grid div{background:rgba(255,255,255,0.14);border-radius:10px;padding:10px;}
   .banner-grid .n{font-size:1.8rem;font-weight:800;}
   .banner-grid .l{font-size:0.8rem;color:#dde5f5;font-weight:600;}
+  /* Dimmed via a direct (slightly darker) color instead of opacity — any
+     opacity below 1 creates its own stacking context, which let this
+     non-positioned button ignore normal paint order and float on top of
+     .sticky-top-bar once scrolled underneath it. */
   .banner-edit-btn{
-    background:none;border:none;color:#dde5f5;font-size:0.8rem;cursor:pointer;
-    padding:0 0 0 4px;vertical-align:middle;opacity:0.85;
+    background:none;border:none;color:#bcc3d0;font-size:0.8rem;cursor:pointer;
+    padding:0 0 0 4px;vertical-align:middle;
   }
-  .banner-edit-btn:active{opacity:1;}
+  .banner-edit-btn:active{color:#dde5f5;}
   /* Sits directly above the giant Good Count number — has to be unmistakable
      about WHICH job that number belongs to, since it's the one thing standing
      between "reading the right job's count" and "reading the wrong one." */
@@ -497,9 +501,14 @@
   .cust-no-results{text-align:center;color:var(--text-tertiary);padding:16px;font-size:0.9rem;}
 
   /* Notes — a button + red count badge, never the notes themselves sitting
-     permanently on-screen (see the modal below instead). */
+     permanently on-screen (see the modal below instead). No position here —
+     .notes-badge is laid out inline, not absolutely positioned against this
+     button, so "relative" was a leftover that let this button ignore normal
+     stacking order and paint over .sticky-top-bar once scrolled underneath
+     it (position:relative + z-index:auto still out-ranks a same-level
+     static sibling by DOM order). */
   .notes-btn{
-    position:relative;display:inline-flex;align-items:center;gap:6px;
+    display:inline-flex;align-items:center;gap:6px;
     background:var(--pink-soft);color:var(--navy);border:2px solid var(--navy);
     border-radius:20px;padding:8px 14px;font-weight:700;font-size:0.9rem;cursor:pointer;
     margin-bottom:10px;
