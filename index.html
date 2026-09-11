@@ -594,6 +594,7 @@
     <button class="dash-btn" id="dashBtnTop" onclick="openDashboard()">📊 <span data-en>Dashboard</span><span data-es>Panel</span></button>
     <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
     <button class="lang-toggle" id="themeToggleBtn" onclick="toggleTheme()">🌙 <span id="themeLabel"><span data-en>Dark</span><span data-es>Oscuro</span></span></button>
+    <button class="dash-btn" id="forceUpdateBtn" onclick="forceUpdateApp()">🔄 <span data-en>Update App</span><span data-es>Actualizar App</span></button>
   </div>
 
   <!-- GLOBAL SYNC BAR — visible whenever a job section is open, independent
@@ -1051,6 +1052,18 @@ function toggleTheme(){
   // whatever's currently drawn so the Data tab doesn't keep showing
   // black bars/lines against a now-dark card.
   if (dashData && dashTab === 'data') renderDashData();
+}
+
+/* Forces a fresh load of index.html instead of whatever the tablet's
+   browser (or its home-screen shortcut) has cached — a plain reload()
+   can still be served from cache, so this appends a fresh cache-busting
+   query string, which makes the browser treat it as a brand-new URL and
+   go fetch it from the network. All app data lives in localStorage, not
+   in this loaded page, so nothing is lost by doing this. */
+function forceUpdateApp(){
+  const url = new URL(location.href);
+  url.searchParams.set('_refresh', Date.now());
+  location.href = url.toString();
 }
 
 function toggleLang(){
