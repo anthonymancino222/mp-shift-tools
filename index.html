@@ -1641,17 +1641,41 @@ function resumeJobView(){
 function startOver(){
   if(!currentJobId) return;
   const isEs = document.body.classList.contains('es');
+  const job = jobs[currentJobId];
   const msg1 = isEs
-    ? `¿Está seguro? Esto BORRARÁ TODO el historial de conteo para "${jobs[currentJobId].po}". Esta acción no se puede deshacer.`
-    : `Are you sure? This will DELETE ALL logged count history for "${jobs[currentJobId].po}". This cannot be undone.`;
+    ? `¿Está seguro? Esto BORRARÁ TODO el historial de conteo para "${job.po}". Esta acción no se puede deshacer.`
+    : `Are you sure? This will DELETE ALL logged count history for "${job.po}". This cannot be undone.`;
   if(!confirm(msg1)) return;
   const msg2 = isEs ? '¿Confirmar borrado permanente?' : 'Confirm permanent delete?';
   if(!confirm(msg2)) return;
+  const po = job.po, pass = job.pass;
   delete jobs[currentJobId];
   saveAll();
   currentJobId = null;
   jobSectionsHidden = false;
   refreshJobSelect();
+  // This job's local copy is gone, but if it ever pushed live entries to the
+  // server, those rows (ActiveEntries/Pallets) stay behind and keep showing
+  // up in the Dashboard's Live Jobs list forever — orphaned, since deleting
+  // it here never told the server. Offer to clean that up too, right now,
+  // instead of leaving it for someone to notice in the Dashboard later. This
+  // is optional/best-effort (needs the same admin PIN as Delete Job) — a
+  // floor worker without the PIN can just tap Cancel and the local clear
+  // above still went through fine.
+  const cleanupMsg = isEs
+    ? '¿Eliminar también este trabajo del servidor (para que no siga apareciendo en "Trabajos Activos" del Panel)? Requiere PIN. Toque Cancelar para omitir.'
+    : 'Also remove this job from the server (so it stops showing up in the Dashboard\'s Live Jobs list)? Requires the admin PIN. Tap Cancel to skip.';
+  if(!confirm(cleanupMsg)) return;
+  const pin = prompt(isEs ? 'Ingrese el PIN de eliminación:' : 'Enter the delete PIN:');
+  if (pin === null) return;
+  fetch(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_job', po, pass, pin, station: 'admin' })
+  }).then(res => res.json()).then(res => {
+    if (res.result !== 'success') alert((isEs ? 'Error: ' : 'Error: ') + (res.message || 'unknown error'));
+  }).catch(err => {
+    alert((isEs ? 'No se pudo conectar: ' : 'Could not connect: ') + err.message);
+  });
 }
 
 /* draftNotice's text is regenerated from these two data attributes rather
