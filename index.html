@@ -136,6 +136,13 @@
   }
   .container{max-width:760px;margin:0 auto;padding:12px;display:none;}
   .container.open{display:block;}
+  /* Tablet/phone layout is unchanged below this — this just gives desktop
+     a wider column instead of the same 760px cap surrounded by a lot of
+     empty space on a full monitor. Still single-column; cards just get
+     a bit bigger since several of them size themselves as a % of this. */
+  @media (min-width:1000px){
+    .container, #landingScreen{max-width:1000px;}
+  }
 
   /* Landing page — shown first instead of dropping straight into the
      logging UI, so opening the app feels like choosing where to go rather
