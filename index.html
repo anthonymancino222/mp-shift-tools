@@ -74,7 +74,12 @@
      localStorage and applied by an inline script right after <body> opens,
      so there's no flash of the light theme before JS finishes loading. */
   body.dark-mode{
-    --bg:#16181b;
+    /* Same shade as --black — per Anthony, the page background and the
+       header/button-row/sync-bar banners should read as one continuous
+       black, not a few slightly-different dark grays stacked on top of
+       each other. Cards (--card) stay a lighter shade on purpose, so
+       content still visually separates from the backdrop. */
+    --bg:#0a0a0a;
     --card:#232629;
     --border:#3a3e44;
     --text:#e8e9eb;
@@ -462,7 +467,7 @@
      needs its own position:sticky — it now lives inside .sticky-top-bar,
      which handles staying on screen for the whole group. */
   .global-sync-bar{
-    background:var(--card);border-bottom:3px solid var(--navy);padding:12px 16px;
+    background:var(--bg);border-bottom:3px solid var(--navy);padding:12px 16px;
     display:flex;flex-direction:column;gap:8px;
   }
   .global-sync-status{font-size:0.95rem;font-weight:800;text-align:center;color:var(--good);}
