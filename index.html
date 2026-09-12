@@ -119,8 +119,11 @@
   header h1{margin:0;font-size:1.4rem;}
   /* Row of top-level buttons — sits right below the header (inside the same
      sticky wrapper), with its own opaque background so scrolled-past cards
-     never show through the gaps between buttons. */
-  .top-btn-row{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;flex-wrap:wrap;background:var(--bg);}
+     never show through the gaps between buttons. Centered as one clustered
+     group (not space-between) — on a wide desktop screen, space-between
+     stretched 5 buttons edge to edge with huge gaps between them instead of
+     reading as one row. */
+  .top-btn-row{display:flex;justify-content:center;gap:14px;padding:10px 12px;flex-wrap:wrap;background:var(--bg);}
   .lang-toggle{
     background:var(--card); border:3px solid var(--navy); border-radius:24px;
     padding:10px 18px; font-weight:700; font-size:1rem; cursor:pointer;
