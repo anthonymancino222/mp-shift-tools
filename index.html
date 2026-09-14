@@ -379,6 +379,18 @@
   .pallet-setup-summary-values{font-size:0.88rem;font-weight:700;color:var(--text-strong-secondary);margin-top:2px;}
   .pallet-setup-summary-edit{background:var(--card);border:2px solid var(--navy);border-radius:20px;padding:8px 14px;font-weight:800;font-size:0.85rem;color:var(--navy);cursor:pointer;flex-shrink:0;}
   .pallet-setup-summary-edit:active{background:var(--navy);color:#fff;}
+
+  /* Shift Log History toggle — same "obviously tappable" card-button look
+     as .pallet-setup-summary above, instead of plain heading text with just
+     a cursor change (which didn't read as a real button). */
+  .history-toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .history-toggle-btn{
+    flex:1;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border:2px solid var(--navy);border-radius:14px;background:var(--pink-soft);
+    color:var(--navy);font-weight:900;font-size:1.05rem;padding:14px 16px;
+  }
+  .history-toggle-btn:active{background:var(--navy);color:#fff;}
+  .history-toggle-caret{font-size:1.2rem;}
   .partial-pallet-row{margin-bottom:10px;}
   .partial-pallet-row input{width:100%;padding:14px;font-size:1.1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:10px;box-sizing:border-box;}
   .partial-pallet-box-input-row{display:flex;gap:8px;}
@@ -837,13 +849,13 @@
        re-renders (renderJob() calls applyHistoryLogOpenState() to reapply
        the current state, never forces it back closed). -->
   <div class="card" id="historyCard" style="display:none;">
-    <h2 class="with-help">
-      <span onclick="toggleHistoryLog()" style="cursor:pointer;display:flex;align-items:center;gap:6px;">
-        <span data-en>Shift Log History</span><span data-es>Historial de Turnos</span>
-        <span id="historyLogCaret" style="font-size:1.3rem;">▾</span>
-      </span>
+    <div class="history-toggle-row">
+      <button type="button" class="history-toggle-btn" onclick="toggleHistoryLog()">
+        <span>📜 <span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></span>
+        <span class="history-toggle-caret" id="historyLogCaret">▾</span>
+      </button>
       <button type="button" class="help-icon-btn" onclick="showHistoryHelp()" title="How this works">?</button>
-    </h2>
+    </div>
     <div class="collapsible-body" id="historyLogBody">
       <div id="historyList"></div>
     </div>
