@@ -1613,7 +1613,12 @@ function createJob(){
     return;
   }
   if(!newJobPass){
-    alert(isEs ? 'Seleccione 1ra Pasada o 2da Pasada.' : 'Select 1st Pass or 2nd Pass.');
+    // Reachable in practice — a deep-linked job only SUGGESTS a Pass (dashed
+    // highlight, see suggestPass()), it never pre-selects one, so this fires
+    // whenever that suggestion goes untapped. The old message named only
+    // 1st/2nd Pass and left out Single Pass, even though it's one of the
+    // three actual buttons.
+    alert(isEs ? 'Seleccione 1ra Pasada, 2da Pasada, o Pasada Única.' : 'Select 1st Pass, 2nd Pass, or Single Pass.');
     return;
   }
   if(!target || parseInt(target, 10) <= 0){
@@ -1665,6 +1670,11 @@ function startOver(){
   if(!confirm(msg2)) return;
   const po = job.po, pass = job.pass;
   delete jobs[currentJobId];
+  // Without this, a later job created with this exact same PO+Pass (same
+  // id = po + '_p' + pass) would silently "restore" this old draft — wrong
+  // shift, stale timestamp — since restoreDraft() only looks up drafts[id]
+  // by that id string, with no way to know the job it belonged to is gone.
+  clearDraft(currentJobId);
   saveAll();
   currentJobId = null;
   jobSectionsHidden = false;
@@ -2899,7 +2909,7 @@ function renderJob(){
 
   const isEs = document.body.classList.contains('es');
 
-  const activePallets = job.pallets.filter(p=>!p.voided && !p.isBox);
+  const activePallets = job.pallets.filter(p=>!p.voided);
   const totalPallets = activePallets.length;
   const shiftPallets = activePallets.filter(p=>p.shift===currentShift).length;
   document.getElementById('palletTotal').textContent = totalPallets.toLocaleString();
