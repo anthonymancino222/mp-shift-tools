@@ -946,6 +946,27 @@
     </div>
   </div>
 
+  <!-- MACHINE COUNT — shown instead of the Pallet card for 1st Pass jobs
+       only (see renderJob()). Per Anthony: 1st Pass never boxes product —
+       output goes onto a pallet loose/organized to feed the 2nd Pass run,
+       so there's no box count to log. Good Count instead comes from the
+       cumulative reading straight off the gluer's own counter (see
+       computeTotalGood). -->
+  <div class="card" id="machineCountCard" style="display:none;">
+    <h2 class="with-help">
+      <span><span data-en>Machine Count</span><span data-es>Conteo de Máquina</span></span>
+      <button type="button" class="help-icon-btn" onclick="showMachineCountHelp()" title="How this works">?</button>
+    </h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin:-6px 0 14px;">
+      <span data-en>1st Pass doesn't box product — log the cumulative count shown on the gluer machine instead.</span>
+      <span data-es>La 1ra Pasada no empaca el producto — registre el conteo acumulado que muestra la máquina pegadora.</span>
+    </p>
+    <button class="btn-pallet" onclick="openMachineCountModal()">📟 <span data-en>LOG MACHINE COUNT</span><span data-es>REGISTRAR CONTEO DE MÁQUINA</span></button>
+    <div class="half-width-centered-nested">
+      <button class="btn-secondary" onclick="undoMachineCount()">↩ <span data-en>Undo Last Machine Count</span><span data-es>Deshacer Último Conteo de Máquina</span></button>
+    </div>
+  </div>
+
   <!-- HISTORY — collapsed by default (see historyLogOpen); tapping the
        title toggles it and it stays however the user last left it across
        re-renders (renderJob() calls applyHistoryLogOpenState() to reapply
@@ -1170,7 +1191,7 @@
       <button type="button" class="notes-btn small" onclick="openPalletPresets()">📂 <span data-en>Saved Setups</span><span data-es>Configs Guardadas</span></button>
       <button type="button" class="notes-btn small" onclick="savePalletPreset()">💾 <span data-en>Save This Setup</span><span data-es>Guardar Esta Config</span></button>
     </div>
-    <button class="modal-cancel-btn" onclick="closePalletSetupModal()"><span data-en>Close</span><span data-es>Cerrar</span></button>
+    <button class="modal-cancel-btn" onclick="closePalletSetupModal()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
   </div>
 </div>
 
@@ -1212,6 +1233,30 @@
     <div class="partial-pallet-btns">
       <button class="modal-cancel-btn" onclick="cancelPartialPallet()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
       <button class="btn-submit" onclick="confirmPartialPallet()"><span data-en>Add Partial Pallet</span><span data-es>Agregar Tarima Parcial</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- MACHINE COUNT — popup for 1st Pass jobs only (see #machineCountCard,
+     which opens this). The reading is a CUMULATIVE total straight off the
+     gluer's own counter, not a per-shift delta — logging a new one replaces
+     the running total rather than adding to it (see computeTotalGood). -->
+<div class="modal-overlay" id="machineCountModalOverlay">
+  <div class="modal-box notes-modal-box">
+    <div class="modal-header-row">
+      <h3>📟 <span data-en>Log Machine Count</span><span data-es>Registrar Conteo de Máquina</span></h3>
+      <button type="button" class="help-icon-btn" onclick="showMachineCountHelp()" title="How this works">?</button>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
+    <label><span data-en>Machine Count Reading</span><span data-es>Lectura del Conteo de Máquina</span></label>
+    <input id="machineCountInput" type="text" inputmode="numeric" oninput="formatThousands(this)" data-ph-en="Cumulative total on the machine right now" data-ph-es="Total acumulado en la máquina ahora" placeholder="Cumulative total on the machine right now">
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin:8px 0 0;">
+      <span data-en>This REPLACES the running total — type the full number shown on the machine right now, not just what ran since the last reading.</span>
+      <span data-es>Esto REEMPLAZA el total acumulado — escriba el número completo que muestra la máquina ahora mismo, no solo lo que corrió desde la última lectura.</span>
+    </p>
+    <div class="partial-pallet-btns" style="margin-top:14px;">
+      <button class="modal-cancel-btn" onclick="closeMachineCountModal()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+      <button class="btn-submit" onclick="confirmMachineCount()"><span data-en>Log Count</span><span data-es>Registrar Conteo</span></button>
     </div>
   </div>
 </div>
@@ -1826,7 +1871,7 @@ function toggleNewJobForm(){
   // "let me go finish that one first," not "you can't start a new job."
   if (currentJobId && jobs[currentJobId]){
     const curJob = jobs[currentJobId];
-    const curGood = curJob.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+    const curGood = computeTotalGood(curJob);
     if (curJob.target > 0 && curGood >= curJob.target){
       const isEs = document.body.classList.contains('es');
       const proceed = confirm(isEs
@@ -2193,10 +2238,11 @@ const HELP_TEXTS = {
   palletSetupPopup: {
     en: {
       title: '⚙️ Packing Setup',
-      body: 'Tells the app how many pieces make one full pallet, so "+1 Pallet Complete" can add the right amount to Good Count automatically.\n\n' +
+      body: 'Tells the app how many pieces make one full pallet, so "+1 Pallet Complete" can add the right amount to Good Count automatically. Only applies to 2nd Pass/Single Pass jobs — 1st Pass never boxes product, so it uses Machine Count instead (see its own "?").\n\n' +
         '1. Enter Pieces per Box and Boxes per Pallet.\n' +
-        '2. Tap "Confirm Setup" to lock it in. This popup will NOT close until you confirm — a warning message appears if you try to tap "Close" first, on purpose, so a job never runs with an unconfirmed setup by accident.\n' +
+        '2. Tap "Confirm Setup" to lock it in. Only a confirmed setup makes "+1 Pallet Complete" auto-add to Good Count.\n' +
         '3. Once confirmed, the fields lock and the popup closes. Tap "Edit" any time afterward to unlock and change them again.\n\n' +
+        'Not ready to set this up yet? Tap "Cancel" — it closes without confirming, no need to type anything first.\n\n' +
         '📂 SAVED SETUPS\n' +
         'Reuse a Pieces per Box/Boxes per Pallet combo saved from another job — shared across every tablet.\n\n' +
         '💾 SAVE THIS SETUP\n' +
@@ -2204,10 +2250,11 @@ const HELP_TEXTS = {
     },
     es: {
       title: '⚙️ Configuración de Empaque',
-      body: 'Le dice a la app cuántas piezas forman una tarima completa, para que "+1 Tarima Completa" pueda sumar la cantidad correcta al Conteo Bueno automáticamente.\n\n' +
+      body: 'Le dice a la app cuántas piezas forman una tarima completa, para que "+1 Tarima Completa" pueda sumar la cantidad correcta al Conteo Bueno automáticamente. Solo aplica a trabajos de 2da Pasada/Pasada Única — la 1ra Pasada nunca empaca el producto, así que usa Conteo de Máquina en su lugar (vea su propio "?").\n\n' +
         '1. Ingrese Piezas por Caja y Cajas por Tarima.\n' +
-        '2. Toque "Confirmar Configuración" para bloquearla. Esta ventana NO se cerrará hasta que confirme — aparece un mensaje de advertencia si intenta tocar "Cerrar" primero, a propósito, para que un trabajo nunca funcione con una configuración sin confirmar por accidente.\n' +
+        '2. Toque "Confirmar Configuración" para bloquearla. Solo una configuración confirmada hace que "+1 Tarima Completa" sume automáticamente al Conteo Bueno.\n' +
         '3. Una vez confirmada, los campos se bloquean y la ventana se cierra. Toque "Editar" en cualquier momento después para desbloquearlos y cambiarlos de nuevo.\n\n' +
+        '¿Aún no está listo para configurar esto? Toque "Cancelar" — se cierra sin confirmar, no necesita escribir nada primero.\n\n' +
         '📂 CONFIGS GUARDADAS\n' +
         'Reutilice una combinación de Piezas por Caja/Cajas por Tarima guardada de otro trabajo — se comparte con todas las tabletas.\n\n' +
         '💾 GUARDAR ESTA CONFIG\n' +
@@ -2250,6 +2297,28 @@ const HELP_TEXTS = {
         'Toque "Cancelar" para cerrar sin registrar nada.'
     }
   },
+  machineCount: {
+    en: {
+      title: '📟 Machine Count',
+      body: '1st Pass never boxes product — the pieces go onto a pallet loose/organized to feed the 2nd Pass run later, so there\'s no box count to log. Instead, Good Count for a 1st Pass job comes from the CUMULATIVE reading straight off the gluer\'s own counter.\n\n' +
+        '1. At the end of a shift, or whenever this 1st Pass run finishes, read the total shown on the machine.\n' +
+        '2. Tap "Log Machine Count" and type that number in.\n' +
+        '3. Tap "Log Count."\n\n' +
+        'IMPORTANT: type the FULL number shown on the machine right now, not just what ran since the last time you logged it — each new reading REPLACES the running total instead of adding to it, since the machine\'s own counter never resets. If you type a number lower than the last one logged, the app will ask you to confirm before accepting it, in case that was a mistake.\n\n' +
+        '↩ UNDO LAST MACHINE COUNT\n' +
+        'Voids the most recent reading — Good Count falls back to whichever reading was logged before it.'
+    },
+    es: {
+      title: '📟 Conteo de Máquina',
+      body: 'La 1ra Pasada nunca empaca el producto — las piezas van a una tarima suelta/organizada para alimentar la corrida de 2da Pasada después, así que no hay conteo de cajas que registrar. En su lugar, el Conteo Bueno de un trabajo de 1ra Pasada viene de la lectura ACUMULADA directamente del contador de la máquina pegadora.\n\n' +
+        '1. Al final de un turno, o cuando esta corrida de 1ra Pasada termine, lea el total que muestra la máquina.\n' +
+        '2. Toque "Registrar Conteo de Máquina" y escriba ese número.\n' +
+        '3. Toque "Registrar Conteo."\n\n' +
+        'IMPORTANTE: escriba el número COMPLETO que muestra la máquina ahora mismo, no solo lo que corrió desde la última vez que lo registró — cada lectura nueva REEMPLAZA el total acumulado en vez de sumarse, ya que el contador de la máquina nunca se reinicia. Si escribe un número menor al último registrado, la app le pedirá confirmar antes de aceptarlo, por si fue un error.\n\n' +
+        '↩ DESHACER ÚLTIMO CONTEO DE MÁQUINA\n' +
+        'Anula la lectura más reciente — el Conteo Bueno vuelve a la lectura registrada antes de esa.'
+    }
+  },
   boxCount: {
     en: {
       title: '📦 Full Boxes on This Pallet',
@@ -2276,14 +2345,14 @@ const HELP_TEXTS = {
     en: {
       title: '📜 Shift Log History',
       body: 'Tap the "Shift Log History" title to open or close this list — it\'s collapsed by default to keep the screen simpler, and stays open or closed however you last left it.\n\n' +
-        'Every count you\'ve submitted for this job shows here once opened, grouped by day, with the running Good/Hold totals for each day.\n\n' +
+        'Every count you\'ve submitted for this job shows here once opened, grouped by day, with the running Good/Hold totals for each day. For a 1st Pass job, this instead shows each Machine Count reading and the day\'s LATEST reading (not a sum — see the Machine Count "?" for why).\n\n' +
         'A count can be edited once (tap ✏️ Edit) if it was entered wrong — after that it\'s locked.\n\n' +
         '📧 "Finish, Send Report" closes this job out for good: it emails the final totals to your manager and removes it from Live Jobs. Only tap this once the job is truly done.'
     },
     es: {
       title: '📜 Historial de Turnos',
       body: 'Toque el título "Historial de Turnos" para abrir o cerrar esta lista — está cerrada por defecto para mantener la pantalla más simple, y queda abierta o cerrada como la haya dejado la última vez.\n\n' +
-        'Cada conteo que ha enviado para este trabajo aparece aquí una vez abierta, agrupado por día, con los totales de Bueno/Retenido de cada día.\n\n' +
+        'Cada conteo que ha enviado para este trabajo aparece aquí una vez abierta, agrupado por día, con los totales de Bueno/Retenido de cada día. Para un trabajo de 1ra Pasada, esto muestra en cambio cada lectura de Conteo de Máquina y la ÚLTIMA lectura del día (no una suma — vea el "?" de Conteo de Máquina para saber por qué).\n\n' +
         'Un conteo se puede editar una sola vez (toque ✏️ Editar) si se ingresó mal — después queda bloqueado.\n\n' +
         '📧 "Terminar, Enviar Reporte" cierra este trabajo definitivamente: envía los totales finales por correo a su gerente y lo quita de Trabajos Activos. Solo toque esto cuando el trabajo esté realmente terminado.'
     }
@@ -2357,6 +2426,7 @@ function showJobPickerHelp(){ openHelpModal('jobPicker'); }
 function showPalletSetupPopupHelp(){ openHelpModal('palletSetupPopup'); }
 function showPalletPresetsHelp(){ openHelpModal('palletPresets'); }
 function showPartialPalletPopupHelp(){ openHelpModal('partialPalletPopup'); }
+function showMachineCountHelp(){ openHelpModal('machineCount'); }
 
 function clearEntryForm(){
   const notice = document.getElementById('draftNotice');
@@ -2391,6 +2461,28 @@ function piecesPerPalletFor(job){
   const ppb = Number(cfg.piecesPerBox) || 0;
   const bpp = Number(cfg.boxesPerPallet) || 0;
   return (ppb > 0 && bpp > 0) ? ppb * bpp : 0;
+}
+
+/* Good Count for the job — the one thing almost every screen needs, but
+   computed two completely different ways depending on Pass:
+   - 2nd Pass/Single Pass: product gets boxed, so Good Count is the SUM of
+     every pallet/partial-pallet entry (each one adds pieces).
+   - 1st Pass: per Anthony, 1st Pass never boxes anything — pieces go onto a
+     pallet loose/organized to feed the 2nd Pass run later. There's no box
+     count to sum, so 1st Pass jobs log a MACHINE COUNT instead: the
+     cumulative reading straight off the gluer's own counter. Each new
+     reading REPLACES the running total (it's cumulative, not a delta), so
+     Good Count here is the latest non-voided reading, never a sum of them —
+     summing cumulative readings would multiply the same pieces many times
+     over. See createMachineCountEntry/openMachineCountModal below. */
+function computeTotalGood(job){
+  const active = (job.entries || []).filter(e => !e.voided);
+  if (job.pass === '1'){
+    const readings = active.filter(e => e.isMachineCount);
+    if (!readings.length) return 0;
+    return readings.reduce((a, b) => b.loggedAt > a.loggedAt ? b : a).good;
+  }
+  return active.reduce((s, e) => s + e.good, 0);
 }
 // Just the per-box count (not the full pallet count) — Partial Pallet uses
 // this alone, since a split-shipment's last pallet is counted in boxes
@@ -2439,7 +2531,7 @@ function renderPalletSection(){
 
   const ppp = piecesPerPalletFor(job);
   if(ppp > 0){
-    const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+    const totalGood = computeTotalGood(job);
     const towardNext = totalGood % ppp;
     progressEl.style.display = 'block';
     progressEl.textContent = isEs
@@ -2515,18 +2607,12 @@ function openPalletSetupModal(){
   renderPalletSection();
   document.getElementById('palletSetupModalOverlay').classList.add('open');
 }
-/* Won't close while Packing Setup isn't confirmed yet — Confirm Setup itself
-   calls this right after setting cfg.confirmed = true, so that path always
-   goes through; only the Close button can be blocked here. */
+/* Always closes, confirmed or not — per Anthony, the earlier "won't close
+   until confirmed" rule forced people who genuinely didn't want/need to set
+   this up right now (there's no cancel-out otherwise) to type throwaway
+   numbers just to get past it. Confirm Setup calls this too, right after
+   setting cfg.confirmed = true. */
 function closePalletSetupModal(){
-  if(currentJobId){
-    const cfg = getPalletConfig(jobs[currentJobId]);
-    if(!cfg.confirmed){
-      const isEs = document.body.classList.contains('es');
-      showQuickToast(isEs ? '⚠ Confirme la Configuración primero.' : '⚠ Confirm Setup first.');
-      return;
-    }
-  }
   document.getElementById('palletSetupModalOverlay').classList.remove('open');
 }
 
@@ -2753,6 +2839,82 @@ function undoPallet(){
     const linkedEntry = job.entries.find(e => e.id === last.linkedEntryId);
     if(linkedEntry) linkedEntry.voided = true;
   }
+  saveAll();
+  renderJob();
+}
+
+/* ── Machine Count — 1st Pass jobs only. Reuses the exact same `entries`
+   array/sync plumbing as pallet-derived entries (pushLiveEntry, Shift Log
+   History), just tagged isMachineCount so computeTotalGood() knows to treat
+   it as "latest reading wins," not "sum everything." ── */
+function createMachineCountEntry(job, count){
+  const entry = {
+    id: 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    shift: currentShift,
+    date: new Date().toISOString().slice(0,10),
+    time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+    good: count, reject: 0, flags: '',
+    loggedAt: Date.now(),
+    edited: false,
+    originalGood: null,
+    originalReject: null,
+    synced: false,
+    notes: [],
+    voided: false,
+    fromPallet: false,
+    isMachineCount: true,
+    partial: false
+  };
+  job.entries.push(entry);
+  pushLiveEntry(job, entry);
+  scheduleSilentSync();
+  return entry;
+}
+
+function openMachineCountModal(){
+  if(!currentJobId) return;
+  document.getElementById('machineCountInput').value = '';
+  document.getElementById('machineCountModalOverlay').classList.add('open');
+}
+function closeMachineCountModal(){
+  document.getElementById('machineCountModalOverlay').classList.remove('open');
+}
+
+/* Cumulative, not additive — a typed number lower than the last logged
+   reading is unusual enough (machine reset? typo?) that it's worth a
+   confirm instead of silently accepting it, since it would otherwise make
+   Good Count go backwards. */
+function confirmMachineCount(){
+  if(!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const job = jobs[currentJobId];
+  const val = parseInt(document.getElementById('machineCountInput').value.replace(/,/g,''), 10) || 0;
+  if(val <= 0){
+    showQuickToast(isEs ? '⚠ Ingrese un número válido.' : '⚠ Enter a valid number.');
+    return;
+  }
+  const prev = computeTotalGood(job);
+  if(val < prev){
+    const proceed = confirm(isEs
+      ? `Este número (${val.toLocaleString()}) es menor que el último conteo de máquina registrado (${prev.toLocaleString()}). ¿Continuar de todos modos?`
+      : `This number (${val.toLocaleString()}) is lower than the last logged machine count (${prev.toLocaleString()}). Continue anyway?`);
+    if(!proceed) return;
+  }
+  createMachineCountEntry(job, val);
+  saveAll();
+  closeMachineCountModal();
+  renderJob();
+}
+
+/* Voids the latest reading only — computeTotalGood() then falls back to
+   whichever reading was logged before it, same "latest wins" rule as normal. */
+function undoMachineCount(){
+  if(!currentJobId) return;
+  const job = jobs[currentJobId];
+  const active = job.entries.filter(e=>!e.voided && e.isMachineCount);
+  if(!active.length) return;
+  const last = active.reduce((a,b)=> b.loggedAt > a.loggedAt ? b : a);
+  last.voided = true;
   saveAll();
   renderJob();
 }
@@ -3203,16 +3365,22 @@ function sendReport(){
   // 30s background retry. Silent: no UI feedback beyond the status line.
   scheduleSilentSync();
 
-  const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+  const totalGood = computeTotalGood(job);
   const totalReject = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
   const totalPallets = job.pallets.filter(p=>!p.voided).length;
 
   const subject = `Shift Count Report — ${job.po} (${job.machine}${passText ? ', '+passText : ''})`;
   let fullLog = '';
   const sorted = [...job.entries].sort((a,b)=>a.loggedAt-b.loggedAt);
+  // 1st Pass jobs never box product — each row is a cumulative Machine Count
+  // reading (replaces the running total), not an additive Good/Reject tally
+  // like every other Pass, so it's logged with its own distinct label to
+  // avoid reading as if these rows should be summed.
   sorted.forEach(e=>{
     const shiftLabel = e.shift==='2' ? 'Shift 2' : 'Shift 1';
-    fullLog += `${e.date} ${e.time} | ${shiftLabel} | Good: ${e.good} | Reject: ${e.reject}`;
+    fullLog += e.isMachineCount
+      ? `${e.date} ${e.time} | ${shiftLabel} | Machine Count (cumulative): ${e.good}`
+      : `${e.date} ${e.time} | ${shiftLabel} | Good: ${e.good} | Reject: ${e.reject}`;
     if(e.flags) fullLog += ` | Flags: ${e.flags}`;
     fullLog += '\n';
   });
@@ -3407,6 +3575,7 @@ function renderJob(){
   const previewHint = document.getElementById('previewHint');
   const shiftSec = document.getElementById('shiftToggleSection');
   const palletCard = document.getElementById('palletCard');
+  const machineCountCard = document.getElementById('machineCountCard');
   const logCard = document.getElementById('logCard');
   const historyCard = document.getElementById('historyCard');
   const deleteCard = document.getElementById('deleteCard');
@@ -3427,6 +3596,7 @@ function renderJob(){
     document.querySelector('.banner-edit-btn').style.display='none';
     shiftSec.style.display='none';
     palletCard.style.display='none';
+    machineCountCard.style.display='none';
     logCard.style.display='none';
     historyCard.style.display='none';
     deleteCard.style.display='none';
@@ -3445,12 +3615,13 @@ function renderJob(){
     document.querySelector('.banner-edit-btn').style.display='none';
     shiftSec.style.display='none';
     palletCard.style.display='none';
+    machineCountCard.style.display='none';
     logCard.style.display='none';
     historyCard.style.display='none';
     deleteCard.style.display='none';
     // Preview only shows the banner counts — skip everything else (shift
     // toggle, entry form, pallets, history) since it isn't shown anyway.
-    const totalGoodPreview = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+    const totalGoodPreview = computeTotalGood(job);
     document.getElementById('bannerCount').textContent = totalGoodPreview.toLocaleString();
     renderJobProgress(job, totalGoodPreview);
     const pvIsEs = document.body.classList.contains('es');
@@ -3463,12 +3634,16 @@ function renderJob(){
 
   previewHint.style.display='none';
   shiftSec.style.display='grid';
-  palletCard.style.display='block';
+  // 1st Pass never boxes product (see computeTotalGood/Machine Count help) —
+  // show the Machine Count card instead of Packing Setup/pallet logging.
+  const is1stPass = job.pass === '1';
+  palletCard.style.display = is1stPass ? 'none' : 'block';
+  machineCountCard.style.display = is1stPass ? 'block' : 'none';
   logCard.style.display='block';
   historyCard.style.display='block';
   deleteCard.style.display='block';
 
-  const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
+  const totalGood = computeTotalGood(job);
 
   document.getElementById('bannerCount').textContent = totalGood.toLocaleString();
   renderJobProgress(job, totalGood);
@@ -3543,7 +3718,11 @@ function renderJob(){
     });
 
     list.innerHTML = groups.map(g=>{
-      const dayGood = g.entries.reduce((s,e)=>s+e.good,0);
+      // 1st Pass (machine-count) entries are cumulative readings, not
+      // per-entry additions — summing them like pallet entries would wildly
+      // over-count, so the day's total is just its latest reading instead
+      // (g.entries is already newest-first, same ordering `sorted` used).
+      const dayGood = job.pass === '1' ? g.entries[0].good : g.entries.reduce((s,e)=>s+e.good,0);
       const dayReject = g.entries.reduce((s,e)=>s+e.reject,0);
       const entriesHtml = g.entries.map(e=>{
         const shiftClass = e.shift==='2' ? 'shift2' : '';
@@ -3570,31 +3749,36 @@ function renderJob(){
           editRowHtml = `<div class="entry-edit-row"><span class="edited-tag">${isEs?'✓ Editado':'✓ Edited'}</span></div>`;
         }
 
+        const entryGoodLbl = e.isMachineCount ? (isEs?'CONTEO DE MÁQUINA':'MACHINE COUNT') : goodLbl;
         return `<div class="entry ${shiftClass}">
           <div class="entry-top"><span>${e.time}</span><span>${shiftLabel}</span></div>
           <div class="entry-counts">
-            <div>
-              <div class="ec-label">${goodLbl}</div>
+            <div${e.isMachineCount ? ' style="grid-column:1/-1;"' : ''}>
+              <div class="ec-label">${entryGoodLbl}</div>
               ${goodOriginalHtml}
               <div class="ec-value good">${e.good.toLocaleString()}</div>
             </div>
-            <div>
+            ${e.isMachineCount ? '' : `<div>
               <div class="ec-label">${rejLbl}</div>
               ${rejectOriginalHtml}
               <div class="ec-value reject">${e.reject.toLocaleString()}</div>
-            </div>
+            </div>`}
           </div>
           <div class="entry-flags">${e.flags||''}</div>
           ${e.fromPallet ? `<div class="entry-pallet-tag">📦 ${isEs?(e.partial?'Auto (Tarima Parcial)':'Auto (Tarima)'):(e.partial?'Auto (Partial Pallet)':'Auto (Pallet)')}</div>` : ''}
+          ${e.isMachineCount ? `<div class="entry-pallet-tag">📟 ${isEs?'Lectura de Máquina':'Machine Reading'}</div>` : ''}
           ${e.synced !== true ? `<div class="entry-pending-tag">⚠ ${isEs?'No sincronizado':'Not synced'}</div>` : ''}
           <button class="notes-btn small" onclick="openNotesModal('entry','${currentJobId}','${e.id}')">📝 ${isEs?'Notas':'Notes'}${(e.notes&&e.notes.length) ? `<span class="notes-badge">${e.notes.length}</span>` : ''}</button>
           ${editRowHtml}
         </div>`;
       }).join('');
+      const daySubtotalHtml = job.pass === '1'
+        ? `<span class="sg">${isEs?'Conteo de Máquina':'Machine Count'}: ${dayGood.toLocaleString()}</span>`
+        : `<span class="sg">${isEs?'Bueno':'Good'}: ${dayGood.toLocaleString()}</span> &nbsp;|&nbsp; <span class="sr">${isEs?'Retenido/Revisión':'Hold/Review'}: ${dayReject.toLocaleString()}</span>`;
       return `<div class="day-group">
         <div class="day-header">
           <span class="day-date">📅 ${g.date}</span>
-          <span class="day-subtotal"><span class="sg">${isEs?'Bueno':'Good'}: ${dayGood.toLocaleString()}</span> &nbsp;|&nbsp; <span class="sr">${isEs?'Retenido/Revisión':'Hold/Review'}: ${dayReject.toLocaleString()}</span></span>
+          <span class="day-subtotal">${daySubtotalHtml}</span>
         </div>
         <div class="day-entries">${entriesHtml}</div>
       </div>`;
