@@ -991,7 +991,10 @@
      label + badge are all that's left showing outside it. -->
 <div class="modal-overlay" id="activeJobModalOverlay">
   <div class="modal-box notes-modal-box">
-    <h3><span data-en>Active Job</span><span data-es>Trabajo Activo</span></h3>
+    <div class="modal-header-row">
+      <h3><span data-en>Active Job</span><span data-es>Trabajo Activo</span></h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
     <p style="font-size:0.85rem;color:var(--text-secondary);margin:-8px 0 14px;"><span data-en>The job you're currently logging counts for.</span><span data-es>El trabajo para el que está registrando conteos ahora.</span></p>
     <div id="jobListWrap"></div>
     <button class="btn-submit" id="continueJobBtn" style="display:none;margin-bottom:8px;" onclick="confirmContinueJob()">▸ <span data-en>Continue Job?</span><span data-es>¿Continuar Trabajo?</span></button>
@@ -1053,7 +1056,10 @@
      auto-retry keeps trying until nothing is left pending. -->
 <div class="modal-overlay" id="syncGateOverlay">
   <div class="modal-box">
-    <h3><span data-en>Sync before starting a new job</span><span data-es>Sincronizar antes de iniciar un nuevo trabajo</span></h3>
+    <div class="modal-header-row">
+      <h3><span data-en>Sync before starting a new job</span><span data-es>Sincronizar antes de iniciar un nuevo trabajo</span></h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
     <p id="syncGateMsg"></p>
     <button class="global-sync-btn" id="syncGateSyncBtn" onclick="syncGateAttempt()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
     <button class="btn-secondary" id="syncGateContinueBtn" style="display:none;" onclick="syncGateContinue()"><span data-en>Continue Anyway</span><span data-es>Continuar de Todos Modos</span></button>
@@ -1083,7 +1089,10 @@
      delete control, on purpose. -->
 <div class="modal-overlay" id="notesModalOverlay">
   <div class="modal-box notes-modal-box">
-    <h3 id="notesModalTitle">Notes</h3>
+    <div class="modal-header-row">
+      <h3 id="notesModalTitle">Notes</h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
     <div class="notes-list" id="notesModalList"></div>
     <label><span data-en>Add a note (for your manager)</span><span data-es>Agregar una nota (para su gerente)</span></label>
     <textarea id="notesModalInput" rows="3" data-ph-en="Type a note…" data-ph-es="Escriba una nota…" placeholder="Type a note…"></textarea>
@@ -1098,7 +1107,10 @@
      that field is always still typed by hand. -->
 <div class="modal-overlay" id="jobPickerOverlay">
   <div class="modal-box notes-modal-box">
-    <h3><span data-en>📋 Select a Job</span><span data-es>📋 Seleccionar Trabajo</span></h3>
+    <div class="modal-header-row">
+      <h3><span data-en>📋 Select a Job</span><span data-es>📋 Seleccionar Trabajo</span></h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
     <div id="jobPickerJobPanel">
       <input type="text" class="job-picker-search" id="jobPickerSearch" oninput="renderJobPickerList()"
         data-ph-en="Search job #, customer, product…" data-ph-es="Buscar # de trabajo, cliente, producto…"
@@ -1124,7 +1136,10 @@
      closes this popup; Close/backdrop-cancel leaves it as-is otherwise. -->
 <div class="modal-overlay" id="palletSetupModalOverlay">
   <div class="modal-box notes-modal-box">
-    <h3>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></h3>
+    <div class="modal-header-row">
+      <h3>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
     <div class="pallet-setup-row">
       <div class="pallet-setup-field">
         <label><span data-en>Pieces per Box</span><span data-es>Piezas por Caja</span></label>
@@ -1152,7 +1167,10 @@
      confirmPartialPallet -> cancelPartialPallet). -->
 <div class="modal-overlay" id="partialPalletModalOverlay">
   <div class="modal-box notes-modal-box partial-pallet-row">
-    <h3>➗ <span data-en>Partial Pallet</span><span data-es>Tarima Parcial</span></h3>
+    <div class="modal-header-row">
+      <h3>➗ <span data-en>Partial Pallet</span><span data-es>Tarima Parcial</span></h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
     <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
          or type it), plus an optional leftover partial-box quantity for
          whatever didn't make a full box. The manual "pieces on this
@@ -1190,7 +1208,10 @@
      to any one job), applied to whichever job is currently active. -->
 <div class="modal-overlay" id="palletPresetsOverlay">
   <div class="modal-box notes-modal-box">
-    <h3><span data-en>📂 Saved Pallet Counts</span><span data-es>📂 Configs de Tarima Guardadas</span></h3>
+    <div class="modal-header-row">
+      <h3><span data-en>📂 Saved Pallet Counts</span><span data-es>📂 Configs de Tarima Guardadas</span></h3>
+      <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+    </div>
     <div class="job-picker-list" id="palletPresetsList"></div>
     <button class="modal-cancel-btn" onclick="closePalletPresets()"><span data-en>Close</span><span data-es>Cerrar</span></button>
   </div>
