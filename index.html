@@ -401,10 +401,11 @@
      input — editing always goes through the modal via the Edit button. */
   /* Setup/configuration tier — set once per job, not tapped during the run
      itself, so it's deliberately smaller/quieter than the pallet-logging
-     buttons: thinner border, tighter padding, a shallow shadow instead of a
-     bevel. Still unmistakably a button (background + border + press). */
+     buttons: tighter padding, a shallow shadow instead of a bevel. Border
+     dropped (per Anthony — border + shadow together read as too busy);
+     the background fill + shadow alone now carry "this is a button." */
   .pallet-setup-summary{
-    display:flex;align-items:center;gap:10px;border:1.5px solid var(--navy);border-radius:12px;
+    display:flex;align-items:center;gap:10px;border:none;border-radius:12px;
     padding:10px 14px;margin-bottom:16px;background:var(--pink-soft);cursor:pointer;
     box-shadow:0 2px 6px rgba(0,0,0,0.1);transition:box-shadow 0.08s ease,transform 0.08s ease;
   }
@@ -413,17 +414,18 @@
   .pallet-setup-summary-text{flex:1;min-width:0;}
   .pallet-setup-summary-title{font-weight:800;font-size:0.92rem;color:var(--navy);}
   .pallet-setup-summary-values{font-size:0.82rem;font-weight:700;color:var(--text-strong-secondary);margin-top:2px;}
-  .pallet-setup-summary-edit{background:var(--card);border:1.5px solid var(--navy);border-radius:20px;padding:6px 12px;font-weight:800;font-size:0.8rem;color:var(--navy);cursor:pointer;flex-shrink:0;}
-  .pallet-setup-summary-edit:active{background:var(--navy);color:#fff;}
+  .pallet-setup-summary-edit{background:var(--navy);border:none;border-radius:20px;padding:6px 12px;font-weight:800;font-size:0.8rem;color:#fff;cursor:pointer;flex-shrink:0;box-shadow:0 2px 4px rgba(0,0,0,0.15);}
+  .pallet-setup-summary-edit:active{background:var(--navy-light);}
 
   /* Shift Log History toggle — matches .btn-secondary's size/weight exactly
      (same tier as Save Progress/Undo Last Pallet), per Anthony, instead of
      the smaller "settings" sizing it had before. Still its own layout (icon
-     + label + caret in a row) since it needs to fit a caret. */
+     + label + caret in a row) since it needs to fit a caret. Border dropped
+     for the same reason as above. */
   .history-toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
   .history-toggle-btn{
     flex:1;display:flex;align-items:center;justify-content:space-between;gap:10px;
-    border:1.5px solid var(--navy);border-radius:10px;background:var(--pink-soft);
+    border:none;border-radius:10px;background:var(--pink-soft);
     color:var(--navy);font-weight:700;font-size:1rem;padding:14px;
     box-shadow:0 2px 0 var(--navy-shadow),0 3px 6px rgba(0,0,0,0.12);
     transition:box-shadow 0.08s ease,transform 0.08s ease;
@@ -452,7 +454,7 @@
      as +1 Pallet — sized a step down so it doesn't compete with it, still
      with its own (lighter) tactile press. */
   .btn-partial-pallet{
-    width:100%;padding:14px;font-size:1rem;font-weight:800;border-radius:12px;border:2px solid var(--warn);
+    width:100%;padding:14px;font-size:1rem;font-weight:800;border-radius:12px;border:none;
     background:var(--warn-soft-bg);color:var(--warn-soft-text);margin-bottom:10px;
     box-shadow:0 3px 0 var(--warn-shadow),0 4px 8px rgba(0,0,0,0.15);
     transition:transform 0.08s ease,box-shadow 0.08s ease;
@@ -493,7 +495,7 @@
      a thinner border and a smaller bevel than the pallet-logging buttons
      above: still visibly a real button, just quieter. */
   .btn-secondary{
-    width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:1.5px solid var(--navy);
+    width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:none;
     background:var(--pink-soft);color:var(--navy);margin-top:8px;cursor:pointer;
     box-shadow:0 2px 0 var(--navy-shadow),0 3px 6px rgba(0,0,0,0.12);
     transition:transform 0.08s ease,box-shadow 0.08s ease;
@@ -503,7 +505,7 @@
     transform:translateY(2px);
     box-shadow:0 0 0 var(--navy-shadow),0 1px 2px rgba(0,0,0,0.1);
   }
-  .btn-danger{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);box-shadow:0 2px 0 var(--accent-shadow),0 3px 6px rgba(0,0,0,0.12);}
+  .btn-danger{background:var(--accent-soft-bg);color:var(--accent);box-shadow:0 2px 0 var(--accent-shadow),0 3px 6px rgba(0,0,0,0.12);}
   .btn-danger:active{background:var(--accent);color:#fff;box-shadow:0 0 0 var(--accent-shadow),0 1px 2px rgba(0,0,0,0.1);}
   .btn-email{background:var(--good-soft-bg);color:var(--good);border-color:var(--good);}
   .btn-email:active{background:var(--good);color:#fff;}
