@@ -104,6 +104,13 @@
     --placeholder-color:#787d84;
   }
   *{box-sizing:border-box;}
+  /* Universal "this is clickable" cursor — covers every <button> plus any
+     non-button element (a <div>/<span> card, row, or label) that carries an
+     onclick, instead of relying on each one's own class to set cursor:pointer
+     by hand and missing some. Disabled buttons get the standard "can't click
+     this" cursor instead. */
+  button, [onclick]{cursor:pointer;}
+  button:disabled{cursor:not-allowed;}
   body{
     margin:0;
     font-family:'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;
@@ -285,6 +292,7 @@
   .pallet-cell.filled{background:var(--good);border-color:var(--good);}
   .pallet-grid-overflow-bar{height:14px;background:var(--warn-soft-bg);border-radius:999px;overflow:hidden;border:1px solid var(--warn);}
   .pallet-grid-overflow-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--good),var(--good-light));border-radius:999px;transition:width 0.5s ease;}
+  .pallet-grid-hint{font-size:0.85rem;font-weight:700;color:var(--warn-soft-text);background:var(--warn-soft-bg);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;cursor:pointer;}
 
   /* Quick self-dismissing warning toast — e.g. "Confirm Setup first" when
      Packing Setup's popup is closed without confirming. Sits above modals
@@ -770,6 +778,13 @@
         <div class="pallet-grid" id="palletGridVisual"></div>
         <div class="pallet-grid-overflow-bar" id="palletGridOverflow" style="display:none;">
           <div class="pallet-grid-overflow-fill" id="palletGridOverflowFill"></div>
+        </div>
+        <!-- Shown instead of the grid whenever Packing Setup isn't confirmed
+             (or the job has no target) — explains WHY the grid is missing,
+             with a direct tap-through to fix it, instead of silently falling
+             back to a plain count. -->
+        <div class="pallet-grid-hint" id="palletGridHint" style="display:none;" onclick="openPalletSetupModal()">
+          <span data-en>⚠ Confirm Packing Setup to see the pallet target grid.</span><span data-es>⚠ Confirme la Configuración de Empaque para ver la cuadrícula de meta de tarimas.</span>
         </div>
       </div>
     </div>
@@ -2996,10 +3011,12 @@ function renderJobProgress(job, totalGood){
   const gridWrap = document.getElementById('palletGridWrap');
   const gridEl = document.getElementById('palletGridVisual');
   const overflowEl = document.getElementById('palletGridOverflow');
+  const hintEl = document.getElementById('palletGridHint');
 
   if (ppp > 0 && target > 0){
     const totalPalletsTarget = Math.max(1, Math.ceil(target / ppp));
     gridWrap.style.display = 'block';
+    hintEl.style.display = 'none';
     document.getElementById('palletGridCaption').textContent = isEs
       ? `${Math.min(completedPallets, totalPalletsTarget)} de ${totalPalletsTarget} tarimas`
       : `${Math.min(completedPallets, totalPalletsTarget)} of ${totalPalletsTarget} pallets`;
@@ -3023,16 +3040,20 @@ function renderJobProgress(job, totalGood){
       document.getElementById('palletGridOverflowFill').style.width = pctP + '%';
     }
   } else if (completedPallets > 0){
-    // Packing Setup not confirmed yet (or no target) — no target pallet
-    // count to compare against, so just show how many have been completed.
+    // Packing Setup not confirmed (or no target set) — no per-pallet piece
+    // count to divide the target by, so there's no target-pallet-count to
+    // draw a grid against. Explain why, with a direct tap-through to fix it,
+    // instead of just silently showing a bare completed count.
     gridWrap.style.display = 'block';
     gridEl.style.display = 'none';
     overflowEl.style.display = 'none';
+    hintEl.style.display = 'block';
     document.getElementById('palletGridCaption').textContent = isEs
       ? `${completedPallets} tarima(s) completada(s)`
       : `${completedPallets} pallet(s) completed`;
   } else {
     gridWrap.style.display = 'none';
+    hintEl.style.display = 'none';
   }
 }
 
