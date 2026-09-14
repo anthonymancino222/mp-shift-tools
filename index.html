@@ -993,6 +993,7 @@
   <div class="modal-box notes-modal-box">
     <div class="modal-header-row">
       <h3><span data-en>Active Job</span><span data-es>Trabajo Activo</span></h3>
+      <button type="button" class="help-icon-btn" onclick="showActiveJobHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
     </div>
     <p style="font-size:0.85rem;color:var(--text-secondary);margin:-8px 0 14px;"><span data-en>The job you're currently logging counts for.</span><span data-es>El trabajo para el que está registrando conteos ahora.</span></p>
@@ -1058,6 +1059,7 @@
   <div class="modal-box">
     <div class="modal-header-row">
       <h3><span data-en>Sync before starting a new job</span><span data-es>Sincronizar antes de iniciar un nuevo trabajo</span></h3>
+      <button type="button" class="help-icon-btn" onclick="showSyncGateHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
     </div>
     <p id="syncGateMsg"></p>
@@ -1091,6 +1093,7 @@
   <div class="modal-box notes-modal-box">
     <div class="modal-header-row">
       <h3 id="notesModalTitle">Notes</h3>
+      <button type="button" class="help-icon-btn" onclick="showNotesHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
     </div>
     <div class="notes-list" id="notesModalList"></div>
@@ -1109,6 +1112,7 @@
   <div class="modal-box notes-modal-box">
     <div class="modal-header-row">
       <h3><span data-en>📋 Select a Job</span><span data-es>📋 Seleccionar Trabajo</span></h3>
+      <button type="button" class="help-icon-btn" onclick="showJobPickerHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
     </div>
     <div id="jobPickerJobPanel">
@@ -1138,6 +1142,7 @@
   <div class="modal-box notes-modal-box">
     <div class="modal-header-row">
       <h3>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></h3>
+      <button type="button" class="help-icon-btn" onclick="showPalletSetupPopupHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
     </div>
     <div class="pallet-setup-row">
@@ -1169,6 +1174,7 @@
   <div class="modal-box notes-modal-box partial-pallet-row">
     <div class="modal-header-row">
       <h3>➗ <span data-en>Partial Pallet</span><span data-es>Tarima Parcial</span></h3>
+      <button type="button" class="help-icon-btn" onclick="showPartialPalletPopupHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
     </div>
     <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
@@ -1183,9 +1189,9 @@
         <button type="button" class="help-icon-btn" onclick="showBoxCountHelp()" title="How this works">?</button>
       </div>
       <div class="partial-pallet-box-input-row">
-        <button type="button" class="btn-add-box btn-remove-box" id="decBoxBtn" onclick="decrementPartialPalletBoxes()" title="Enter Pieces per Box above first">−1 <span data-en>Box</span><span data-es>Caja</span></button>
+        <button type="button" class="btn-add-box btn-remove-box" id="decBoxBtn" onclick="decrementPartialPalletBoxes()" title="Confirm Pieces per Box in Packing Setup first">−1 <span data-en>Box</span><span data-es>Caja</span></button>
         <input id="partialPalletBoxes" type="text" inputmode="numeric" placeholder="0" oninput="onPartialPalletBoxesChange(this)">
-        <button type="button" class="btn-add-box" id="incBoxBtn" onclick="incrementPartialPalletBoxes()" title="Enter Pieces per Box above first">+1 <span data-en>Box</span><span data-es>Caja</span></button>
+        <button type="button" class="btn-add-box" id="incBoxBtn" onclick="incrementPartialPalletBoxes()" title="Confirm Pieces per Box in Packing Setup first">+1 <span data-en>Box</span><span data-es>Caja</span></button>
       </div>
       <label><span data-en>Partial Box Quantity (if any)</span><span data-es>Cantidad de Caja Parcial (si aplica)</span></label>
       <input id="partialPalletBoxQty" type="text" inputmode="numeric" data-ph-en="Optional — pieces not making a full box" data-ph-es="Opcional — piezas que no completan una caja" placeholder="Optional — pieces not making a full box" oninput="onPartialPalletBoxesChange(this)">
@@ -1210,6 +1216,7 @@
   <div class="modal-box notes-modal-box">
     <div class="modal-header-row">
       <h3><span data-en>📂 Saved Pallet Counts</span><span data-es>📂 Configs de Tarima Guardadas</span></h3>
+      <button type="button" class="help-icon-btn" onclick="showPalletPresetsHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
     </div>
     <div class="job-picker-list" id="palletPresetsList"></div>
@@ -2083,58 +2090,166 @@ function setShift(s){
    language toggle (and the rest of the page) stays usable while it's open —
    see toggleLang(), which calls renderHelpModal() to re-render in place. ── */
 const HELP_TEXTS = {
-  boxCount: {
+  activeJob: {
     en: {
-      title: '📦 Full Boxes on This Pallet',
-      body: 'Count the full boxes stacked on this partial pallet. Tap +1 Box each time you add one, −1 Box if you tap by mistake. Add any leftover pieces below (Partial Box Quantity), then tap "Add Partial Pallet" when done.'
+      title: '📋 Active Job',
+      body: 'This popup is where you switch between saved jobs, or start a new one. The small number on the "Active Job" label counts how many jobs are saved on this device but not yet finished/sent (like a notification badge).\n\n' +
+        'TO SWITCH TO A DIFFERENT SAVED JOB\n' +
+        '1. Tap the "Active Job" label to open this popup.\n' +
+        '2. Tap the job you want in the list.\n' +
+        '3. Tap "Continue Job?" and confirm the switch.\n\n' +
+        'TO START A BRAND NEW JOB\n' +
+        '1. Tap "+ Start New Job."\n' +
+        '2. Tap "Sync Now" on the popup that appears (this happens every time, on purpose — it keeps syncing a habit).\n' +
+        '3. Fill in Job/PO Number, Product Number, Station, Pass, and Quantity to Produce — see the "?" inside that form for details.\n' +
+        '4. Tap "Create Job."\n\n' +
+        'Tap "Close," or complete either action above, to close this popup.'
     },
     es: {
-      title: '📦 Cajas Completas en Esta Tarima',
-      body: 'Cuente las cajas completas apiladas en esta tarima parcial. Toque +1 Caja cada vez que agregue una, −1 Caja si toca por error. Agregue las piezas sobrantes abajo (Cantidad de Caja Parcial), luego toque "Agregar Tarima Parcial" cuando termine.'
+      title: '📋 Trabajo Activo',
+      body: 'Esta ventana es donde cambia entre trabajos guardados, o inicia uno nuevo. El número pequeño en la etiqueta "Trabajo Activo" cuenta cuántos trabajos están guardados en este dispositivo pero aún no terminados/enviados (como una notificación).\n\n' +
+        'PARA CAMBIAR A OTRO TRABAJO GUARDADO\n' +
+        '1. Toque la etiqueta "Trabajo Activo" para abrir esta ventana.\n' +
+        '2. Toque el trabajo que desea en la lista.\n' +
+        '3. Toque "¿Continuar Trabajo?" y confirme el cambio.\n\n' +
+        'PARA INICIAR UN TRABAJO COMPLETAMENTE NUEVO\n' +
+        '1. Toque "+ Iniciar Nuevo Trabajo."\n' +
+        '2. Toque "Sincronizar Ahora" en la ventana que aparece (esto pasa siempre, a propósito — mantiene el hábito de sincronizar).\n' +
+        '3. Llene Número de Trabajo/OC, Número de Producto, Estación, Pasada, y Cantidad a Producir — vea el "?" dentro de ese formulario para más detalles.\n' +
+        '4. Toque "Crear Trabajo."\n\n' +
+        'Toque "Cerrar," o complete cualquiera de las acciones de arriba, para cerrar esta ventana.'
     }
   },
   newJob: {
     en: {
-      title: '🆕 Start New Job',
+      title: '🆕 New Job Details',
       body: 'Fill in Job/PO Number, Product Number, Station, Pass, and Quantity to Produce, then tap "Create Job." All of these are required.\n\n' +
-        '📋 PULL SCHEDULE\n' +
+        '📋 PULL SCHEDULE (OPTIONAL)\n' +
         'Tap a job from QA\'s exported schedule instead of typing it — auto-fills Job Number and Product Number for you. Quantity to Produce is still always typed by hand, since the schedule doesn\'t include it.\n\n' +
-        'Pass defaults to Single Pass, but can be changed to 1st/2nd Pass before tapping Create Job.'
+        'Pass defaults to Single Pass, but can be changed to 1st/2nd Pass before tapping Create Job. Creating the job also closes this popup automatically.'
     },
     es: {
-      title: '🆕 Iniciar Nuevo Trabajo',
+      title: '🆕 Detalles del Nuevo Trabajo',
       body: 'Llene Número de Trabajo/OC, Número de Producto, Estación, Pasada, y Cantidad a Producir, luego toque "Crear Trabajo." Todos estos son obligatorios.\n\n' +
-        '📋 TRAER PROGRAMA\n' +
+        '📋 TRAER PROGRAMA (OPCIONAL)\n' +
         'Toque un trabajo del programa que QA exportó en lugar de escribirlo — llena automáticamente el Número de Trabajo y el Número de Producto. La Cantidad a Producir siempre se escribe a mano, ya que el programa no la incluye.\n\n' +
-        'Pasada por defecto es Pasada Única, pero se puede cambiar a 1ra/2da Pasada antes de tocar Crear Trabajo.'
+        'Pasada por defecto es Pasada Única, pero se puede cambiar a 1ra/2da Pasada antes de tocar Crear Trabajo. Crear el trabajo también cierra esta ventana automáticamente.'
+    }
+  },
+  syncGate: {
+    en: {
+      title: '🔄 Sync Before Starting a New Job',
+      body: 'This popup appears every time you tap "+ Start New Job" — even if nothing is actually waiting to sync. That\'s on purpose: it makes syncing before a new job a habit instead of a step that\'s easy to forget.\n\n' +
+        '1. Tap "Sync Now."\n' +
+        '2. If everything syncs successfully, this closes on its own and takes you to the New Job form.\n' +
+        '3. If it can\'t connect (weak signal, no wifi), tap "Continue Anyway" — the app keeps retrying by itself in the background (every 30 seconds, and whenever the connection comes back) until everything is synced. You don\'t have to keep reopening this to check.\n\n' +
+        'Tap "Cancel" to back out without starting a new job.'
+    },
+    es: {
+      title: '🔄 Sincronizar Antes de Iniciar un Nuevo Trabajo',
+      body: 'Esta ventana aparece cada vez que toca "+ Iniciar Nuevo Trabajo" — incluso si no hay nada pendiente de sincronizar. Esto es a propósito: convierte sincronizar antes de un nuevo trabajo en un hábito, no en un paso fácil de olvidar.\n\n' +
+        '1. Toque "Sincronizar Ahora."\n' +
+        '2. Si todo se sincroniza con éxito, esto se cierra solo y lo lleva al formulario de Nuevo Trabajo.\n' +
+        '3. Si no puede conectarse (señal débil, sin wifi), toque "Continuar de Todos Modos" — la app sigue reintentando por sí sola en segundo plano (cada 30 segundos, y cuando vuelva la conexión) hasta que todo esté sincronizado. No tiene que volver a abrir esto para verificar.\n\n' +
+        'Toque "Cancelar" para salir sin iniciar un nuevo trabajo.'
     }
   },
   pallet: {
     en: {
       title: '📦 Pallets Ready for Shipping',
-      body: '⚙️ PACKING SETUP\n' +
-        'Enter Pieces per Box and Boxes per Pallet, then tap "Confirm Setup" to lock it in. Tap "Edit" to change it later.\n\n' +
+      body: '📈 JOB TARGET PROGRESS\n' +
+        'The bar above this card shows Good Count vs. your Quantity to Produce. Once Packing Setup is confirmed and a target is set, the grid below it also shows one square per pallet needed to finish the job — green = already done, orange-yellow = still needed.\n\n' +
+        '⚙️ PACKING SETUP\n' +
+        'Tap the "Packing Setup" row to open it, enter Pieces per Box and Boxes per Pallet, then tap "Confirm Setup." That popup won\'t close until you confirm it — tap "Edit" (on the row, or inside the popup) to unlock and change it later.\n\n' +
         '📦 +1 PALLET COMPLETE\n' +
-        'One tap logs a pallet. If Packing Setup is confirmed, it also adds that many pieces to Good Count automatically.\n\n' +
+        'One tap logs a whole pallet. If Packing Setup is confirmed, it also adds that many pieces to Good Count automatically.\n\n' +
         '➗ PARTIAL PALLET\n' +
-        'For a split shipment\'s last pallet that isn\'t completely full — count in full boxes (tap +1 Box, or type it) plus any partial box quantity, or just type the total pieces manually. The manual field always overrides the box math if you type in it.\n\n' +
+        'For a split shipment\'s last pallet that isn\'t completely full — tap to open the popup, see its own "?" for how to log one.\n\n' +
         '↩ UNDO LAST PALLET\n' +
-        'Removes the most recent pallet and also reverses any pieces it added to Good Count.\n\n' +
-        '📂 SAVED SETUPS\n' +
-        'Save a packing setup to reuse on future jobs — shared with every tablet.'
+        'Removes the most recent pallet and also reverses any pieces it added to Good Count.'
     },
     es: {
       title: '📦 Tarimas Listas para Envío',
-      body: '⚙️ CONFIGURACIÓN DE EMPAQUE\n' +
-        'Ingrese Piezas por Caja y Cajas por Tarima, luego toque "Confirmar Configuración" para bloquearlo. Toque "Editar" para cambiarlo después.\n\n' +
+      body: '📈 PROGRESO DE META DEL TRABAJO\n' +
+        'La barra arriba de esta tarjeta muestra el Conteo Bueno contra su Cantidad a Producir. Una vez que la Configuración de Empaque esté confirmada y haya una meta, la cuadrícula debajo también muestra un cuadro por cada tarima que falta para terminar el trabajo — verde = ya completada, naranja-amarillo = aún necesaria.\n\n' +
+        '⚙️ CONFIGURACIÓN DE EMPAQUE\n' +
+        'Toque la fila "Configuración de Empaque" para abrirla, ingrese Piezas por Caja y Cajas por Tarima, luego toque "Confirmar Configuración." Esa ventana no se cerrará hasta que confirme — toque "Editar" (en la fila, o dentro de la ventana) para desbloquearla y cambiarla después.\n\n' +
         '📦 +1 TARIMA COMPLETA\n' +
-        'Un toque registra una tarima. Si la Configuración de Empaque está confirmada, también suma esa cantidad de piezas al Conteo Bueno automáticamente.\n\n' +
+        'Un toque registra una tarima completa. Si la Configuración de Empaque está confirmada, también suma esa cantidad de piezas al Conteo Bueno automáticamente.\n\n' +
         '➗ TARIMA PARCIAL\n' +
-        'Para la última tarima de un envío dividido que no está completamente llena — cuente en cajas completas (toque +1 Caja, o escríbalo) más cualquier cantidad de caja parcial, o simplemente escriba el total de piezas manualmente. El campo manual siempre tiene prioridad sobre el cálculo de cajas si escribe en él.\n\n' +
+        'Para la última tarima de un envío dividido que no está completamente llena — toque para abrir la ventana, vea su propio "?" para instrucciones.\n\n' +
         '↩ DESHACER ÚLTIMA TARIMA\n' +
-        'Quita la tarima más reciente y también revierte las piezas que haya sumado al Conteo Bueno.\n\n' +
+        'Quita la tarima más reciente y también revierte las piezas que haya sumado al Conteo Bueno.'
+    }
+  },
+  palletSetupPopup: {
+    en: {
+      title: '⚙️ Packing Setup',
+      body: 'Tells the app how many pieces make one full pallet, so "+1 Pallet Complete" can add the right amount to Good Count automatically.\n\n' +
+        '1. Enter Pieces per Box and Boxes per Pallet.\n' +
+        '2. Tap "Confirm Setup" to lock it in. This popup will NOT close until you confirm — a warning message appears if you try to tap "Close" first, on purpose, so a job never runs with an unconfirmed setup by accident.\n' +
+        '3. Once confirmed, the fields lock and the popup closes. Tap "Edit" any time afterward to unlock and change them again.\n\n' +
+        '📂 SAVED SETUPS\n' +
+        'Reuse a Pieces per Box/Boxes per Pallet combo saved from another job — shared across every tablet.\n\n' +
+        '💾 SAVE THIS SETUP\n' +
+        'Saves the numbers currently typed above as a named preset for future jobs.'
+    },
+    es: {
+      title: '⚙️ Configuración de Empaque',
+      body: 'Le dice a la app cuántas piezas forman una tarima completa, para que "+1 Tarima Completa" pueda sumar la cantidad correcta al Conteo Bueno automáticamente.\n\n' +
+        '1. Ingrese Piezas por Caja y Cajas por Tarima.\n' +
+        '2. Toque "Confirmar Configuración" para bloquearla. Esta ventana NO se cerrará hasta que confirme — aparece un mensaje de advertencia si intenta tocar "Cerrar" primero, a propósito, para que un trabajo nunca funcione con una configuración sin confirmar por accidente.\n' +
+        '3. Una vez confirmada, los campos se bloquean y la ventana se cierra. Toque "Editar" en cualquier momento después para desbloquearlos y cambiarlos de nuevo.\n\n' +
         '📂 CONFIGS GUARDADAS\n' +
-        'Guarde una configuración de empaque para reutilizarla en futuros trabajos — se comparte con todas las tabletas.'
+        'Reutilice una combinación de Piezas por Caja/Cajas por Tarima guardada de otro trabajo — se comparte con todas las tabletas.\n\n' +
+        '💾 GUARDAR ESTA CONFIG\n' +
+        'Guarda los números escritos arriba como una configuración con nombre para futuros trabajos.'
+    }
+  },
+  palletPresets: {
+    en: {
+      title: '📂 Saved Pallet Counts',
+      body: 'Lets you reuse a Pieces per Box × Boxes per Pallet setup from a past job instead of retyping it — handy when a station runs the same box size often. Saved setups are shared across every tablet, not just this one.\n\n' +
+        '1. Tap a saved setup in the list to apply it into the Packing Setup fields.\n' +
+        '2. Back in Packing Setup, tap "Confirm Setup" to actually lock it in for this job — picking a preset here doesn\'t confirm it by itself.\n\n' +
+        'Tap "Close" to leave without picking one.'
+    },
+    es: {
+      title: '📂 Configs de Tarima Guardadas',
+      body: 'Le permite reutilizar una configuración de Piezas por Caja × Cajas por Tarima de un trabajo anterior en vez de volver a escribirla — útil cuando una estación usa el mismo tamaño de caja seguido. Las configuraciones guardadas se comparten con todas las tabletas, no solo esta.\n\n' +
+        '1. Toque una configuración guardada en la lista para aplicarla en los campos de Configuración de Empaque.\n' +
+        '2. De vuelta en Configuración de Empaque, toque "Confirmar Configuración" para realmente bloquearla para este trabajo — elegir una configuración aquí no la confirma por sí sola.\n\n' +
+        'Toque "Cerrar" para salir sin elegir ninguna.'
+    }
+  },
+  partialPalletPopup: {
+    en: {
+      title: '➗ Partial Pallet',
+      body: 'Use this for a pallet that isn\'t a standard full pallet — usually the last pallet of a split shipment.\n\n' +
+        '1. Tap "Partial Pallet" to open this popup.\n' +
+        '2. If Packing Setup is confirmed, count in full boxes (tap +1 Box/−1 Box, or type the number), plus any leftover Partial Box Quantity — see the "?" next to "Full Boxes on This Pallet" for details.\n' +
+        '3. Or skip the box math entirely and just type the total piece count into "Pieces on this pallet" at the bottom — if you type anything there, it always wins over the box count above.\n' +
+        '4. Tap "Add Partial Pallet" — this logs the pallet, adds the pieces to Good Count, and closes the popup automatically.\n\n' +
+        'Tap "Cancel" to close without logging anything.'
+    },
+    es: {
+      title: '➗ Tarima Parcial',
+      body: 'Úselo para una tarima que no es una tarima completa estándar — normalmente la última tarima de un envío dividido.\n\n' +
+        '1. Toque "Tarima Parcial" para abrir esta ventana.\n' +
+        '2. Si la Configuración de Empaque está confirmada, cuente en cajas completas (toque +1 Caja/−1 Caja, o escriba el número), más cualquier Cantidad de Caja Parcial sobrante — vea el "?" junto a "Cajas Completas en Esta Tarima" para más detalles.\n' +
+        '3. O sáltese el cálculo de cajas por completo y simplemente escriba el total de piezas en "Piezas en esta tarima" al final — si escribe algo ahí, siempre tiene prioridad sobre el cálculo de cajas de arriba.\n' +
+        '4. Toque "Agregar Tarima Parcial" — esto registra la tarima, suma las piezas al Conteo Bueno, y cierra la ventana automáticamente.\n\n' +
+        'Toque "Cancelar" para cerrar sin registrar nada.'
+    }
+  },
+  boxCount: {
+    en: {
+      title: '📦 Full Boxes on This Pallet',
+      body: 'Count the full boxes stacked on this partial pallet. Tap +1 Box each time you add one, −1 Box if you tap by mistake. Add any leftover pieces below (Partial Box Quantity), then tap "Add Partial Pallet" when done — that closes the popup for you.'
+    },
+    es: {
+      title: '📦 Cajas Completas en Esta Tarima',
+      body: 'Cuente las cajas completas apiladas en esta tarima parcial. Toque +1 Caja cada vez que agregue una, −1 Caja si toca por error. Agregue las piezas sobrantes abajo (Cantidad de Caja Parcial), luego toque "Agregar Tarima Parcial" cuando termine — eso cierra la ventana por usted.'
     }
   },
   submit: {
@@ -2152,15 +2267,51 @@ const HELP_TEXTS = {
   history: {
     en: {
       title: '📜 Shift Log History',
-      body: 'Every count you\'ve submitted for this job, grouped by day, with the running Good/Hold totals for each day.\n\n' +
+      body: 'Tap the "Shift Log History" title to open or close this list — it\'s collapsed by default to keep the screen simpler, and stays open or closed however you last left it.\n\n' +
+        'Every count you\'ve submitted for this job shows here once opened, grouped by day, with the running Good/Hold totals for each day.\n\n' +
         'A count can be edited once (tap ✏️ Edit) if it was entered wrong — after that it\'s locked.\n\n' +
         '📧 "Finish, Send Report" closes this job out for good: it emails the final totals to your manager and removes it from Live Jobs. Only tap this once the job is truly done.'
     },
     es: {
       title: '📜 Historial de Turnos',
-      body: 'Cada conteo que ha enviado para este trabajo, agrupado por día, con los totales de Bueno/Retenido de cada día.\n\n' +
+      body: 'Toque el título "Historial de Turnos" para abrir o cerrar esta lista — está cerrada por defecto para mantener la pantalla más simple, y queda abierta o cerrada como la haya dejado la última vez.\n\n' +
+        'Cada conteo que ha enviado para este trabajo aparece aquí una vez abierta, agrupado por día, con los totales de Bueno/Retenido de cada día.\n\n' +
         'Un conteo se puede editar una sola vez (toque ✏️ Editar) si se ingresó mal — después queda bloqueado.\n\n' +
         '📧 "Terminar, Enviar Reporte" cierra este trabajo definitivamente: envía los totales finales por correo a su gerente y lo quita de Trabajos Activos. Solo toque esto cuando el trabajo esté realmente terminado.'
+    }
+  },
+  notes: {
+    en: {
+      title: '📝 Notes',
+      body: 'Notes are messages to your manager about this job (or, from a specific entry\'s own ✏️ Edit area, about that one count) — they don\'t change any counts themselves.\n\n' +
+        '1. Type your note in the box.\n' +
+        '2. Tap "Add Note."\n\n' +
+        'Once added, a note can\'t be edited or deleted — it\'s a permanent part of the record. All notes are included in the final report when you tap "Finish, Send Report," and are cleared from the server after that — the report becomes the permanent copy of them from then on.'
+    },
+    es: {
+      title: '📝 Notas',
+      body: 'Las notas son mensajes para su gerente sobre este trabajo (o, desde el área ✏️ Editar de un registro específico, sobre ese conteo) — no cambian ningún conteo por sí mismas.\n\n' +
+        '1. Escriba su nota en el cuadro.\n' +
+        '2. Toque "Agregar Nota."\n\n' +
+        'Una vez agregada, una nota no se puede editar ni eliminar — es parte permanente del registro. Todas las notas se incluyen en el reporte final cuando toca "Terminar, Enviar Reporte," y se eliminan del servidor después de eso — el reporte se convierte en la copia permanente de ellas desde ese momento.'
+    }
+  },
+  jobPicker: {
+    en: {
+      title: '📋 Select a Job',
+      body: 'Pulls the job schedule QA already exported, so you can tap a job instead of typing it by hand.\n\n' +
+        '1. Type part of the job number, customer, or product to search — or just scroll the list.\n' +
+        '2. Tap a job to fill in its Job/PO Number and Product Number automatically back on the New Job form.\n' +
+        '3. Quantity to Produce is never included in the schedule, so you\'ll still type that in by hand.\n\n' +
+        'Tap "Cancel" to close this without picking anything.'
+    },
+    es: {
+      title: '📋 Seleccionar Trabajo',
+      body: 'Trae el programa de trabajos que QA ya exportó, para que pueda tocar un trabajo en lugar de escribirlo a mano.\n\n' +
+        '1. Escriba parte del número de trabajo, cliente, o producto para buscar — o simplemente recorra la lista.\n' +
+        '2. Toque un trabajo para llenar automáticamente su Número de Trabajo/OC y Número de Producto de vuelta en el formulario de Nuevo Trabajo.\n' +
+        '3. La Cantidad a Producir nunca está incluida en el programa, así que la seguirá escribiendo a mano.\n\n' +
+        'Toque "Cancelar" para cerrar esto sin elegir nada.'
     }
   }
 };
@@ -2191,6 +2342,13 @@ function showPalletHelp(){ openHelpModal('pallet'); }
 function showBoxCountHelp(){ openHelpModal('boxCount'); }
 function showSubmitHelp(){ openHelpModal('submit'); }
 function showHistoryHelp(){ openHelpModal('history'); }
+function showActiveJobHelp(){ openHelpModal('activeJob'); }
+function showSyncGateHelp(){ openHelpModal('syncGate'); }
+function showNotesHelp(){ openHelpModal('notes'); }
+function showJobPickerHelp(){ openHelpModal('jobPicker'); }
+function showPalletSetupPopupHelp(){ openHelpModal('palletSetupPopup'); }
+function showPalletPresetsHelp(){ openHelpModal('palletPresets'); }
+function showPartialPalletPopupHelp(){ openHelpModal('partialPalletPopup'); }
 
 function clearEntryForm(){
   const notice = document.getElementById('draftNotice');
@@ -2753,9 +2911,10 @@ function fetchLive(){
    so a failed push here never loses data; it only delays other devices
    seeing it. entry.synced tracks whether the backend has confirmed it.
    Weak WiFi on the tablets means pushes routinely fail on the first try,
-   so unsynced entries are retried automatically (on reconnect + on a
-   timer) as well as via the manual "Sync Now" button — nothing depends
-   on a person remembering to tap it.
+   so unsynced entries are retried automatically (on reconnect, on a 30s
+   timer, ~7s after logging a count, and via the Sync Gate's "Sync Now"
+   before starting a new job) — nothing depends on a person remembering
+   to manually sync; there's no standalone Sync Now button anymore.
 ══════════════════════════════════════════════════════════════════ */
 // Shared by the global sync bar, the sync-gate modal, and the per-job sync
 // message — one definition of "how many things in this job aren't synced
