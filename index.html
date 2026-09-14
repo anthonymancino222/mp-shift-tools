@@ -76,6 +76,16 @@
     --navy-shadow:#a3005c;
     --warn-shadow:#a66c0a;
     --accent-shadow:#8f2a2b;
+    /* Overs — the extra pieces/pallets run beyond the base Quantity to
+       Produce (see Overs selector on New Job). Deliberately its own color
+       family (light blue), distinct from every other status color already
+       in use (green=done, orange-yellow=still needed, pink=navy/brand, red
+       =reject/danger), so the regular-vs-overs divider in Job Target
+       Progress reads at a glance. */
+    --overs:#2f9ee0;
+    --overs-light:#5cb8ec;
+    --overs-track:#dcf0fb;
+    --overs-shadow:#1f6f9e;
   }
   /* Dark mode — same brand colors (pink/red/green/amber read fine on dark
      backgrounds already), just the neutral surface/text colors invert.
@@ -113,6 +123,10 @@
     --disabled-bg:#33373d;
     --disabled-btn-bg:#3a453f;
     --placeholder-color:#787d84;
+    --overs:#4ab3f0;
+    --overs-light:#6fc4f4;
+    --overs-track:#153447;
+    --overs-shadow:#2782ab;
   }
   *{box-sizing:border-box;}
   /* Universal "this is clickable" cursor — covers every <button> plus any
@@ -293,10 +307,21 @@
   .progress-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
   .progress-title{font-size:0.85rem;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;}
   .progress-pct{font-size:1.2rem;font-weight:900;color:var(--navy);}
-  .progress-track{width:100%;height:14px;background:var(--warn-soft-bg);border-radius:999px;overflow:hidden;border:1px solid var(--warn);}
-  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--good-light),var(--good));border-radius:999px;transition:width 0.5s ease;}
+  /* position:relative so .progress-divider (an absolutely-positioned child)
+     can mark the boundary between the regular Quantity to Produce and the
+     Overs % added on top of it — see renderJobProgress(). overflow:visible
+     (not hidden) so the divider's slight top/bottom overshoot isn't clipped;
+     .progress-fill gets its own rounded corners + overflow instead. */
+  .progress-track{width:100%;height:14px;background:var(--warn-soft-bg);border-radius:999px;overflow:visible;border:1px solid var(--warn);position:relative;}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--good-light),var(--good));border-radius:999px;transition:width 0.5s ease;overflow:hidden;}
+  /* Marks where the regular (non-overs) Quantity to Produce ends and the
+     Overs % begins — only shown for a job with Overs selected. Color is
+     neutral (var(--text)) on purpose so it reads against both the green/
+     orange-yellow regular segment and the light-blue overs segment. */
+  .progress-divider{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1.5px;background:var(--text);border-radius:2px;box-shadow:0 0 0 1px var(--card);display:none;}
   .progress-sub{display:flex;justify-content:space-between;align-items:center;font-size:0.88rem;font-weight:700;color:var(--text-strong-secondary);margin-top:10px;}
   .progress-edit-btn{background:none;border:none;color:var(--navy);font-size:0.85rem;font-weight:700;cursor:pointer;padding:0 0 0 8px;}
+  .progress-overs-line{font-size:0.78rem;font-weight:700;color:var(--overs);margin-top:2px;display:none;}
 
   /* Pallet grid — one cell per pallet needed to hit the job target (computed
      from Packing Setup); filled = already completed, empty = still needed.
@@ -309,6 +334,12 @@
   .pallet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:6px;}
   .pallet-cell{aspect-ratio:1;border-radius:5px;background:var(--warn-soft-bg);border:1.5px solid var(--warn);transition:background 0.3s ease;}
   .pallet-cell.filled{background:var(--good);border-color:var(--good);}
+  /* Overs pallets — beyond the regular Quantity to Produce, needed only
+     because of the Overs % (see Overs selector on New Job). Own light-blue
+     color regardless of filled/empty, distinct from both regular states, so
+     "this pallet only exists because of overs" reads at a glance. */
+  .pallet-cell.overs{background:var(--overs-track);border-color:var(--overs);}
+  .pallet-cell.overs.filled{background:var(--overs);border-color:var(--overs);}
   .pallet-grid-overflow-bar{height:14px;background:var(--warn-soft-bg);border-radius:999px;overflow:hidden;border:1px solid var(--warn);}
   .pallet-grid-overflow-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--good),var(--good-light));border-radius:999px;transition:width 0.5s ease;}
   .pallet-grid-hint{font-size:0.85rem;font-weight:700;color:var(--warn-soft-text);background:var(--warn-soft-bg);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;cursor:pointer;}
@@ -891,11 +922,12 @@
         <span class="progress-title"><span data-en>Job Target Progress</span><span data-es>Progreso de Meta del Trabajo</span></span>
         <span class="progress-pct" id="progressPct">0%</span>
       </div>
-      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div><div class="progress-divider" id="progressDivider"></div></div>
       <div class="progress-sub">
         <span id="progressSub">0</span>
         <button type="button" class="progress-edit-btn banner-edit-btn" onclick="editJobTarget()" title="Edit">✏️ <span data-en>Edit Target</span><span data-es>Editar Meta</span></button>
       </div>
+      <div class="progress-overs-line" id="progressOversLine"></div>
 
       <div class="pallet-grid-wrap" id="palletGridWrap" style="display:none;">
         <div class="pallet-grid-title-row">
@@ -1088,6 +1120,22 @@
         </button>
         <button type="button" class="station-btn" id="passSBtn" onclick="selectPass('S')">
           <span data-en>Single Pass</span><span data-es>Pasada Única</span>
+        </button>
+      </div>
+
+      <div class="section-label-row">
+        <label style="margin:0;"><span data-en>Overs</span><span data-es>Overs (Excedente)</span></label>
+        <button type="button" class="help-icon-btn" onclick="showOversHelp()" title="How this works">?</button>
+      </div>
+      <div class="pass-grid">
+        <button type="button" class="station-btn selected" id="overs0Btn" onclick="selectOvers(0)">
+          <span data-en>No Overs</span><span data-es>Sin Overs</span>
+        </button>
+        <button type="button" class="station-btn" id="overs5Btn" onclick="selectOvers(5)">
+          <span data-en>5% Overs</span><span data-es>5% Overs</span>
+        </button>
+        <button type="button" class="station-btn" id="overs10Btn" onclick="selectOvers(10)">
+          <span data-en>10% Overs</span><span data-es>10% Overs</span>
         </button>
       </div>
 
@@ -1369,6 +1417,12 @@ let currentShift = '1';
 // still fully changeable before Create Job is tapped.
 let newJobStation = null;
 let newJobPass = null;
+// Overs — extra pieces run beyond the base Quantity to Produce (5%/10% are
+// the common amounts — see effectiveTargetFor()). Defaults to "No Overs"
+// (0), unlike Station/Pass which have no default — most jobs don't run
+// overs, so this should never block Create Job the way an unset required
+// field would.
+let newJobOvers = 0;
 let editingEntryId = null;
 // Which job/entry the Notes modal is currently open for — null when closed.
 let notesModalContext = null;
@@ -1543,6 +1597,13 @@ function selectPass(pass){
   // pass got tapped — clear the dashed highlight and hint either way.
   ['pass1Btn','pass2Btn','passSBtn'].forEach(function(id){ document.getElementById(id).classList.remove('suggested'); });
   document.getElementById('passSuggestHint').style.display = 'none';
+}
+
+function selectOvers(percent){
+  newJobOvers = percent;
+  document.getElementById('overs0Btn').classList.toggle('selected', percent===0);
+  document.getElementById('overs5Btn').classList.toggle('selected', percent===5);
+  document.getElementById('overs10Btn').classList.toggle('selected', percent===10);
 }
 
 /* Highlights a Pass button as a SUGGESTION (dashed, not filled) without
@@ -1873,6 +1934,7 @@ function _applyPrefillFromURL(){
     if (qty) { var q = parseInt(qty, 10); if (q > 0) document.getElementById('njTarget').value = q.toLocaleString('en-US'); }
     if (station === 'Long Gluer' || station === 'Short Gluer') selectStation(station);
     if (pass === '1' || pass === '2' || pass === 'S') suggestPass(pass);
+    selectOvers(0);
     document.getElementById('newJobForm').style.display = 'block';
     document.getElementById('newJobForm').scrollIntoView({behavior:'smooth', block:'start'});
   });
@@ -1891,11 +1953,12 @@ function toggleNewJobForm(){
   if (currentJobId && jobs[currentJobId]){
     const curJob = jobs[currentJobId];
     const curGood = computeTotalGood(curJob);
-    if (curJob.target > 0 && curGood >= curJob.target){
+    const curEffectiveTarget = effectiveTargetFor(curJob);
+    if (curEffectiveTarget > 0 && curGood >= curEffectiveTarget){
       const isEs = document.body.classList.contains('es');
       const proceed = confirm(isEs
-        ? `El trabajo "${curJob.po}" ya alcanzó su meta (${curGood.toLocaleString()} / ${curJob.target.toLocaleString()}) y no se ha enviado el reporte todavía.\n\n¿Iniciar un nuevo trabajo de todos modos?\n(Toque Cancelar para ir a "Terminar, Enviar Reporte" primero)`
-        : `Job "${curJob.po}" already reached its target (${curGood.toLocaleString()} / ${curJob.target.toLocaleString()}) and hasn't been finished/sent yet.\n\nStart a new job anyway?\n(Tap Cancel to go finish it with "Finish, Send Report" first)`);
+        ? `El trabajo "${curJob.po}" ya alcanzó su meta (${curGood.toLocaleString()} / ${curEffectiveTarget.toLocaleString()}) y no se ha enviado el reporte todavía.\n\n¿Iniciar un nuevo trabajo de todos modos?\n(Toque Cancelar para ir a "Terminar, Enviar Reporte" primero)`
+        : `Job "${curJob.po}" already reached its target (${curGood.toLocaleString()} / ${curEffectiveTarget.toLocaleString()}) and hasn't been finished/sent yet.\n\nStart a new job anyway?\n(Tap Cancel to go finish it with "Finish, Send Report" first)`);
       if (!proceed) return;
     }
   }
@@ -1910,6 +1973,7 @@ function toggleNewJobForm(){
     document.getElementById('stLongBtn').classList.remove('selected');
     document.getElementById('stShortBtn').classList.remove('selected');
     selectPass('S');
+    selectOvers(0);
     document.getElementById('njPODrop').style.display = 'none';
     document.getElementById('njPOScheduleHint').style.display = 'none';
     f.style.display = 'block';
@@ -2018,13 +2082,14 @@ function createJob(){
   // the 2nd pass never inherits the 1st pass's running total.
   const id = po + '_p' + newJobPass;
   if (!jobs[id]) {
-    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false } };
+    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, oversPercent: newJobOvers || 0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false } };
     saveAll();
   }
   currentJobId = id;
   jobSectionsHidden = false;
   newJobStation = null;
   newJobPass = null;
+  selectOvers(0);
   document.getElementById('njPO').value='';
   document.getElementById('njProduct').value='';
   document.getElementById('njTarget').value='';
@@ -2203,17 +2268,39 @@ const HELP_TEXTS = {
   newJob: {
     en: {
       title: '🆕 New Job Details',
-      body: 'Fill in Job/PO Number, Product Number, Station, Pass, and Quantity to Produce, then tap "Create Job." All of these are required.\n\n' +
+      body: 'Fill in Job/PO Number, Product Number, Station, Pass, and Quantity to Produce, then tap "Create Job." All of these are required — Overs is the only optional one (defaults to No Overs).\n\n' +
         '📋 PULL SCHEDULE (OPTIONAL)\n' +
         'Tap a job from QA\'s exported schedule instead of typing it — auto-fills Job Number and Product Number for you. Quantity to Produce is still always typed by hand, since the schedule doesn\'t include it.\n\n' +
-        'Pass defaults to Single Pass, but can be changed to 1st/2nd Pass before tapping Create Job. Creating the job also closes this popup automatically.'
+        'Pass defaults to Single Pass, but can be changed to 1st/2nd Pass before tapping Create Job.\n\n' +
+        '📊 OVERS\n' +
+        'Choose No Overs / 5% Overs / 10% Overs before typing Quantity to Produce — see its own "?" for what this changes. Creating the job also closes this popup automatically.'
     },
     es: {
       title: '🆕 Detalles del Nuevo Trabajo',
-      body: 'Llene Número de Trabajo/OC, Número de Producto, Estación, Pasada, y Cantidad a Producir, luego toque "Crear Trabajo." Todos estos son obligatorios.\n\n' +
+      body: 'Llene Número de Trabajo/OC, Número de Producto, Estación, Pasada, y Cantidad a Producir, luego toque "Crear Trabajo." Todos estos son obligatorios — Overs es el único opcional (por defecto Sin Overs).\n\n' +
         '📋 TRAER PROGRAMA (OPCIONAL)\n' +
         'Toque un trabajo del programa que QA exportó en lugar de escribirlo — llena automáticamente el Número de Trabajo y el Número de Producto. La Cantidad a Producir siempre se escribe a mano, ya que el programa no la incluye.\n\n' +
-        'Pasada por defecto es Pasada Única, pero se puede cambiar a 1ra/2da Pasada antes de tocar Crear Trabajo. Crear el trabajo también cierra esta ventana automáticamente.'
+        'Pasada por defecto es Pasada Única, pero se puede cambiar a 1ra/2da Pasada antes de tocar Crear Trabajo.\n\n' +
+        '📊 OVERS\n' +
+        'Elija Sin Overs / 5% Overs / 10% Overs antes de escribir la Cantidad a Producir — vea su propio "?" para saber qué cambia esto. Crear el trabajo también cierra esta ventana automáticamente.'
+    }
+  },
+  overs: {
+    en: {
+      title: '📊 Overs',
+      body: 'Overs is extra product run beyond what was ordered, to cover expected spoilage/waste — 5% and 10% are the common amounts.\n\n' +
+        'Quantity to Produce is always the REGULAR/ordered amount — pick Overs FIRST, then type that regular quantity. The app adds the % on top automatically to get the real finish line for this job:\n\n' +
+        'Example: 150,000 Quantity to Produce + 10% Overs = 165,000 total pieces to actually run.\n\n' +
+        'The Job Target Progress bar and pallet grid both show this split visually — a divider line marks where the regular amount ends, and everything past it (the overs portion) is colored light blue instead of the usual green/orange-yellow, both in the bar and in the individual pallet squares.\n\n' +
+        'Pick "No Overs" for a job that\'s only running exactly what was ordered.'
+    },
+    es: {
+      title: '📊 Overs',
+      body: 'Overs es producto extra que se corre más allá de lo pedido, para cubrir el desperdicio/merma esperado — 5% y 10% son las cantidades comunes.\n\n' +
+        'Cantidad a Producir siempre es la cantidad REGULAR/pedida — elija Overs PRIMERO, luego escriba esa cantidad regular. La app suma el % automáticamente para obtener la meta real de este trabajo:\n\n' +
+        'Ejemplo: 150,000 Cantidad a Producir + 10% Overs = 165,000 piezas totales a correr.\n\n' +
+        'La barra de Progreso de Meta del Trabajo y la cuadrícula de tarimas muestran esta división visualmente — una línea divisoria marca dónde termina la cantidad regular, y todo lo que sigue (la parte de overs) se colorea azul claro en vez del verde/naranja-amarillo habitual, tanto en la barra como en los cuadros individuales de tarima.\n\n' +
+        'Elija "Sin Overs" para un trabajo que solo va a correr exactamente lo pedido.'
     }
   },
   syncGate: {
@@ -2238,7 +2325,7 @@ const HELP_TEXTS = {
     en: {
       title: '📦 Pallets Ready for Shipping',
       body: '📈 JOB TARGET PROGRESS\n' +
-        'The bar above this card shows Good Count vs. your Quantity to Produce. Once Packing Setup is confirmed and a target is set, the grid below it also shows one square per pallet needed to finish the job — green = already done, orange-yellow = still needed.\n\n' +
+        'The bar above this card shows Good Count vs. your Quantity to Produce. Once Packing Setup is confirmed and a target is set, the grid below it also shows one square per pallet needed to finish the job — green = already done, orange-yellow = still needed. If this job has Overs selected, both the bar and the grid also show a light-blue portion (with a divider line on the bar) for the extra pallets/pieces that only exist because of Overs — see its own "?" on New Job.\n\n' +
         '⚙️ PACKING SETUP\n' +
         'Tap the "Packing Setup" row to open it, enter Pieces per Box and Boxes per Pallet, then tap "Confirm Setup." That popup won\'t close until you confirm it — tap "Edit" (on the row, or inside the popup) to unlock and change it later.\n\n' +
         '📦 +1 PALLET COMPLETE\n' +
@@ -2251,7 +2338,7 @@ const HELP_TEXTS = {
     es: {
       title: '📦 Tarimas Listas para Envío',
       body: '📈 PROGRESO DE META DEL TRABAJO\n' +
-        'La barra arriba de esta tarjeta muestra el Conteo Bueno contra su Cantidad a Producir. Una vez que la Configuración de Empaque esté confirmada y haya una meta, la cuadrícula debajo también muestra un cuadro por cada tarima que falta para terminar el trabajo — verde = ya completada, naranja-amarillo = aún necesaria.\n\n' +
+        'La barra arriba de esta tarjeta muestra el Conteo Bueno contra su Cantidad a Producir. Una vez que la Configuración de Empaque esté confirmada y haya una meta, la cuadrícula debajo también muestra un cuadro por cada tarima que falta para terminar el trabajo — verde = ya completada, naranja-amarillo = aún necesaria. Si este trabajo tiene Overs seleccionado, tanto la barra como la cuadrícula también muestran una parte azul claro (con una línea divisoria en la barra) para las tarimas/piezas extra que existen solo por los Overs — vea su propio "?" en Nuevo Trabajo.\n\n' +
         '⚙️ CONFIGURACIÓN DE EMPAQUE\n' +
         'Toque la fila "Configuración de Empaque" para abrirla, ingrese Piezas por Caja y Cajas por Tarima, luego toque "Confirmar Configuración." Esa ventana no se cerrará hasta que confirme — toque "Editar" (en la fila, o dentro de la ventana) para desbloquearla y cambiarla después.\n\n' +
         '📦 +1 TARIMA COMPLETA\n' +
@@ -2442,6 +2529,7 @@ function renderHelpModal(){
 }
 
 function showNewJobHelp(){ openHelpModal('newJob'); }
+function showOversHelp(){ openHelpModal('overs'); }
 function showPalletHelp(){ openHelpModal('pallet'); }
 function showBoxCountHelp(){ openHelpModal('boxCount'); }
 function showSubmitHelp(){ openHelpModal('submit'); }
@@ -2510,6 +2598,19 @@ function computeTotalGood(job){
     return readings.reduce((a, b) => b.loggedAt > a.loggedAt ? b : a).good;
   }
   return active.reduce((s, e) => s + e.good, 0);
+}
+
+/* Overs — extra pieces run beyond the base order quantity, a common
+   printing/packaging buffer for spoilage (5% and 10% are the usual amounts
+   here — see the Overs selector on New Job). job.target is always the
+   REGULAR/base Quantity to Produce the operator typed in; this is the
+   actual finish line the job is run to once Overs is factored in. Used
+   for the progress bar/pallet grid's 100% mark and for "target reached"
+   checks — everywhere job.target alone used to mean "the target." */
+function effectiveTargetFor(job){
+  const base = job.target || 0;
+  const oversPercent = job.oversPercent || 0;
+  return oversPercent > 0 ? Math.round(base * (1 + oversPercent / 100)) : base;
 }
 // Just the per-box count (not the full pallet count) — Partial Pallet uses
 // this alone, since a split-shipment's last pallet is counted in boxes
@@ -3431,7 +3532,12 @@ function sendReport(){
       notesText += `${new Date(n.loggedAt).toLocaleString()} (re: entry ${n.entryTime}) | ${n.text}\n`;
     });
   }
-  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
+  const jobOversPercent = job.oversPercent || 0;
+  const jobEffectiveTarget = effectiveTargetFor(job);
+  const oversLine = jobOversPercent > 0
+    ? `Overs: ${jobOversPercent}% (${jobEffectiveTarget.toLocaleString()} total incl. overs)\n`
+    : '';
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n${oversLine}\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
 
   const payload = {
     action: 'finish_report',
@@ -3440,6 +3546,8 @@ function sendReport(){
     station: job.machine,
     pass: job.pass || '',
     target: job.target || 0,
+    oversPercent: jobOversPercent,
+    effectiveTarget: jobEffectiveTarget,
     totalGood, totalReject, totalPallets,
     subject, body,
     fullLog
@@ -3537,13 +3645,57 @@ function saveEditEntry(jobId, entryId){
    same numbers renderJob() already computes for bannerCount in each case. */
 function renderJobProgress(job, totalGood){
   const isEs = document.body.classList.contains('es');
-  const target = job.target || 0;
+  const regularTarget = job.target || 0;
+  const oversPercent = job.oversPercent || 0;
+  // Overs — extra pieces/pallets run beyond the base Quantity to Produce
+  // (see the Overs selector on New Job). effectiveTargetFor() is the single
+  // source of truth for this math — reused here, in the pallet grid below,
+  // and in sendReport()/the target-reached checks elsewhere.
+  const target = effectiveTargetFor(job);
   const pct = target > 0 ? Math.min(100, Math.round((totalGood / target) * 100)) : 0;
-  document.getElementById('progressFill').style.width = pct + '%';
+  // Where the regular portion ends and overs begins, as a % of the WHOLE
+  // bar (100% = effective target, including overs) — drives both the
+  // divider's position and the two-tone coloring below.
+  const boundaryPct = (oversPercent > 0 && target > 0) ? Math.min(100, (regularTarget / target) * 100) : 100;
+
+  const fillEl = document.getElementById('progressFill');
+  const trackEl = document.getElementById('progressTrack');
+  const dividerEl = document.getElementById('progressDivider');
+  fillEl.style.width = pct + '%';
   document.getElementById('progressPct').textContent = pct + '%';
   document.getElementById('progressSub').textContent = target > 0
     ? `${totalGood.toLocaleString()} / ${target.toLocaleString()} ${isEs ? 'piezas' : 'items'}`
     : (isEs ? 'Sin meta establecida' : 'No target set');
+
+  const oversLineEl = document.getElementById('progressOversLine');
+  if (oversPercent > 0 && target > 0){
+    const oversAmount = target - regularTarget;
+    oversLineEl.style.display = 'block';
+    oversLineEl.textContent = isEs
+      ? `↳ ${regularTarget.toLocaleString()} regular + ${oversAmount.toLocaleString()} de overs (${oversPercent}%) = ${target.toLocaleString()} total`
+      : `↳ ${regularTarget.toLocaleString()} regular + ${oversAmount.toLocaleString()} overs (${oversPercent}%) = ${target.toLocaleString()} total`;
+    dividerEl.style.display = 'block';
+    dividerEl.style.left = boundaryPct + '%';
+    // Track (the "not done yet" background) splits cleanly at boundaryPct
+    // since it's sized to the track's own box — no clipping to worry about.
+    trackEl.style.background = `linear-gradient(90deg, var(--warn-soft-bg) 0%, var(--warn-soft-bg) ${boundaryPct}%, var(--overs-track) ${boundaryPct}%, var(--overs-track) 100%)`;
+    // The fill's own box shrinks to `pct`% width, so percentage-based color
+    // stops on IT would be relative to that shrinking width, not the full
+    // bar — sizing the gradient to the full track's pixel width (measured
+    // now) and letting the fill's narrower box simply clip/reveal it keeps
+    // the color-change anchored to the right ABSOLUTE spot as it grows.
+    const trackWidthPx = trackEl.getBoundingClientRect().width || 1;
+    const boundaryPx = (boundaryPct / 100) * trackWidthPx;
+    fillEl.style.backgroundImage = `linear-gradient(90deg, var(--good-light) 0px, var(--good) ${boundaryPx}px, var(--overs-light) ${boundaryPx}px, var(--overs) ${trackWidthPx}px)`;
+    fillEl.style.backgroundSize = `${trackWidthPx}px 100%`;
+    fillEl.style.backgroundRepeat = 'no-repeat';
+  } else {
+    oversLineEl.style.display = 'none';
+    dividerEl.style.display = 'none';
+    trackEl.style.background = '';
+    fillEl.style.backgroundImage = '';
+    fillEl.style.backgroundSize = '';
+  }
 
   const ppp = piecesPerPalletFor(job);
   const completedPallets = (job.pallets || []).filter(p => !p.voided).length;
@@ -3554,6 +3706,9 @@ function renderJobProgress(job, totalGood){
 
   if (ppp > 0 && target > 0){
     const totalPalletsTarget = Math.max(1, Math.ceil(target / ppp));
+    // Same regular-vs-overs split as the bar above, just in whole pallets —
+    // a pallet index at or past this point only exists because of Overs.
+    const regularPalletsTarget = oversPercent > 0 ? Math.ceil(regularTarget / ppp) : totalPalletsTarget;
     gridWrap.style.display = 'block';
     hintEl.style.display = 'none';
     document.getElementById('palletGridCaption').textContent = isEs
@@ -3567,8 +3722,11 @@ function renderJobProgress(job, totalGood){
       gridEl.innerHTML = '';
       const frag = document.createDocumentFragment();
       for (let i = 0; i < totalPalletsTarget; i++){
+        let cls = 'pallet-cell';
+        if (i < completedPallets) cls += ' filled';
+        if (i >= regularPalletsTarget) cls += ' overs';
         const cell = document.createElement('div');
-        cell.className = 'pallet-cell' + (i < completedPallets ? ' filled' : '');
+        cell.className = cls;
         frag.appendChild(cell);
       }
       gridEl.appendChild(frag);
@@ -3695,14 +3853,15 @@ function renderJob(){
   // finished/sent, sitting in Live Jobs indefinitely. Purely a visual
   // reminder here; toggleNewJobForm() below is what actually interrupts.
   {
-    const targetReached = job.target > 0 && totalGood >= job.target;
+    const jobEffectiveTarget = effectiveTargetFor(job);
+    const targetReached = jobEffectiveTarget > 0 && totalGood >= jobEffectiveTarget;
     const banner = document.getElementById('targetReachedBanner');
     const isEs2 = document.body.classList.contains('es');
     if (targetReached){
       banner.style.display = 'block';
       banner.textContent = isEs2
-        ? `🎯 ¡Meta alcanzada! (${totalGood.toLocaleString()} / ${job.target.toLocaleString()}) — si este trabajo está terminado, toque "Terminar, Enviar Reporte" abajo.`
-        : `🎯 Target reached! (${totalGood.toLocaleString()} / ${job.target.toLocaleString()}) — if this job is done, tap "Finish, Send Report" below.`;
+        ? `🎯 ¡Meta alcanzada! (${totalGood.toLocaleString()} / ${jobEffectiveTarget.toLocaleString()}) — si este trabajo está terminado, toque "Terminar, Enviar Reporte" abajo.`
+        : `🎯 Target reached! (${totalGood.toLocaleString()} / ${jobEffectiveTarget.toLocaleString()}) — if this job is done, tap "Finish, Send Report" below.`;
     } else {
       banner.style.display = 'none';
     }
