@@ -203,11 +203,6 @@
      for Active Job, Save Progress, Start Over, and the global Sync Now
      button specifically, not a general layout rule. */
   .half-width-centered{max-width:50%;margin-left:auto;margin-right:auto;}
-  /* Sync Now sits in the full-bleed sync bar (not inside .container), so a
-     plain 50% would be half of the whole screen, not half of the app's own
-     760px content column like the other three. 368px matches that same
-     column's half-width (760px container minus its 12px×2 padding, halved). */
-  .global-sync-btn-half{max-width:368px;margin-left:auto;margin-right:auto;}
   /* Sizes a card to hug its own content (one line of text/button) instead of
      a fixed fraction — per Anthony, for Active Job and Save Progress only. */
   .fit-content-centered{width:fit-content;max-width:100%;margin-left:auto;margin-right:auto;}
@@ -263,15 +258,38 @@
   .banner-grid div{background:rgba(255,255,255,0.14);border-radius:10px;padding:10px;}
   .banner-grid .n{font-size:1.8rem;font-weight:800;}
   .banner-grid .l{font-size:0.8rem;color:#dde5f5;font-weight:600;}
-  /* Dimmed via a direct (slightly darker) color instead of opacity — any
-     opacity below 1 creates its own stacking context, which let this
-     non-positioned button ignore normal paint order and float on top of
-     .sticky-top-bar once scrolled underneath it. */
-  .banner-edit-btn{
-    background:none;border:none;color:#bcc3d0;font-size:0.8rem;cursor:pointer;
-    padding:0 0 0 4px;vertical-align:middle;
-  }
-  .banner-edit-btn:active{color:#dde5f5;}
+
+  /* Job Target Progress — replaces the old Hold/Review + Qty-to-Produce
+     number pair with a single at-a-glance bar (job.target vs Good Count)
+     plus a pallet-by-pallet visual underneath, since a bar + grid reads
+     faster than two raw numbers. */
+  .progress-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+  .progress-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .progress-title{font-size:0.85rem;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;}
+  .progress-pct{font-size:1.2rem;font-weight:900;color:var(--navy);}
+  .progress-track{width:100%;height:14px;background:var(--bg);border-radius:999px;overflow:hidden;border:1px solid var(--border);}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--navy-light),var(--navy));border-radius:999px;transition:width 0.5s ease;}
+  .progress-sub{display:flex;justify-content:space-between;align-items:center;font-size:0.88rem;font-weight:700;color:var(--text-strong-secondary);margin-top:10px;}
+  .progress-edit-btn{background:none;border:none;color:var(--navy);font-size:0.85rem;font-weight:700;cursor:pointer;padding:0 0 0 8px;}
+
+  /* Pallet grid — one cell per pallet needed to hit the job target (computed
+     from Packing Setup); filled = already completed, empty = still needed.
+     Above ~60 target pallets a grid of tiny cells stops being readable, so
+     it falls back to a second progress bar instead (see renderJobProgress). */
+  .pallet-grid-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+  .pallet-grid-title-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .pallet-grid-title{font-size:0.8rem;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;}
+  .pallet-grid-caption{font-size:0.88rem;font-weight:800;color:var(--good);}
+  .pallet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:6px;}
+  .pallet-cell{aspect-ratio:1;border-radius:5px;background:var(--bg);border:1.5px solid var(--border);transition:background 0.3s ease;}
+  .pallet-cell.filled{background:var(--good);border-color:var(--good);}
+  .pallet-grid-overflow-bar{height:14px;background:var(--bg);border-radius:999px;overflow:hidden;border:1px solid var(--border);}
+  .pallet-grid-overflow-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--good),var(--good-light));border-radius:999px;transition:width 0.5s ease;}
+  /* Now lives on the white Job Target Progress card (not the dark banner it
+     was originally styled for) — see .progress-edit-btn above, which this
+     button also carries. Kept as its own class since renderJob() still
+     toggles visibility via document.querySelector('.banner-edit-btn'). */
+  .banner-edit-btn:active{color:var(--navy-light);}
   /* Sits directly above the giant Good Count number — has to be unmistakable
      about WHICH job that number belongs to, since it's the one thing standing
      between "reading the right job's count" and "reading the wrong one." */
@@ -299,17 +317,17 @@
   .btn-pallet:active{background:var(--good-light);}
   .btn-pallet:disabled{background:var(--disabled-btn-bg);cursor:not-allowed;}
 
-  /* Packing setup — nested inside the Pallet card, lets the app compute
-     pieces-per-pallet from Pieces/Box × Boxes/Pallet, so +1 Pallet can also
-     auto-add the right amount to Good Count. Open by default (not tucked
-     behind a collapsed toggle) and sized to stand out, since it's easy to
-     miss otherwise. */
-  .pallet-setup, .collapsible-section{border:3px solid var(--navy);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--pink-soft);}
-  .pallet-setup-toggle, .collapsible-toggle{width:100%;background:none;border:none;padding:0;display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:1.15rem;color:var(--navy);cursor:pointer;}
-  .pallet-setup-toggle span:first-child, .collapsible-toggle span:first-child{display:flex;align-items:center;gap:6px;}
-  #palletSetupCaret, .collapsible-caret{font-size:1.3rem;}
-  .pallet-setup-body, .collapsible-body{display:none;margin-top:14px;}
-  .pallet-setup-body.open, .collapsible-body.open{display:block;}
+  /* Packing setup — lets the app compute pieces-per-pallet from Pieces/Box ×
+     Boxes/Pallet, so +1 Pallet can also auto-add the right amount to Good
+     Count. Fields themselves live in the Packing Setup popup modal now (see
+     #palletSetupModalOverlay) — .pallet-setup-summary above is the only
+     inline trace of it, read-only. */
+  .collapsible-section{border:3px solid var(--navy);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--pink-soft);}
+  .collapsible-toggle{width:100%;background:none;border:none;padding:0;display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:1.15rem;color:var(--navy);cursor:pointer;}
+  .collapsible-toggle span:first-child{display:flex;align-items:center;gap:6px;}
+  .collapsible-caret{font-size:1.3rem;}
+  .collapsible-body{display:none;margin-top:14px;}
+  .collapsible-body.open{display:block;}
   /* When a collapsible section also needs its own help icon, the toggle
      button shares the row with a separate (non-nested) help button — a
      button can't contain another button, so this sits beside it instead. */
@@ -329,6 +347,17 @@
   .btn-edit-setup:active{background:var(--pink-soft);}
   .pallet-setup-btns{display:flex;gap:10px;margin-top:14px;}
   .pallet-setup-btns .notes-btn.small{flex:1;justify-content:center;margin-bottom:0;padding:10px 8px;font-size:0.88rem;}
+  /* Packing Setup — collapsed to a tappable summary row (opens the popup
+     modal below) instead of always-expanded inline fields. Read-only at a
+     glance: only the two confirmed numbers show here, never an editable
+     input — editing always goes through the modal via the Edit button. */
+  .pallet-setup-summary{display:flex;align-items:center;gap:12px;border:2px solid var(--navy);border-radius:14px;padding:14px 16px;margin-bottom:16px;background:var(--pink-soft);cursor:pointer;}
+  .pallet-setup-summary-icon{font-size:1.4rem;}
+  .pallet-setup-summary-text{flex:1;min-width:0;}
+  .pallet-setup-summary-title{font-weight:900;font-size:1.05rem;color:var(--navy);}
+  .pallet-setup-summary-values{font-size:0.88rem;font-weight:700;color:var(--text-strong-secondary);margin-top:2px;}
+  .pallet-setup-summary-edit{background:var(--card);border:2px solid var(--navy);border-radius:20px;padding:8px 14px;font-weight:800;font-size:0.85rem;color:var(--navy);cursor:pointer;flex-shrink:0;}
+  .pallet-setup-summary-edit:active{background:var(--navy);color:#fff;}
   .partial-pallet-row{margin-bottom:10px;}
   .partial-pallet-row input{width:100%;padding:14px;font-size:1.1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:10px;box-sizing:border-box;}
   .partial-pallet-box-input-row{display:flex;gap:8px;}
@@ -628,11 +657,15 @@
        covers it). Lives inside .sticky-top-bar (not sticky on its own
        anymore) so it stacks right under the button row instead of both
        fighting over top:0 and overlapping. -->
+  <!-- No manual Sync Now button here anymore — the app already forces a sync
+       before a new job can start (see the Sync Gate modal), auto-retries
+       every 30s / on reconnect (see the bottom of the script), and fires an
+       extra silent sync a few seconds after Finish/Send Report. This status
+       line is purely informational now. -->
   <div class="global-sync-bar" id="globalSyncBar">
     <div class="global-sync-status" id="globalSyncStatus">
       <span data-en>All synced</span><span data-es>Todo sincronizado</span>
     </div>
-    <button class="global-sync-btn global-sync-btn-half" onclick="manualGlobalSync()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
   </div>
 </div>
 
@@ -729,11 +762,35 @@
     <div class="handoff-banner">
       <div class="label"><span data-en>Current Good Count</span><span data-es>Conteo Bueno Actual</span></div>
       <div class="count" id="bannerCount">0</div>
-      <div class="banner-grid">
-        <div><div class="n" id="bannerHold">0</div><div class="l"><span data-en>HOLD / REVIEW</span><span data-es>RETENIDO / REVISIÓN</span></div></div>
-        <div><div class="n" id="bannerTarget">0</div><div class="l"><span data-en>QTY TO PRODUCE</span><span data-es>CANTIDAD A PRODUCIR</span><button type="button" class="banner-edit-btn" onclick="editJobTarget()" title="Edit">✏️</button></div></div>
+    </div>
+
+    <!-- JOB TARGET PROGRESS — replaces the old Hold/Review + Qty-to-Produce
+         number pair. Bar + % shows progress toward job.target; the grid
+         below shows one cell per pallet still needed to hit that target
+         (filled = done), computed from Packing Setup. See renderJobProgress(). -->
+    <div class="progress-card" id="jobProgressCard">
+      <div class="progress-header">
+        <span class="progress-title"><span data-en>Job Target Progress</span><span data-es>Progreso de Meta del Trabajo</span></span>
+        <span class="progress-pct" id="progressPct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-sub">
+        <span id="progressSub">0</span>
+        <button type="button" class="progress-edit-btn banner-edit-btn" onclick="editJobTarget()" title="Edit">✏️ <span data-en>Edit Target</span><span data-es>Editar Meta</span></button>
+      </div>
+
+      <div class="pallet-grid-wrap" id="palletGridWrap" style="display:none;">
+        <div class="pallet-grid-title-row">
+          <span class="pallet-grid-title"><span data-en>Pallets Completed</span><span data-es>Tarimas Completadas</span></span>
+          <span class="pallet-grid-caption" id="palletGridCaption"></span>
+        </div>
+        <div class="pallet-grid" id="palletGridVisual"></div>
+        <div class="pallet-grid-overflow-bar" id="palletGridOverflow" style="display:none;">
+          <div class="pallet-grid-overflow-fill" id="palletGridOverflowFill"></div>
+        </div>
       </div>
     </div>
+
     <div class="preview-hint" id="previewHint" style="display:none;">👆 <span data-en>This is a preview — tap "Continue Job?" above to start logging for this job.</span><span data-es>Esto es una vista previa — toca "¿Continuar Trabajo?" arriba para empezar a registrar este trabajo.</span></div>
   </div>
 
@@ -751,35 +808,17 @@
     </h2>
 
     <!-- Packing setup — can be entered/changed any time during the job, not
-         just at creation. Typing here doesn't take effect right away: it
-         only applies (and only then does +1 Pallet start auto-adding to
-         Good Count) once "Confirm Setup" is tapped, so an accidental typo
-         mid-edit can't silently change the count. Confirmed fields lock —
-         tap Edit to change them again. -->
-    <div class="pallet-setup">
-      <button type="button" class="pallet-setup-toggle" onclick="togglePalletSetup()">
-        <span>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></span>
-        <span id="palletSetupCaret">▴</span>
-      </button>
-      <div class="pallet-setup-body open" id="palletSetupBody">
-        <div class="pallet-setup-row">
-          <div class="pallet-setup-field">
-            <label><span data-en>Pieces per Box</span><span data-es>Piezas por Caja</span></label>
-            <input id="palletPiecesPerBox" type="text" inputmode="numeric" oninput="onPalletConfigInput(this)">
-          </div>
-          <div class="pallet-setup-field">
-            <label><span data-en>Boxes per Pallet</span><span data-es>Cajas por Tarima</span></label>
-            <input id="palletBoxesPerPallet" type="text" inputmode="numeric" oninput="onPalletConfigInput(this)">
-          </div>
-        </div>
-        <div class="pallet-setup-computed" id="palletComputedLine"></div>
-        <button type="button" class="btn-confirm-setup" id="palletConfirmBtn" onclick="confirmPalletSetup()">✓ <span data-en>Confirm Setup</span><span data-es>Confirmar Configuración</span></button>
-        <button type="button" class="btn-edit-setup" id="palletEditBtn" onclick="editPalletSetup()" style="display:none;">✏️ <span data-en>Edit</span><span data-es>Editar</span></button>
-        <div class="pallet-setup-btns">
-          <button type="button" class="notes-btn small" onclick="openPalletPresets()">📂 <span data-en>Saved Setups</span><span data-es>Configs Guardadas</span></button>
-          <button type="button" class="notes-btn small" onclick="savePalletPreset()">💾 <span data-en>Save This Setup</span><span data-es>Guardar Esta Config</span></button>
-        </div>
+         just at creation. Tapping this row opens it as a popup (see
+         #palletSetupModalOverlay below); once closed, this row only ever
+         shows the two confirmed read-only numbers — editing always goes
+         back through the popup via its own Edit button (or this row's). -->
+    <div class="pallet-setup-summary" id="palletSetupSummaryRow" onclick="openPalletSetupModal()">
+      <span class="pallet-setup-summary-icon">⚙️</span>
+      <div class="pallet-setup-summary-text">
+        <div class="pallet-setup-summary-title"><span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></div>
+        <div class="pallet-setup-summary-values" id="palletSetupSummaryValues"></div>
       </div>
+      <button type="button" class="pallet-setup-summary-edit" onclick="event.stopPropagation();openPalletSetupModal();">✏️ <span data-en>Edit</span><span data-es>Editar</span></button>
     </div>
 
     <div class="pallet-display">
@@ -791,36 +830,6 @@
 
     <button class="btn-pallet" id="palletCompleteBtn" onclick="addPallet()" title="Confirm Packing Setup above first">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
 
-    <div class="partial-pallet-row" id="partialPalletRow" style="display:none;">
-      <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
-           or type it), plus an optional leftover partial-box quantity for
-           whatever didn't make a full box. The manual "pieces on this
-           pallet" field below stays visible at the same time (not hidden
-           behind this), on purpose — a manual override in case +1 Box or
-           +1 Pallet ever glitches and miscounts, per Anthony. -->
-      <div id="partialPalletBoxMode" style="display:none;">
-        <div class="section-label-row" style="margin-top:0;">
-          <label style="margin:0;"><span data-en>Full Boxes on This Pallet</span><span data-es>Cajas Completas en Esta Tarima</span></label>
-          <button type="button" class="help-icon-btn" onclick="showBoxCountHelp()" title="How this works">?</button>
-        </div>
-        <div class="partial-pallet-box-input-row">
-          <button type="button" class="btn-add-box btn-remove-box" id="decBoxBtn" onclick="decrementPartialPalletBoxes()" title="Enter Pieces per Box above first">−1 <span data-en>Box</span><span data-es>Caja</span></button>
-          <input id="partialPalletBoxes" type="text" inputmode="numeric" placeholder="0" oninput="onPartialPalletBoxesChange(this)">
-          <button type="button" class="btn-add-box" id="incBoxBtn" onclick="incrementPartialPalletBoxes()" title="Enter Pieces per Box above first">+1 <span data-en>Box</span><span data-es>Caja</span></button>
-        </div>
-        <label><span data-en>Partial Box Quantity (if any)</span><span data-es>Cantidad de Caja Parcial (si aplica)</span></label>
-        <input id="partialPalletBoxQty" type="text" inputmode="numeric" data-ph-en="Optional — pieces not making a full box" data-ph-es="Opcional — piezas que no completan una caja" placeholder="Optional — pieces not making a full box" oninput="onPartialPalletBoxesChange(this)">
-        <div class="partial-pallet-computed" id="partialPalletComputed"></div>
-        <div class="partial-pallet-divider" id="partialPalletDivider"><span data-en>— or enter the total manually —</span><span data-es>— o ingrese el total manualmente —</span></div>
-      </div>
-      <!-- Manual override — always available, not just when no Packing Setup
-           is confirmed. If this has a value, it wins over the box math. -->
-      <input id="partialPalletInput" type="text" inputmode="numeric" oninput="formatThousands(this)" data-ph-en="Pieces on this pallet" data-ph-es="Piezas en esta tarima" placeholder="Pieces on this pallet">
-      <div class="partial-pallet-btns">
-        <button class="modal-cancel-btn" onclick="cancelPartialPallet()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
-        <button class="btn-submit" onclick="confirmPartialPallet()"><span data-en>Add Partial Pallet</span><span data-es>Agregar Tarima Parcial</span></button>
-      </div>
-    </div>
     <button class="btn-partial-pallet" id="partialPalletToggleBtn" onclick="togglePartialPallet()">➗ <span data-en>Partial Pallet (For example: Split Shipment)</span><span data-es>Tarima Parcial (Por ejemplo: Envío Dividido)</span></button>
     <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
@@ -921,6 +930,75 @@
       <div class="job-picker-list" id="jobPickerProductList"></div>
     </div>
     <button class="modal-cancel-btn" onclick="closeJobPicker()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+  </div>
+</div>
+
+<!-- PACKING SETUP — popup instead of an always-expanded inline section (see
+     .pallet-setup-summary in the Pallet card, which opens this). Typing here
+     doesn't take effect right away: it only applies (and only then does +1
+     Pallet start auto-adding to Good Count) once "Confirm Setup" is tapped,
+     so an accidental typo mid-edit can't silently change the count.
+     Confirmed fields lock — tap Edit to change them again. Confirm Setup
+     closes this popup; Close/backdrop-cancel leaves it as-is otherwise. -->
+<div class="modal-overlay" id="palletSetupModalOverlay">
+  <div class="modal-box notes-modal-box">
+    <h3>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></h3>
+    <div class="pallet-setup-row">
+      <div class="pallet-setup-field">
+        <label><span data-en>Pieces per Box</span><span data-es>Piezas por Caja</span></label>
+        <input id="palletPiecesPerBox" type="text" inputmode="numeric" oninput="onPalletConfigInput(this)">
+      </div>
+      <div class="pallet-setup-field">
+        <label><span data-en>Boxes per Pallet</span><span data-es>Cajas por Tarima</span></label>
+        <input id="palletBoxesPerPallet" type="text" inputmode="numeric" oninput="onPalletConfigInput(this)">
+      </div>
+    </div>
+    <div class="pallet-setup-computed" id="palletComputedLine"></div>
+    <button type="button" class="btn-confirm-setup" id="palletConfirmBtn" onclick="confirmPalletSetup()">✓ <span data-en>Confirm Setup</span><span data-es>Confirmar Configuración</span></button>
+    <button type="button" class="btn-edit-setup" id="palletEditBtn" onclick="editPalletSetup()" style="display:none;">✏️ <span data-en>Edit</span><span data-es>Editar</span></button>
+    <div class="pallet-setup-btns">
+      <button type="button" class="notes-btn small" onclick="openPalletPresets()">📂 <span data-en>Saved Setups</span><span data-es>Configs Guardadas</span></button>
+      <button type="button" class="notes-btn small" onclick="savePalletPreset()">💾 <span data-en>Save This Setup</span><span data-es>Guardar Esta Config</span></button>
+    </div>
+    <button class="modal-cancel-btn" onclick="closePalletSetupModal()"><span data-en>Close</span><span data-es>Cerrar</span></button>
+  </div>
+</div>
+
+<!-- PARTIAL PALLET — popup instead of an inline expanding row (see
+     #partialPalletToggleBtn in the Pallet card, which opens this). Closes
+     automatically once "Add Partial Pallet" is tapped (see
+     confirmPartialPallet -> cancelPartialPallet). -->
+<div class="modal-overlay" id="partialPalletModalOverlay">
+  <div class="modal-box notes-modal-box partial-pallet-row">
+    <h3>➗ <span data-en>Partial Pallet</span><span data-es>Tarima Parcial</span></h3>
+    <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
+         or type it), plus an optional leftover partial-box quantity for
+         whatever didn't make a full box. The manual "pieces on this
+         pallet" field below stays visible at the same time (not hidden
+         behind this), on purpose — a manual override in case +1 Box or
+         +1 Pallet ever glitches and miscounts, per Anthony. -->
+    <div id="partialPalletBoxMode" style="display:none;">
+      <div class="section-label-row" style="margin-top:0;">
+        <label style="margin:0;"><span data-en>Full Boxes on This Pallet</span><span data-es>Cajas Completas en Esta Tarima</span></label>
+        <button type="button" class="help-icon-btn" onclick="showBoxCountHelp()" title="How this works">?</button>
+      </div>
+      <div class="partial-pallet-box-input-row">
+        <button type="button" class="btn-add-box btn-remove-box" id="decBoxBtn" onclick="decrementPartialPalletBoxes()" title="Enter Pieces per Box above first">−1 <span data-en>Box</span><span data-es>Caja</span></button>
+        <input id="partialPalletBoxes" type="text" inputmode="numeric" placeholder="0" oninput="onPartialPalletBoxesChange(this)">
+        <button type="button" class="btn-add-box" id="incBoxBtn" onclick="incrementPartialPalletBoxes()" title="Enter Pieces per Box above first">+1 <span data-en>Box</span><span data-es>Caja</span></button>
+      </div>
+      <label><span data-en>Partial Box Quantity (if any)</span><span data-es>Cantidad de Caja Parcial (si aplica)</span></label>
+      <input id="partialPalletBoxQty" type="text" inputmode="numeric" data-ph-en="Optional — pieces not making a full box" data-ph-es="Opcional — piezas que no completan una caja" placeholder="Optional — pieces not making a full box" oninput="onPartialPalletBoxesChange(this)">
+      <div class="partial-pallet-computed" id="partialPalletComputed"></div>
+      <div class="partial-pallet-divider" id="partialPalletDivider"><span data-en>— or enter the total manually —</span><span data-es>— o ingrese el total manualmente —</span></div>
+    </div>
+    <!-- Manual override — always available, not just when no Packing Setup
+         is confirmed. If this has a value, it wins over the box math. -->
+    <input id="partialPalletInput" type="text" inputmode="numeric" oninput="formatThousands(this)" data-ph-en="Pieces on this pallet" data-ph-es="Piezas en esta tarima" placeholder="Pieces on this pallet">
+    <div class="partial-pallet-btns">
+      <button class="modal-cancel-btn" onclick="cancelPartialPallet()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+      <button class="btn-submit" onclick="confirmPartialPallet()"><span data-en>Add Partial Pallet</span><span data-es>Agregar Tarima Parcial</span></button>
+    </div>
   </div>
 </div>
 
@@ -1986,13 +2064,28 @@ function renderPalletSection(){
   const decBtn = document.getElementById('decBoxBtn');
   if (incBtn) incBtn.disabled = !boxesKnown;
   if (decBtn) decBtn.disabled = !boxesKnown;
+
+  // Read-only summary row (see .pallet-setup-summary) — the only view of
+  // Packing Setup visible once the popup is closed.
+  const summaryValuesEl = document.getElementById('palletSetupSummaryValues');
+  if (summaryValuesEl){
+    summaryValuesEl.textContent = cfg.confirmed
+      ? (isEs
+          ? `Piezas por Caja: ${ppbRaw.toLocaleString()} • Cajas por Tarima: ${bppRaw.toLocaleString()}`
+          : `Pieces per Box: ${ppbRaw.toLocaleString()} • Boxes per Pallet: ${bppRaw.toLocaleString()}`)
+      : (isEs ? 'Toque para configurar' : 'Tap to set up');
+  }
 }
 
-function togglePalletSetup(){
-  const body = document.getElementById('palletSetupBody');
-  const caret = document.getElementById('palletSetupCaret');
-  const open = body.classList.toggle('open');
-  caret.textContent = open ? '▴' : '▾';
+/* Packing Setup popup (see #palletSetupModalOverlay). Opens with whatever
+   is currently saved for this job, pre-filled by renderPalletSection(). */
+function openPalletSetupModal(){
+  if(!currentJobId) return;
+  renderPalletSection();
+  document.getElementById('palletSetupModalOverlay').classList.add('open');
+}
+function closePalletSetupModal(){
+  document.getElementById('palletSetupModalOverlay').classList.remove('open');
 }
 
 function onPalletConfigInput(el){
@@ -2016,6 +2109,7 @@ function confirmPalletSetup(){
   cfg.confirmed = true;
   saveAll();
   renderPalletSection();
+  closePalletSetupModal();
 }
 
 /* Unlocks the fields for a correction. Auto-add pauses again (piecesPerPalletFor
@@ -2094,18 +2188,14 @@ function addPallet(){
 
 /* Manual override for a pallet that isn't the standard full count — a
    split-shipment's last pallet, or any job with no packing setup entered.
-   Always available regardless of whether Packing Setup is filled in. The
-   toggle button itself opens AND closes this now (tap again to collapse
-   whenever you want), instead of only being closeable via Cancel. */
+   Always available regardless of whether Packing Setup is filled in. Now a
+   popup (see #partialPalletModalOverlay) instead of an inline expanding
+   row — the toggle button opens it, and it closes on Cancel or once "Add
+   Partial Pallet" is confirmed (see confirmPartialPallet). */
 function togglePartialPallet(){
-  const row = document.getElementById('partialPalletRow');
-  if (row.style.display === 'block') cancelPartialPallet();
+  const overlay = document.getElementById('partialPalletModalOverlay');
+  if (overlay.classList.contains('open')) cancelPartialPallet();
   else openPartialPallet();
-}
-function setPartialPalletToggleLabel(isOpen){
-  document.getElementById('partialPalletToggleBtn').innerHTML = isOpen
-    ? '▲ <span data-en>Close Partial Pallet</span><span data-es>Cerrar Tarima Parcial</span>'
-    : '➗ <span data-en>Partial Pallet (For example: Split Shipment)</span><span data-es>Tarima Parcial (Por ejemplo: Envío Dividido)</span>';
 }
 function openPartialPallet(){
   if(!currentJobId) return;
@@ -2121,12 +2211,10 @@ function openPartialPallet(){
   document.getElementById('partialPalletBoxMode').style.display = boxMode ? 'block' : 'none';
   document.getElementById('partialPalletDivider').style.display = boxMode ? 'block' : 'none';
   if (boxMode) updatePartialPalletComputed();
-  document.getElementById('partialPalletRow').style.display = 'block';
-  setPartialPalletToggleLabel(true);
+  document.getElementById('partialPalletModalOverlay').classList.add('open');
 }
 function cancelPartialPallet(){
-  document.getElementById('partialPalletRow').style.display = 'none';
-  setPartialPalletToggleLabel(false);
+  document.getElementById('partialPalletModalOverlay').classList.remove('open');
 }
 function incrementPartialPalletBoxes(){
   const el = document.getElementById('partialPalletBoxes');
@@ -2609,17 +2697,6 @@ function syncActiveEntries(manual){
     .catch(function(){ /* current job's pull failed — retryPendingSyncs still covers pushing pending entries */ });
 }
 
-/* The one button on the global sync bar: pushes everything pending across
-   every job, then pulls the latest for whichever job is currently open. */
-function manualGlobalSync(){
-  const isEs = document.body.classList.contains('es');
-  const el = document.getElementById('globalSyncStatus');
-  if (el){ el.classList.remove('pending'); el.textContent = isEs ? '⏳ Sincronizando…' : '⏳ Syncing…'; }
-  Promise.all([retryPendingSyncs(), syncActiveEntries(true)]).then(() => {
-    renderGlobalSyncStatus();
-  });
-}
-
 /* Quantity to Produce is only ever set once, at Create Job — this is the
    one place to correct it afterward (a mis-typed target, or a legitimate
    change mid-job). Native prompt()/confirm() match the same PIN-entry
@@ -2659,6 +2736,12 @@ function sendReport(){
     ? `¿Terminar este trabajo y enviar el reporte a Jayro?\n\nTrabajo: ${job.po}\nEstación: ${job.machine}\nPasada: ${passText || 'N/A'}`
     : `Finish this job and send the report to Jayro?\n\nJob: ${job.po}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}`;
   if(!confirm(confirmMsg)) return;
+
+  // No manual Sync Now button anymore — instead, quietly re-sync everything
+  // a few seconds after Finish/Send Report is tapped, so any other still-open
+  // job's pending entries/pallets/notes don't have to wait for the regular
+  // 30s background retry. Silent: no UI feedback beyond the status line.
+  setTimeout(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 7000);
 
   const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
   const totalReject = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
@@ -2793,6 +2876,65 @@ function saveEditEntry(jobId, entryId){
   renderJob();
 }
 
+/* Job Target Progress bar + pallet grid visual (see .progress-card in the
+   banner). Reads straight off the job object so it works both for the
+   actively-open job and for a job only being previewed (pendingJobId) —
+   same numbers renderJob() already computes for bannerCount in each case. */
+function renderJobProgress(job, totalGood){
+  const isEs = document.body.classList.contains('es');
+  const target = job.target || 0;
+  const pct = target > 0 ? Math.min(100, Math.round((totalGood / target) * 100)) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressSub').textContent = target > 0
+    ? `${totalGood.toLocaleString()} / ${target.toLocaleString()} ${isEs ? 'piezas' : 'items'}`
+    : (isEs ? 'Sin meta establecida' : 'No target set');
+
+  const ppp = piecesPerPalletFor(job);
+  const completedPallets = (job.pallets || []).filter(p => !p.voided).length;
+  const gridWrap = document.getElementById('palletGridWrap');
+  const gridEl = document.getElementById('palletGridVisual');
+  const overflowEl = document.getElementById('palletGridOverflow');
+
+  if (ppp > 0 && target > 0){
+    const totalPalletsTarget = Math.max(1, Math.ceil(target / ppp));
+    gridWrap.style.display = 'block';
+    document.getElementById('palletGridCaption').textContent = isEs
+      ? `${Math.min(completedPallets, totalPalletsTarget)} de ${totalPalletsTarget} tarimas`
+      : `${Math.min(completedPallets, totalPalletsTarget)} of ${totalPalletsTarget} pallets`;
+    // Above ~60 cells a literal grid stops being readable at a glance, so it
+    // falls back to a second progress bar instead of tiny illegible squares.
+    if (totalPalletsTarget <= 60){
+      gridEl.style.display = 'grid';
+      overflowEl.style.display = 'none';
+      gridEl.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < totalPalletsTarget; i++){
+        const cell = document.createElement('div');
+        cell.className = 'pallet-cell' + (i < completedPallets ? ' filled' : '');
+        frag.appendChild(cell);
+      }
+      gridEl.appendChild(frag);
+    } else {
+      gridEl.style.display = 'none';
+      overflowEl.style.display = 'block';
+      const pctP = Math.min(100, Math.round((completedPallets / totalPalletsTarget) * 100));
+      document.getElementById('palletGridOverflowFill').style.width = pctP + '%';
+    }
+  } else if (completedPallets > 0){
+    // Packing Setup not confirmed yet (or no target) — no target pallet
+    // count to compare against, so just show how many have been completed.
+    gridWrap.style.display = 'block';
+    gridEl.style.display = 'none';
+    overflowEl.style.display = 'none';
+    document.getElementById('palletGridCaption').textContent = isEs
+      ? `${completedPallets} tarima(s) completada(s)`
+      : `${completedPallets} pallet(s) completed`;
+  } else {
+    gridWrap.style.display = 'none';
+  }
+}
+
 function renderJob(){
   renderGlobalSyncStatus();
   const banner = document.getElementById('bannerSection');
@@ -2843,10 +2985,8 @@ function renderJob(){
     // Preview only shows the banner counts — skip everything else (shift
     // toggle, entry form, pallets, history) since it isn't shown anyway.
     const totalGoodPreview = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
-    const totalRejectPreview = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
     document.getElementById('bannerCount').textContent = totalGoodPreview.toLocaleString();
-    document.getElementById('bannerHold').textContent = totalRejectPreview.toLocaleString();
-    document.getElementById('bannerTarget').textContent = job.target ? job.target.toLocaleString() : '—';
+    renderJobProgress(job, totalGoodPreview);
     const pvIsEs = document.body.classList.contains('es');
     const pvLabel = pvIsEs ? 'Vista previa de:' : 'Previewing:';
     const pvPass = passLabel(job.pass, pvIsEs);
@@ -2863,11 +3003,9 @@ function renderJob(){
   deleteCard.style.display='block';
 
   const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
-  const totalReject = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
 
   document.getElementById('bannerCount').textContent = totalGood.toLocaleString();
-  document.getElementById('bannerHold').textContent = totalReject.toLocaleString();
-  document.getElementById('bannerTarget').textContent = job.target ? job.target.toLocaleString() : '—';
+  renderJobProgress(job, totalGood);
 
   // Nudges a packer toward the one step that was quietly getting skipped —
   // a job that reached its Quantity to Produce but was never actually
