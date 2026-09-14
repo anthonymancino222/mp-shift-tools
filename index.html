@@ -217,13 +217,21 @@
     padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.08);
   }
   .card h2{margin:0 0 12px;font-size:1.1rem;color:var(--navy);border-bottom:2px solid var(--border);padding-bottom:8px;}
-  /* Shrinks a card/button to half its normal width, centered — per Anthony,
-     for Active Job, Save Progress, Start Over, and the global Sync Now
-     button specifically, not a general layout rule. */
-  .half-width-centered{max-width:50%;margin-left:auto;margin-right:auto;}
-  /* Sizes a card to hug its own content (one line of text/button) instead of
-     a fixed fraction — per Anthony, for Active Job and Save Progress only. */
-  .fit-content-centered{width:fit-content;max-width:100%;margin-left:auto;margin-right:auto;}
+  /* Shrinks a card/button, centered — per Anthony, for Save Progress, Undo
+     Last Pallet, Shift Log History, and Start Over — a FIXED pixel cap
+     (not a %, and not sized off any one button's own label text) so all
+     four render at the exact same physical width.
+     Two variants, not one, because they sit at two different nesting
+     depths: Save Progress/Start Over apply this directly to their own
+     .card (whose own 16px×2 padding — see .card above — comes out of that
+     340px). Undo Last Pallet/Shift Log History apply it to a wrapper DIV
+     nested one level deeper, already inside another full-width .card whose
+     padding was already subtracted once — so that wrapper needs 340px
+     MINUS this same 32px, or it would render 32px wider than the other two
+     despite using "the same" 340px cap. If .card's padding ever changes
+     from 16px, update the 32 below to match (2 × padding). */
+  .half-width-centered{max-width:340px;margin-left:auto;margin-right:auto;}
+  .half-width-centered-nested{max-width:calc(340px - 32px);margin-left:auto;margin-right:auto;}
   .card h2.with-help{display:flex;justify-content:space-between;align-items:center;}
   .help-icon-btn{
     width:26px;height:26px;min-width:26px;border-radius:50%;border:2px solid var(--navy);
@@ -921,7 +929,13 @@
     <button class="btn-pallet" id="palletCompleteBtn" onclick="addPallet()" title="Confirm Packing Setup above first">📦 <span data-en>+1 PALLET COMPLETE</span><span data-es>+1 TARIMA COMPLETA</span></button>
 
     <button class="btn-partial-pallet" id="partialPalletToggleBtn" onclick="togglePartialPallet()">➗ <span data-en>Partial Pallet (For example: Split Shipment)</span><span data-es>Tarima Parcial (Por ejemplo: Envío Dividido)</span></button>
-    <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
+    <!-- Occasional/safety-net action, not part of the per-pallet loop — sized
+         with the same fixed-ratio wrapper as Save Progress/Start Over
+         (.half-width-centered) instead of stretching full-width, so its
+         physical size matches theirs regardless of its own label length. -->
+    <div class="half-width-centered-nested">
+      <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
+    </div>
   </div>
 
   <!-- HISTORY — collapsed by default (see historyLogOpen); tapping the
@@ -929,7 +943,10 @@
        re-renders (renderJob() calls applyHistoryLogOpenState() to reapply
        the current state, never forces it back closed). -->
   <div class="card" id="historyCard" style="display:none;">
-    <div class="history-toggle-row">
+    <!-- Same fixed-ratio sizing as Save Progress/Start Over/Undo Last Pallet
+         (.half-width-centered) — not full-width, and not sized off this
+         row's own label length either. -->
+    <div class="history-toggle-row half-width-centered-nested">
       <button type="button" class="history-toggle-btn" onclick="toggleHistoryLog()">
         <span>📜 <span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></span>
         <span class="history-toggle-caret" id="historyLogCaret">▾</span>
@@ -944,7 +961,11 @@
   </div>
 
   <!-- ENTRY CARD -->
-  <div class="card fit-content-centered" id="logCard" style="display:none;">
+  <!-- Same fixed-ratio sizing (.half-width-centered) as Undo Last Pallet and
+       Shift Log History now use, so all three match by a shared fixed rule
+       instead of this one alone being sized off its own (longer) label
+       text via the old .fit-content-centered. -->
+  <div class="card half-width-centered" id="logCard" style="display:none;">
 
     <!-- Good Count comes entirely from Pallet actions (+1 Pallet Complete /
          Partial Pallet). Hold/Review Count entry, Quality Issues, and manual
