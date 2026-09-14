@@ -854,6 +854,25 @@
        stays visible even when saveProgress() collapses the sections below. -->
   <div id="draftNotice" style="display:none;text-align:center;font-size:0.95rem;font-weight:800;color:var(--good);margin-bottom:14px;padding:12px;border:2px solid var(--good);background:var(--good-soft-bg);border-radius:10px;"></div>
 
+  <!-- NO ACTIVE JOB / JOB PAUSED — shown whenever the screen would otherwise
+       just be blank below the Active Job label: no job at all (after Start
+       Over or after Finish/Send Report clears it), or the current job is
+       paused via Save Progress. A clear "+ Start New Job" (and "Resume This
+       Job" when paused) instead of leaving the user with nothing to tap,
+       per Anthony. See renderJob(). -->
+  <div id="noActiveJobState" style="display:none;text-align:center;padding:36px 16px 4px;">
+    <div id="noActiveJobMsg" style="font-size:1.05rem;font-weight:800;color:var(--text-strong-secondary);margin-bottom:18px;"></div>
+    <!-- This wrapper's own left/right padding (16px, matching .card) means it
+         needs the "nested" compensated width, same reasoning as Undo Last
+         Pallet/Shift Log History — see .half-width-centered-nested's comment. -->
+    <div class="half-width-centered-nested" id="resumeFromEmptyWrap" style="display:none;margin-bottom:10px;">
+      <button class="btn-secondary" onclick="resumeJobView()">▸ <span data-en>Resume This Job</span><span data-es>Reanudar Este Trabajo</span></button>
+    </div>
+    <div class="half-width-centered-nested">
+      <button class="btn-submit" onclick="startNewJobFromEmptyState()">+ <span data-en>Start New Job</span><span data-es>Iniciar Nuevo Trabajo</span></button>
+    </div>
+  </div>
+
   <!-- BANNER -->
   <div id="bannerSection" style="display:none;">
     <div class="job-meta" id="jobMetaLine"></div>
@@ -2023,6 +2042,14 @@ function resumeJobView(){
   restoreDraft();
   renderJob();
   renderJobList();
+}
+
+/* Tapped from the "No Active Job" empty state (see renderJob()) — jumps
+   straight to the New Job form instead of making the user open Active Job
+   and then tap "+ Start New Job" themselves as a second step. */
+function startNewJobFromEmptyState(){
+  openActiveJobModal();
+  toggleNewJobForm();
 }
 
 function startOver(){
@@ -3589,6 +3616,7 @@ function renderJob(){
   // be submitted against a job that hasn't actually been switched to yet.
   const previewId = pendingJobId || currentJobId;
   const validJob = previewId && jobs[previewId];
+  const emptyState = document.getElementById('noActiveJobState');
   if(!validJob || jobSectionsHidden){
     banner.style.display='none';
     previewHint.style.display='none';
@@ -3600,8 +3628,22 @@ function renderJob(){
     logCard.style.display='none';
     historyCard.style.display='none';
     deleteCard.style.display='none';
+    // Otherwise this would just be a blank screen below the Active Job
+    // label with no obvious next step — give a clear "+ Start New Job" (and
+    // "Resume This Job" if a job is only paused via Save Progress, not
+    // actually gone) instead. See startNewJobFromEmptyState().
+    {
+      const isEs = document.body.classList.contains('es');
+      const paused = validJob && jobSectionsHidden;
+      document.getElementById('resumeFromEmptyWrap').style.display = paused ? 'block' : 'none';
+      document.getElementById('noActiveJobMsg').textContent = paused
+        ? (isEs ? '⏸ Este trabajo está en pausa (Progreso Guardado).' : '⏸ This job is paused (Progress Saved).')
+        : (isEs ? 'No hay ningún trabajo activo ahora mismo.' : 'No job is active right now.');
+      emptyState.style.display = 'block';
+    }
     return;
   }
+  emptyState.style.display = 'none';
 
   const job = jobs[previewId];
   banner.style.display='block';
