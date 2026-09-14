@@ -67,6 +67,15 @@
     --disabled-bg:#ececec;
     --disabled-btn-bg:#b9c9bf;
     --placeholder-color:#aaa;
+    /* "Physical button" bevel colors — a darker shade of each button's own
+       face color, for the bottom-edge shadow that gives the big tappable
+       buttons (+1 Pallet, Partial Pallet, Finish/Send Report, Submit, etc.)
+       a pressable, tactile look instead of a flat color block. See
+       .btn-pallet and friends. */
+    --good-shadow:#1e5c3a;
+    --navy-shadow:#a3005c;
+    --warn-shadow:#a66c0a;
+    --accent-shadow:#8f2a2b;
   }
   /* Dark mode — same brand colors (pink/red/green/amber read fine on dark
      backgrounds already), just the neutral surface/text colors invert.
@@ -93,7 +102,9 @@
     --input-bg:#2b2e33;
     --good:#3fbf77;
     --good-light:#59d491;
+    --good-shadow:#1f7a4a;
     --accent:#e2605f;
+    --accent-shadow:#a13d3e;
     --good-soft-bg:#16301f;
     --good-soft-bg-strong:#1f3a28;
     --accent-soft-bg:#3a1613;
@@ -334,9 +345,25 @@
   .pallet-total-label{font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
   .pallet-shift-line{text-align:center;font-size:0.95rem;font-weight:700;color:var(--text-strong-secondary);margin-bottom:4px;}
   .pallet-progress-line{text-align:center;font-size:0.82rem;color:var(--text-tertiary);margin-bottom:14px;}
-  .btn-pallet{width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;background:var(--good);color:#fff;margin-bottom:10px;}
-  .btn-pallet:active{background:var(--good-light);}
-  .btn-pallet:disabled{background:var(--disabled-btn-bg);cursor:not-allowed;}
+  /* The single most-tapped control in the whole app during a run — stays
+     the biggest, boldest thing on screen. "Physical button" depth (a solid
+     bottom edge + soft drop shadow, pressed flat on :active) instead of a
+     bright outline, per Anthony: outlines were kept for light/dark-mode
+     contrast elsewhere, but a tactile press is a clearer "did my tap
+     register" signal for a fast-paced floor environment than a hover/active
+     color swap alone. */
+  .btn-pallet{
+    width:100%;padding:28px;font-size:1.7rem;font-weight:900;border-radius:14px;border:none;
+    background:var(--good);color:#fff;margin-bottom:10px;
+    box-shadow:0 5px 0 var(--good-shadow),0 8px 16px rgba(0,0,0,0.28);
+    transition:transform 0.08s ease,box-shadow 0.08s ease;
+  }
+  .btn-pallet:active{
+    background:var(--good-light);
+    transform:translateY(4px);
+    box-shadow:0 1px 0 var(--good-shadow),0 2px 6px rgba(0,0,0,0.22);
+  }
+  .btn-pallet:disabled{background:var(--disabled-btn-bg);cursor:not-allowed;transform:none;box-shadow:none;}
 
   /* Packing setup — lets the app compute pieces-per-pallet from Pieces/Box ×
      Boxes/Pallet, so +1 Pallet can also auto-add the right amount to Good
@@ -372,25 +399,36 @@
      modal below) instead of always-expanded inline fields. Read-only at a
      glance: only the two confirmed numbers show here, never an editable
      input — editing always goes through the modal via the Edit button. */
-  .pallet-setup-summary{display:flex;align-items:center;gap:12px;border:2px solid var(--navy);border-radius:14px;padding:14px 16px;margin-bottom:16px;background:var(--pink-soft);cursor:pointer;}
-  .pallet-setup-summary-icon{font-size:1.4rem;}
+  /* Setup/configuration tier — set once per job, not tapped during the run
+     itself, so it's deliberately smaller/quieter than the pallet-logging
+     buttons: thinner border, tighter padding, a shallow shadow instead of a
+     bevel. Still unmistakably a button (background + border + press). */
+  .pallet-setup-summary{
+    display:flex;align-items:center;gap:10px;border:1.5px solid var(--navy);border-radius:12px;
+    padding:10px 14px;margin-bottom:16px;background:var(--pink-soft);cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);transition:box-shadow 0.08s ease,transform 0.08s ease;
+  }
+  .pallet-setup-summary:active{transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,0.1);}
+  .pallet-setup-summary-icon{font-size:1.15rem;}
   .pallet-setup-summary-text{flex:1;min-width:0;}
-  .pallet-setup-summary-title{font-weight:900;font-size:1.05rem;color:var(--navy);}
-  .pallet-setup-summary-values{font-size:0.88rem;font-weight:700;color:var(--text-strong-secondary);margin-top:2px;}
-  .pallet-setup-summary-edit{background:var(--card);border:2px solid var(--navy);border-radius:20px;padding:8px 14px;font-weight:800;font-size:0.85rem;color:var(--navy);cursor:pointer;flex-shrink:0;}
+  .pallet-setup-summary-title{font-weight:800;font-size:0.92rem;color:var(--navy);}
+  .pallet-setup-summary-values{font-size:0.82rem;font-weight:700;color:var(--text-strong-secondary);margin-top:2px;}
+  .pallet-setup-summary-edit{background:var(--card);border:1.5px solid var(--navy);border-radius:20px;padding:6px 12px;font-weight:800;font-size:0.8rem;color:var(--navy);cursor:pointer;flex-shrink:0;}
   .pallet-setup-summary-edit:active{background:var(--navy);color:#fff;}
 
   /* Shift Log History toggle — same "obviously tappable" card-button look
-     as .pallet-setup-summary above, instead of plain heading text with just
-     a cursor change (which didn't read as a real button). */
+     as .pallet-setup-summary above (same quiet/settings tier: reviewed
+     occasionally, not part of the per-pallet logging flow), instead of
+     plain heading text with just a cursor change. */
   .history-toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
   .history-toggle-btn{
     flex:1;display:flex;align-items:center;justify-content:space-between;gap:10px;
-    border:2px solid var(--navy);border-radius:14px;background:var(--pink-soft);
-    color:var(--navy);font-weight:900;font-size:1.05rem;padding:14px 16px;
+    border:1.5px solid var(--navy);border-radius:12px;background:var(--pink-soft);
+    color:var(--navy);font-weight:800;font-size:0.92rem;padding:10px 14px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);transition:box-shadow 0.08s ease,transform 0.08s ease;
   }
-  .history-toggle-btn:active{background:var(--navy);color:#fff;}
-  .history-toggle-caret{font-size:1.2rem;}
+  .history-toggle-btn:active{background:var(--navy);color:#fff;transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,0.1);}
+  .history-toggle-caret{font-size:1.1rem;}
   .partial-pallet-row{margin-bottom:10px;}
   .partial-pallet-row input{width:100%;padding:14px;font-size:1.1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:10px;box-sizing:border-box;}
   .partial-pallet-box-input-row{display:flex;gap:8px;}
@@ -409,8 +447,20 @@
   .partial-pallet-divider{font-size:0.8rem;font-weight:700;color:var(--text-tertiary);text-align:center;margin-bottom:10px;}
   .partial-pallet-btns{display:flex;gap:8px;}
   .partial-pallet-btns button{flex:1;margin-bottom:0;}
-  .btn-partial-pallet{width:100%;padding:18px;font-size:1.15rem;font-weight:800;border-radius:12px;border:3px solid var(--warn);background:var(--warn-soft-bg);color:var(--warn-soft-text);margin-bottom:10px;}
-  .btn-partial-pallet:active{background:var(--warn);color:#fff;}
+  /* Used sometimes during a run (split shipments), but nowhere near as often
+     as +1 Pallet — sized a step down so it doesn't compete with it, still
+     with its own (lighter) tactile press. */
+  .btn-partial-pallet{
+    width:100%;padding:14px;font-size:1rem;font-weight:800;border-radius:12px;border:2px solid var(--warn);
+    background:var(--warn-soft-bg);color:var(--warn-soft-text);margin-bottom:10px;
+    box-shadow:0 3px 0 var(--warn-shadow),0 4px 8px rgba(0,0,0,0.15);
+    transition:transform 0.08s ease,box-shadow 0.08s ease;
+  }
+  .btn-partial-pallet:active{
+    background:var(--warn);color:#fff;
+    transform:translateY(3px);
+    box-shadow:0 0 0 var(--warn-shadow),0 1px 3px rgba(0,0,0,0.12);
+  }
   .pallet-preset-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .pallet-preset-row .job-picker-row{flex:1;margin-bottom:0;}
   .pallet-preset-del{background:none;border:none;color:var(--accent);font-size:1.1rem;font-weight:800;cursor:pointer;padding:6px 10px;}
@@ -427,25 +477,52 @@
   }
   .count-input.reject{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);}
 
-  .btn-submit{width:100%;padding:20px;font-size:1.4rem;font-weight:900;border-radius:12px;border:none;background:var(--navy);color:#fff;margin-top:8px;}
-  .btn-submit:active{background:var(--navy-light);}
-  .btn-secondary{width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:2px solid var(--navy);background:var(--pink-soft);color:var(--navy);margin-top:8px;box-shadow:0 1px 3px rgba(0,0,0,0.12);cursor:pointer;}
-  .btn-secondary:active{background:var(--navy);color:#fff;}
-  .btn-danger{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);}
-  .btn-danger:active{background:var(--accent);color:#fff;}
+  .btn-submit{
+    width:100%;padding:20px;font-size:1.4rem;font-weight:900;border-radius:12px;border:none;
+    background:var(--navy);color:#fff;margin-top:8px;
+    box-shadow:0 4px 0 var(--navy-shadow),0 6px 12px rgba(0,0,0,0.22);
+    transition:transform 0.08s ease,box-shadow 0.08s ease;
+  }
+  .btn-submit:active{
+    background:var(--navy-light);
+    transform:translateY(3px);
+    box-shadow:0 1px 0 var(--navy-shadow),0 2px 4px rgba(0,0,0,0.18);
+  }
+  /* Lowest tier — occasional actions (Undo, Save Progress, Start Over), so
+     a thinner border and a smaller bevel than the pallet-logging buttons
+     above: still visibly a real button, just quieter. */
+  .btn-secondary{
+    width:100%;padding:14px;font-size:1rem;font-weight:700;border-radius:10px;border:1.5px solid var(--navy);
+    background:var(--pink-soft);color:var(--navy);margin-top:8px;cursor:pointer;
+    box-shadow:0 2px 0 var(--navy-shadow),0 3px 6px rgba(0,0,0,0.12);
+    transition:transform 0.08s ease,box-shadow 0.08s ease;
+  }
+  .btn-secondary:active{
+    background:var(--navy);color:#fff;
+    transform:translateY(2px);
+    box-shadow:0 0 0 var(--navy-shadow),0 1px 2px rgba(0,0,0,0.1);
+  }
+  .btn-danger{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);box-shadow:0 2px 0 var(--accent-shadow),0 3px 6px rgba(0,0,0,0.12);}
+  .btn-danger:active{background:var(--accent);color:#fff;box-shadow:0 0 0 var(--accent-shadow),0 1px 2px rgba(0,0,0,0.1);}
   .btn-email{background:var(--good-soft-bg);color:var(--good);border-color:var(--good);}
   .btn-email:active{background:var(--good);color:#fff;}
-  /* Finish, Send Report was easy to miss — same soft-outline weight as every
-     other secondary button, at the bottom of a long scroll. Filled/bold like
-     the app's other primary actions (Submit Shift Count, +1 Pallet), plus a
-     gentle pulse once Good Count reaches Target so a truly-done job stands
-     out instead of quietly sitting in Live Jobs forever. */
+  /* Finish, Send Report is a big deal (closes the job out for good) but
+     tapped once per job, not per pallet — sized a clear step below +1
+     Pallet Complete so the two don't compete, while still reading as solid/
+     important (not a quiet secondary action), plus a gentle pulse once
+     Good Count reaches Target so a truly-done job stands out instead of
+     quietly sitting in Live Jobs forever. */
   .btn-finish-report{
-    width:100%;padding:22px;font-size:1.25rem;font-weight:900;border-radius:14px;
+    width:100%;padding:18px;font-size:1.15rem;font-weight:900;border-radius:14px;
     border:none;background:var(--good);color:#fff;margin-top:10px;cursor:pointer;
-    box-shadow:0 2px 8px rgba(0,0,0,0.18);
+    box-shadow:0 4px 0 var(--good-shadow),0 6px 12px rgba(0,0,0,0.2);
+    transition:transform 0.08s ease,box-shadow 0.08s ease;
   }
-  .btn-finish-report:active{background:var(--good-light);}
+  .btn-finish-report:active{
+    background:var(--good-light);
+    transform:translateY(3px);
+    box-shadow:0 1px 0 var(--good-shadow),0 2px 4px rgba(0,0,0,0.16);
+  }
   .btn-finish-report.target-reached{animation:finishPulse 1.6s ease-in-out infinite;}
   @keyframes finishPulse{
     0%,100%{box-shadow:0 0 0 0 rgba(46,125,79,0.55);}
