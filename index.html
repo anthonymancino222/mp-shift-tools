@@ -285,6 +285,19 @@
   .pallet-cell.filled{background:var(--good);border-color:var(--good);}
   .pallet-grid-overflow-bar{height:14px;background:var(--warn-soft-bg);border-radius:999px;overflow:hidden;border:1px solid var(--warn);}
   .pallet-grid-overflow-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--good),var(--good-light));border-radius:999px;transition:width 0.5s ease;}
+
+  /* Quick self-dismissing warning toast — e.g. "Confirm Setup first" when
+     Packing Setup's popup is closed without confirming. Sits above modals
+     (z-index higher than .modal-overlay's 200) since it can fire while one
+     is open. */
+  .quick-toast{
+    position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(12px);
+    max-width:90vw;text-align:center;background:var(--warn-soft-bg);color:var(--warn-soft-text);
+    border:2px solid var(--warn);border-radius:12px;padding:12px 20px;font-weight:800;font-size:0.95rem;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:300;opacity:0;pointer-events:none;
+    transition:opacity 0.25s ease,transform 0.25s ease;
+  }
+  .quick-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   /* Now lives on the white Job Target Progress card (not the dark banner it
      was originally styled for) — see .progress-edit-btn above, which this
      button also carries. Kept as its own class since renderJob() still
@@ -2136,6 +2149,24 @@ function renderPalletSection(){
   }
 }
 
+/* Quick self-dismissing warning (see .quick-toast) — used to nudge instead
+   of a blocking alert()/confirm(), since the thing it's nudging about (e.g.
+   Confirm Setup) is right there on the same screen already. */
+let quickToastTimer = null;
+function showQuickToast(msg){
+  let el = document.getElementById('quickToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'quickToast';
+    el.className = 'quick-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(quickToastTimer);
+  quickToastTimer = setTimeout(function(){ el.classList.remove('show'); }, 2600);
+}
+
 /* Packing Setup popup (see #palletSetupModalOverlay). Opens with whatever
    is currently saved for this job, pre-filled by renderPalletSection(). */
 function openPalletSetupModal(){
@@ -2143,7 +2174,18 @@ function openPalletSetupModal(){
   renderPalletSection();
   document.getElementById('palletSetupModalOverlay').classList.add('open');
 }
+/* Won't close while Packing Setup isn't confirmed yet — Confirm Setup itself
+   calls this right after setting cfg.confirmed = true, so that path always
+   goes through; only the Close button can be blocked here. */
 function closePalletSetupModal(){
+  if(currentJobId){
+    const cfg = getPalletConfig(jobs[currentJobId]);
+    if(!cfg.confirmed){
+      const isEs = document.body.classList.contains('es');
+      showQuickToast(isEs ? '⚠ Confirme la Configuración primero.' : '⚠ Confirm Setup first.');
+      return;
+    }
+  }
   document.getElementById('palletSetupModalOverlay').classList.remove('open');
 }
 
