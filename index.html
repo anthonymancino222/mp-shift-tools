@@ -274,7 +274,7 @@
   .progress-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
   .progress-title{font-size:0.85rem;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;}
   .progress-pct{font-size:1.2rem;font-weight:900;color:var(--navy);}
-  .progress-track{width:100%;height:14px;background:var(--bg);border-radius:999px;overflow:hidden;border:1px solid var(--border);}
+  .progress-track{width:100%;height:14px;background:var(--warn-soft-bg);border-radius:999px;overflow:hidden;border:1px solid var(--warn);}
   .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--good-light),var(--good));border-radius:999px;transition:width 0.5s ease;}
   .progress-sub{display:flex;justify-content:space-between;align-items:center;font-size:0.88rem;font-weight:700;color:var(--text-strong-secondary);margin-top:10px;}
   .progress-edit-btn{background:none;border:none;color:var(--navy);font-size:0.85rem;font-weight:700;cursor:pointer;padding:0 0 0 8px;}
@@ -832,13 +832,21 @@
     <button class="btn-secondary" onclick="undoPallet()">↩ <span data-en>Undo Last Pallet</span><span data-es>Deshacer Última Tarima</span></button>
   </div>
 
-  <!-- HISTORY -->
+  <!-- HISTORY — collapsed by default (see historyLogOpen); tapping the
+       title toggles it and it stays however the user last left it across
+       re-renders (renderJob() calls applyHistoryLogOpenState() to reapply
+       the current state, never forces it back closed). -->
   <div class="card" id="historyCard" style="display:none;">
     <h2 class="with-help">
-      <span><span data-en>Shift Log History</span><span data-es>Historial de Turnos</span></span>
+      <span onclick="toggleHistoryLog()" style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <span data-en>Shift Log History</span><span data-es>Historial de Turnos</span>
+        <span id="historyLogCaret" style="font-size:1.3rem;">▾</span>
+      </span>
       <button type="button" class="help-icon-btn" onclick="showHistoryHelp()" title="How this works">?</button>
     </h2>
-    <div id="historyList"></div>
+    <div class="collapsible-body" id="historyLogBody">
+      <div id="historyList"></div>
+    </div>
     <div class="target-reached-banner" id="targetReachedBanner" style="display:none;"></div>
     <button class="btn-finish-report" id="reportBtn" onclick="sendReport()">📧 <span data-en>Finish, Send Report</span><span data-es>Terminar, Enviar Reporte</span></button>
   </div>
@@ -2182,6 +2190,24 @@ function showQuickToast(msg){
   quickToastTimer = setTimeout(function(){ el.classList.remove('show'); }, 2600);
 }
 
+/* Shift Log History — collapsed by default each time the app loads; once a
+   user opens or closes it, renderJob() re-applies that same state on every
+   re-render (new entry logged, pallet added, language toggle, etc.) instead
+   of silently snapping back closed. Session-only (not persisted), same as
+   Packing Setup's fields-open/closed state. */
+let historyLogOpen = false;
+function toggleHistoryLog(){
+  historyLogOpen = !historyLogOpen;
+  applyHistoryLogOpenState();
+}
+function applyHistoryLogOpenState(){
+  const body = document.getElementById('historyLogBody');
+  if (!body) return;
+  body.classList.toggle('open', historyLogOpen);
+  const caret = document.getElementById('historyLogCaret');
+  if (caret) caret.textContent = historyLogOpen ? '▴' : '▾';
+}
+
 /* Packing Setup popup (see #palletSetupModalOverlay). Opens with whatever
    is currently saved for this job, pre-filled by renderPalletSection(). */
 function openPalletSetupModal(){
@@ -3177,6 +3203,7 @@ function renderJob(){
     ? `Este turno: ${shiftPallets} — Total: ${totalPallets}`
     : `This shift: ${shiftPallets} — Total: ${totalPallets}`;
   renderPalletSection();
+  applyHistoryLogOpenState();
   const activeEntries = job.entries.filter(e=>!e.voided);
   const list = document.getElementById('historyList');
   if(activeEntries.length === 0){
