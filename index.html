@@ -648,6 +648,14 @@
      on the OUTCOME of the sync attempt (see requireSyncBeforeAction). */
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;padding:16px;}
   .modal-overlay.open{display:flex;}
+  /* Every "?" now opens the shared Help modal from ON TOP of whatever popup
+     it was tapped from (Packing Setup, Partial Pallet, Notes, etc. — all
+     also .modal-overlay, z-index:200). Same z-index + later DOM position
+     was letting some of those paint over Help instead of under it, since
+     stacking order among ties falls back to DOM order, not "which one
+     opened more recently." A strictly higher z-index guarantees Help always
+     wins regardless of DOM order or which modal it was opened from. */
+  #helpModalOverlay{z-index:210;}
   .modal-box{background:var(--card);border-radius:14px;padding:22px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;}
   .modal-box h3{margin:0 0 10px;font-size:1.05rem;color:var(--navy);}
   /* Lets a modal put its own language toggle right in the popup itself
