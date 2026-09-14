@@ -416,18 +416,19 @@
   .pallet-setup-summary-edit{background:var(--card);border:1.5px solid var(--navy);border-radius:20px;padding:6px 12px;font-weight:800;font-size:0.8rem;color:var(--navy);cursor:pointer;flex-shrink:0;}
   .pallet-setup-summary-edit:active{background:var(--navy);color:#fff;}
 
-  /* Shift Log History toggle — same "obviously tappable" card-button look
-     as .pallet-setup-summary above (same quiet/settings tier: reviewed
-     occasionally, not part of the per-pallet logging flow), instead of
-     plain heading text with just a cursor change. */
+  /* Shift Log History toggle — matches .btn-secondary's size/weight exactly
+     (same tier as Save Progress/Undo Last Pallet), per Anthony, instead of
+     the smaller "settings" sizing it had before. Still its own layout (icon
+     + label + caret in a row) since it needs to fit a caret. */
   .history-toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
   .history-toggle-btn{
     flex:1;display:flex;align-items:center;justify-content:space-between;gap:10px;
-    border:1.5px solid var(--navy);border-radius:12px;background:var(--pink-soft);
-    color:var(--navy);font-weight:800;font-size:0.92rem;padding:10px 14px;
-    box-shadow:0 2px 6px rgba(0,0,0,0.1);transition:box-shadow 0.08s ease,transform 0.08s ease;
+    border:1.5px solid var(--navy);border-radius:10px;background:var(--pink-soft);
+    color:var(--navy);font-weight:700;font-size:1rem;padding:14px;
+    box-shadow:0 2px 0 var(--navy-shadow),0 3px 6px rgba(0,0,0,0.12);
+    transition:box-shadow 0.08s ease,transform 0.08s ease;
   }
-  .history-toggle-btn:active{background:var(--navy);color:#fff;transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,0.1);}
+  .history-toggle-btn:active{background:var(--navy);color:#fff;transform:translateY(2px);box-shadow:0 0 0 var(--navy-shadow),0 1px 2px rgba(0,0,0,0.1);}
   .history-toggle-caret{font-size:1.1rem;}
   .partial-pallet-row{margin-bottom:10px;}
   .partial-pallet-row input{width:100%;padding:14px;font-size:1.1rem;border:2px solid var(--navy);border-radius:10px;margin-bottom:10px;box-sizing:border-box;}
