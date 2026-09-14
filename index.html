@@ -2298,6 +2298,11 @@ function createAutoEntryFromPallet(job, good, partial){
   };
   job.entries.push(entry);
   pushLiveEntry(job, entry);
+  // Also on the 7s silent-sync timer (see scheduleSilentSync) — belt-and-
+  // suspenders alongside pushLiveEntry's own immediate push above, in case
+  // that immediate push fails (offline, dropped request) and needs a retry
+  // sooner than the regular 30s background timer.
+  scheduleSilentSync();
   return entry;
 }
 
@@ -2740,6 +2745,18 @@ function retryPendingSyncs(){
   return Promise.all(pushes);
 }
 
+/* Fires one retryPendingSyncs() ~7s after being called, debounced — used
+   after logging a count (see createAutoEntryFromPallet) and after Finish/
+   Send Report. Debounced (not one setTimeout per call) so a burst of rapid
+   pallet taps schedules a single sync ~7s after the LAST one, not a pile of
+   redundant overlapping ones. Silent: no UI feedback beyond the status line
+   updating once it runs. */
+let silentSyncTimer = null;
+function scheduleSilentSync(){
+  clearTimeout(silentSyncTimer);
+  silentSyncTimer = setTimeout(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 7000);
+}
+
 /* Pulls active (not-yet-finished) entries for the current PO from the
    backend and merges any not already present locally, deduped by entryId.
    Called automatically on job load, and via the global Sync button. */
@@ -2895,7 +2912,7 @@ function sendReport(){
   // a few seconds after Finish/Send Report is tapped, so any other still-open
   // job's pending entries/pallets/notes don't have to wait for the regular
   // 30s background retry. Silent: no UI feedback beyond the status line.
-  setTimeout(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 7000);
+  scheduleSilentSync();
 
   const totalGood = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.good,0);
   const totalReject = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
