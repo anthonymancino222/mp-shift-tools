@@ -3849,11 +3849,34 @@ function sendReport(){
   // synced" no matter how many retries ran. Repair it right here instead of
   // failing — this is the only thing missing, nothing else about the job
   // (entries/pallets/notes/pending sync) is touched.
-  if (!job.machine){
+  // Trim-checked, not just truthy-checked: the Worker itself rejects on
+  // `!data.station.trim()`, so a whitespace-only value (e.g. " ") is
+  // "blank" to the Worker and to the eye on screen, but is a non-empty
+  // string that a plain `!job.machine` check would miss entirely — this
+  // is exactly what let the very first version of this fix silently do
+  // nothing for a job whose Station had been reduced to just whitespace.
+  if (!job.machine || !String(job.machine).trim()){
     const isShort = confirm(isEs
       ? 'A este trabajo le falta la Estación guardada (Pegadora Larga/Corta) — sin eso el reporte no se puede enviar.\n\n¿Es la PEGADORA CORTA? (Aceptar = Corta, Cancelar = Larga)'
       : 'This job is missing its saved Station (Long/Short Gluer) — the report can\'t send without it.\n\nIs this the SHORT GLUER? (OK = Short Gluer, Cancel = Long Gluer)');
     job.machine = isShort ? 'Short Gluer' : 'Long Gluer';
+    saveAll();
+  }
+  // Same class of problem, same fix shape: `po` is Worker-required too
+  // (`!data.po.trim()`), and while createJob() itself always insists on a
+  // non-empty PO, a job.po that's a raw Google Sheets NUMBER (rather than
+  // a string) rather than a real name would still fail the Worker's
+  // `typeof data.po !== 'string'` check outright — cheap to guard here too.
+  if (job.po === undefined || job.po === null || !String(job.po).trim()){
+    const typedPO = prompt(isEs
+      ? 'A este trabajo le falta el Número de Trabajo/OC guardado — sin eso el reporte no se puede enviar.\n\nEscriba el Número de Trabajo/OC:'
+      : 'This job is missing its saved Job/PO Number — the report can\'t send without it.\n\nType the Job/PO Number:', '');
+    if (typedPO && typedPO.trim()){
+      job.po = normalizePO(typedPO);
+      saveAll();
+    }
+  } else if (typeof job.po !== 'string'){
+    job.po = String(job.po);
     saveAll();
   }
 
