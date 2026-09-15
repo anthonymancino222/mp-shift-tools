@@ -4126,7 +4126,7 @@ function reopenJobPrompt(reportIndex){
   if (pin === null) return;
   fetch(REPORT_ENDPOINT_URL, {
     method: 'POST',
-    body: JSON.stringify({ action: 'reopen_job', po: report.PO, pass: report.Pass || '', timestamp: report.Timestamp, pin })
+    body: JSON.stringify({ action: 'reopen_job', po: report.PO, pass: report.Pass || '', station: report.Station || 'admin', timestamp: report.Timestamp, pin })
   }).then(res => res.json()).then(res => {
     if (res.result === 'success'){
       alert(isEs ? '✅ Trabajo reabierto — ahora está en Trabajos Activos.' : '✅ Job reopened — it\'s now in Live Jobs.');
