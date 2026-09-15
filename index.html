@@ -736,6 +736,11 @@
   }
   .global-sync-status{font-size:0.95rem;font-weight:800;text-align:center;color:var(--good);}
   .global-sync-status.pending{color:var(--warn);}
+  .force-resync-link{
+    display:block;width:100%;background:transparent;border:none;color:var(--text-tertiary);
+    font-weight:700;font-size:0.75rem;margin-top:4px;padding:0;cursor:pointer;text-align:center;
+  }
+  .force-resync-link:active{color:var(--navy);}
   .global-sync-btn{
     width:100%;padding:16px;font-size:1.2rem;font-weight:900;border-radius:12px;border:none;
     background:var(--navy);color:#fff;cursor:pointer;
@@ -928,6 +933,18 @@
     <div class="global-sync-status" id="globalSyncStatus">
       <span data-en>All synced</span><span data-es>Todo sincronizado</span>
     </div>
+    <!-- Not a general "Sync Now" (removed on purpose, see the comment
+         above) — this specifically re-sends everything for the current job
+         even if it's already marked synced=true locally, for recovering
+         from the 2026-09-15 concurrency bug (a request could get a real
+         "success" back from the server while the actual row silently never
+         landed, due to concurrent writes racing with no lock — fixed
+         server-side now, but anything logged before that fix could still
+         be sitting locally marked synced with nothing to show for it on
+         the server). Safe to tap even when nothing's actually missing —
+         the backend is idempotent on entryId, so already-landed rows just
+         get skipped. -->
+    <button type="button" class="force-resync-link" onclick="forceResyncCurrentJob()">🔁 <span data-en>Force resync this job</span><span data-es>Forzar resincronización de este trabajo</span></button>
   </div>
 </div>
 
@@ -3483,6 +3500,40 @@ function retryPendingSyncs(){
     });
   });
   return Promise.all(pushes);
+}
+
+/* Force-resyncs EVERYTHING for the current job, ignoring each item's own
+   synced flag — recovery tool for the 2026-09-15 concurrency bug (see the
+   "Force resync this job" button above): a request could get a real
+   success response back while the row never actually landed, because
+   concurrent writes could race with no server-side lock (now fixed there),
+   so anything logged before that fix could be sitting here marked synced
+   with nothing to show for it on the server. Safe to run any time even
+   when nothing's actually missing — the backend is idempotent on entryId,
+   so anything that DID land just gets skipped server-side, nothing
+   duplicates. */
+function forceResyncCurrentJob(){
+  if (!currentJobId) return;
+  const isEs = document.body.classList.contains('es');
+  const job = jobs[currentJobId];
+  const confirmMsg = isEs
+    ? `¿Volver a enviar TODOS los registros de "${job.po}" al servidor, aunque ya digan "sincronizado"? Use esto solo si sospecha que algo no llegó realmente al servidor.`
+    : `Re-send EVERYTHING for "${job.po}" to the server, even items already marked synced? Only use this if you suspect something didn't actually reach the server.`;
+  if (!confirm(confirmMsg)) return;
+  (job.entries||[]).forEach(e => {
+    e.synced = false;
+    (e.notes||[]).forEach(n => { n.synced = false; });
+  });
+  (job.pallets||[]).forEach(p => { p.synced = false; });
+  (job.notes||[]).forEach(n => { n.synced = false; });
+  saveAll();
+  renderGlobalSyncStatus();
+  const statusEl = document.getElementById('globalSyncStatus');
+  if (statusEl) statusEl.textContent = isEs ? '⏳ Reenviando…' : '⏳ Resending…';
+  retryPendingSyncs().then(() => {
+    renderGlobalSyncStatus();
+    alert(isEs ? '✅ Reenvío completo.' : '✅ Resend complete.');
+  });
 }
 
 /* Fires one retryPendingSyncs() ~7s after being called, debounced — used

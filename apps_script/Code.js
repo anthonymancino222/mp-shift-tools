@@ -1,4 +1,41 @@
+/* Every write in doPostLocked() below (appendRow/deleteRow) runs WITHOUT any
+   serialization of its own — Apps Script Web Apps run each incoming request
+   in its own separate execution, and nothing about SpreadsheetApp calls
+   automatically queues concurrent ones against each other. Under real
+   concurrent load (multiple tablets, or just several rapid taps close
+   together), two executions' appendRow() calls can race and one write can
+   silently clobber/lose the other — each execution still independently
+   returns success() since neither one ever finds out about the other, so
+   the CLIENT correctly believes it synced (entry.synced = true) even
+   though the row never durably landed. Found 2026-09-15: a tablet's own
+   sync status read "✅ All synced" while the server was missing the large
+   majority of its pallets/entries — this is that bug, not a network
+   timeout (a real, separate fetch-timeout fix already exists client-side,
+   but it can't fix data that the server itself silently dropped).
+   LockService.getScriptLock() forces every request to fully finish before
+   the next one starts, at the cost of some queueing latency under
+   concurrent load — the right tradeoff for a system whose whole job is
+   recording accurate production counts. 30s is generous — if the lock
+   genuinely can't be acquired in that window (something else stuck badly),
+   surfacing a "Server busy" error the client will retry is far better than
+   two requests racing on the sheet. */
 function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ result: 'error', message: 'Server busy — please retry' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  try {
+    return doPostLocked(e);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function doPostLocked(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
