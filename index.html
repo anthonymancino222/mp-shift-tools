@@ -460,9 +460,20 @@
   .pallet-setup-summary:active{transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,0.1);}
   .pallet-setup-summary-icon{font-size:1.15rem;}
   .pallet-setup-summary-text{flex:1;min-width:0;}
-  .pallet-setup-summary-title{font-weight:800;font-size:0.92rem;color:var(--navy);}
+  .pallet-setup-summary-title{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-weight:800;font-size:0.92rem;color:var(--navy);}
   .pallet-setup-summary-values{font-size:0.82rem;font-weight:700;color:var(--text-strong-secondary);margin-top:2px;}
   .pallet-setup-summary-edit{background:var(--navy);border:none;border-radius:20px;padding:6px 12px;font-weight:800;font-size:0.8rem;color:#fff;cursor:pointer;flex-shrink:0;box-shadow:0 2px 4px rgba(0,0,0,0.15);}
+  /* Marks this row as the required first step before pallets/boxes can be
+     logged at all — only shown while unconfirmed; once Packing Setup is
+     confirmed there's nothing left to flag as "still needs doing." This
+     card only ever renders for 2nd Pass/Single Pass jobs (1st Pass uses
+     Machine Count instead, a separate card), so there's no need to spell
+     out which pass types it applies to — just that it's step one. */
+  .pallet-setup-step-badge{
+    display:inline-block;flex-shrink:0;background:var(--warn);color:#3a2900;
+    font-size:0.7rem;font-weight:900;letter-spacing:0.4px;text-transform:uppercase;
+    border-radius:20px;padding:4px 10px;
+  }
   .pallet-setup-summary-edit:active{background:var(--navy-light);}
 
   /* Shift Log History toggle — matches .btn-secondary's size/weight exactly
@@ -1015,7 +1026,10 @@
     <div class="pallet-setup-summary" id="palletSetupSummaryRow" onclick="openPalletSetupModal()">
       <span class="pallet-setup-summary-icon">⚙️</span>
       <div class="pallet-setup-summary-text">
-        <div class="pallet-setup-summary-title"><span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></div>
+        <div class="pallet-setup-summary-title">
+          <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span>
+          <span class="pallet-setup-step-badge" id="palletSetupStepBadge" style="display:none;"><span data-en>Step 1</span><span data-es>Paso 1</span></span>
+        </div>
         <div class="pallet-setup-summary-values" id="palletSetupSummaryValues"></div>
       </div>
       <button type="button" class="pallet-setup-summary-edit" onclick="event.stopPropagation();openPalletSetupModal();">✏️ <span data-en>Edit</span><span data-es>Editar</span></button>
@@ -2749,15 +2763,21 @@ function renderPalletSection(){
   if (decBtn) decBtn.disabled = !boxesKnown;
 
   // Read-only summary row (see .pallet-setup-summary) — the only view of
-  // Packing Setup visible once the popup is closed.
+  // Packing Setup visible once the popup is closed. While unconfirmed, this
+  // is the required first step before +1 Pallet/+1 Box can be tapped at
+  // all (see palletBtn/incBtn/decBtn.disabled above) — the "Step 1" badge
+  // and directive subtitle make that obvious at a glance instead of just
+  // reading as an optional settings row.
   const summaryValuesEl = document.getElementById('palletSetupSummaryValues');
+  const stepBadgeEl = document.getElementById('palletSetupStepBadge');
   if (summaryValuesEl){
     summaryValuesEl.textContent = cfg.confirmed
       ? (isEs
           ? `Piezas por Caja: ${ppbRaw.toLocaleString()} • Cajas por Tarima: ${bppRaw.toLocaleString()}`
           : `Pieces per Box: ${ppbRaw.toLocaleString()} • Boxes per Pallet: ${bppRaw.toLocaleString()}`)
-      : (isEs ? 'Toque para configurar' : 'Tap to set up');
+      : (isEs ? 'Toque para configurar antes de registrar tarimas' : 'Tap to set up before logging pallets');
   }
+  if (stepBadgeEl) stepBadgeEl.style.display = cfg.confirmed ? 'none' : 'inline-block';
 }
 
 /* Quick self-dismissing warning (see .quick-toast) — used to nudge instead
