@@ -76,6 +76,12 @@
     --navy-shadow:#a3005c;
     --warn-shadow:#a66c0a;
     --accent-shadow:#8f2a2b;
+    /* Finish, Send Report's own color — blue, deliberately distinct from
+       --overs (a lighter sky blue used elsewhere for the Overs progress bar)
+       so the two don't read as the same meaning. */
+    --finish:#2563eb;
+    --finish-light:#3b82f6;
+    --finish-shadow:#1e40af;
     /* Overs — the extra pieces/pallets run beyond the base Quantity to
        Produce (see Overs selector on New Job). Deliberately its own color
        family (light blue), distinct from every other status color already
@@ -115,6 +121,9 @@
     --good-shadow:#1f7a4a;
     --accent:#e2605f;
     --accent-shadow:#a13d3e;
+    --finish:#3b82f6;
+    --finish-light:#60a5fa;
+    --finish-shadow:#1d4ed8;
     --good-soft-bg:#16301f;
     --good-soft-bg-strong:#1f3a28;
     --accent-soft-bg:#3a1613;
@@ -555,20 +564,36 @@
      Good Count reaches Target so a truly-done job stands out instead of
      quietly sitting in Live Jobs forever. */
   .btn-finish-report{
-    width:100%;padding:18px;font-size:1.15rem;font-weight:900;border-radius:14px;
-    border:none;background:var(--good);color:#fff;margin-top:10px;cursor:pointer;
-    box-shadow:0 4px 0 var(--good-shadow),0 6px 12px rgba(0,0,0,0.2);
+    width:100%;padding:18px 46px;font-size:1.15rem;font-weight:900;border-radius:14px;
+    border:none;background:var(--finish);color:#fff;margin-top:10px;cursor:pointer;
+    box-shadow:0 4px 0 var(--finish-shadow),0 6px 12px rgba(0,0,0,0.2);
     transition:transform 0.08s ease,box-shadow 0.08s ease;
+    /* position:relative + overflow:hidden lets the checkered-flag strips
+       below sit on the button's own left/right edges, clipped to its
+       rounded corners, without needing extra markup. */
+    position:relative;overflow:hidden;
   }
+  /* Racing-flag checkered strips on each side — "Finish" as in a finish
+     line. Always literal black/white regardless of theme, same as a real
+     checkered flag; extra left/right padding above keeps the button's own
+     text clear of them. */
+  .btn-finish-report::before,.btn-finish-report::after{
+    content:'';position:absolute;top:0;bottom:0;width:30px;
+    background-image:repeating-conic-gradient(#000 0% 25%, #fff 0% 50%);
+    background-size:15px 15px;
+    box-shadow:0 0 0 1px rgba(0,0,0,0.25) inset;
+  }
+  .btn-finish-report::before{left:0;}
+  .btn-finish-report::after{right:0;}
   .btn-finish-report:active{
-    background:var(--good-light);
+    background:var(--finish-light);
     transform:translateY(3px);
-    box-shadow:0 1px 0 var(--good-shadow),0 2px 4px rgba(0,0,0,0.16);
+    box-shadow:0 1px 0 var(--finish-shadow),0 2px 4px rgba(0,0,0,0.16);
   }
   .btn-finish-report.target-reached{animation:finishPulse 1.6s ease-in-out infinite;}
   @keyframes finishPulse{
-    0%,100%{box-shadow:0 0 0 0 rgba(46,125,79,0.55);}
-    50%{box-shadow:0 0 0 14px rgba(46,125,79,0);}
+    0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,0.55);}
+    50%{box-shadow:0 0 0 14px rgba(37,99,235,0);}
   }
   .target-reached-banner{
     text-align:center;font-weight:800;font-size:0.95rem;color:var(--good);
