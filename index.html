@@ -2248,7 +2248,24 @@ function createJob(){
   // same PO are fully independent jobs with their own counts/target/report —
   // the 2nd pass never inherits the 1st pass's running total.
   const id = po + '_p' + newJobPass;
-  if (!jobs[id]) {
+  // A job with this exact PO+Pass already existing locally isn't an error —
+  // "Create Job" always resumes rather than duplicates — but doing that
+  // SILENTLY reads as a real bug: existing pallets/Good Count/a
+  // already-confirmed Packing Setup all just appear out of nowhere, with
+  // nothing said about it. Anthony hit exactly this 2026-09-15 (typed a PO
+  // meaning to start fresh, got the existing job's 5 pallets back
+  // instead). Warn plainly and let Cancel back out to fix the PO/Pass —
+  // the New Job form stays open either way, nothing's created/switched yet.
+  if (jobs[id]) {
+    const existing = jobs[id];
+    const existingGood = computeTotalGood(existing);
+    const existingPallets = (existing.pallets||[]).filter(p=>!p.voided).length;
+    const passText = passLabel(newJobPass, isEs);
+    const proceed = confirm(isEs
+      ? `Ya existe un trabajo para "${po}" (${passText}) — ${existingGood.toLocaleString()} piezas buenas y ${existingPallets} tarima(s) ya registradas. ¿Continuar ESE trabajo en vez de crear uno nuevo?\n\n(No se puede crear un trabajo duplicado con el mismo Número de Trabajo/OC y Pasada — esto solo abre el que ya existe.)`
+      : `A job for "${po}" (${passText}) already exists — ${existingGood.toLocaleString()} good pieces and ${existingPallets} pallet(s) already logged. Continue THAT job instead of creating a new one?\n\n(A duplicate job with the same Job/PO Number and Pass can't be created — this just opens the one that already exists.)`);
+    if (!proceed) return;
+  } else {
     jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, oversPercent: newJobOvers || 0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false } };
     saveAll();
   }
