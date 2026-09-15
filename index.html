@@ -1520,6 +1520,25 @@ const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.d
 const SCHEDULE_BACKEND_URL = 'https://qa-checklist-backend.anthony-mancino2.workers.dev';
 const SCHEDULE_API_KEY = 'MoquinQA2026SecureKeyAlpha7';
 
+/* Wraps fetch() with a hard timeout via AbortController. Without this, a
+   request that never resolves — a real risk on weak tablet WiFi, where a
+   connection can get accepted but the response never completes — sits in
+   pushesInFlight/palletPushesInFlight/notePushesInFlight FOREVER, since
+   retryPendingSyncs() just returns that same still-pending promise instead
+   of trying again. That silently and PERMANENTLY blocks retries for that
+   one entry, even though the 30s timer/reconnect/silent-resync keep firing
+   for everything else — found 2026-09-15 when a tablet showing 201,600
+   good/20 pallets locally had only 20,160/1 pallet actually on the server.
+   20s is generous for slow WiFi but finite, so a genuinely stuck request
+   eventually fails and re-queues on the next retry pass instead of
+   blocking that entry forever. */
+function fetchWithTimeout(url, opts, timeoutMs){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 20000);
+  return fetch(url, Object.assign({}, opts, { signal: controller.signal }))
+    .finally(() => clearTimeout(timer));
+}
+
 // A PO typed as "45402" and "045402" is the same real job, but Google Sheets
 // itself strips leading zeros from anything that looks numeric once it lands
 // in a cell — so without normalizing here too, the two spellings silently
@@ -1885,7 +1904,7 @@ const notePushesInFlight = new Map();
 function pushLiveNote(job, note, scope, entryId){
   if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve(false);
   if (notePushesInFlight.has(note.id)) return notePushesInFlight.get(note.id);
-  const p = fetch(REPORT_ENDPOINT_URL, {
+  const p = fetchWithTimeout(REPORT_ENDPOINT_URL, {
     method: 'POST',
     body: JSON.stringify({
       action: 'add_note',
@@ -3316,7 +3335,7 @@ const palletPushesInFlight = new Map();
 function pushLivePallet(job, pallet){
   if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve(false);
   if (palletPushesInFlight.has(pallet.id)) return palletPushesInFlight.get(pallet.id);
-  const p = fetch(REPORT_ENDPOINT_URL, {
+  const p = fetchWithTimeout(REPORT_ENDPOINT_URL, {
     method: 'POST',
     body: JSON.stringify({
       action: 'log_pallet',
@@ -3343,7 +3362,7 @@ function pushLivePallet(job, pallet){
    any intermediate cache that ignores Cache-Control. */
 function fetchLive(){
   const bust = REPORT_ENDPOINT_URL + (REPORT_ENDPOINT_URL.includes('?') ? '&' : '?') + '_=' + Date.now();
-  return fetch(bust, { method: 'GET', cache: 'no-store' }).then(res => res.json());
+  return fetchWithTimeout(bust, { method: 'GET', cache: 'no-store' }).then(res => res.json());
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -3421,7 +3440,7 @@ const pushesInFlight = new Map();
 function pushLiveEntry(job, entry){
   if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve(false);
   if (pushesInFlight.has(entry.id)) return pushesInFlight.get(entry.id);
-  const p = fetch(REPORT_ENDPOINT_URL, {
+  const p = fetchWithTimeout(REPORT_ENDPOINT_URL, {
     method: 'POST',
     body: JSON.stringify({
       action: 'log_entry',
@@ -4220,12 +4239,29 @@ let dashData = null;
 let dashTab = 'history';
 let dashCharts = [];
 
+/* Keeps Live Jobs (and History/Data) current on its own while the Dashboard
+   is open, instead of only ever showing the one snapshot fetched when it
+   was opened — a desktop viewer previously had to remember to tap Refresh
+   to see counts a tablet kept logging elsewhere in the meantime. Starts
+   when the Dashboard opens, stops the moment it closes; never touches the
+   active job screen (a completely separate view/data path) at all.
+   180000ms (3 min), not shorter — matches _discoveryTick's own interval
+   further down, and the same reasoning applies: this GET reads every row
+   of every sheet on the Apps Script side regardless of whether anything
+   changed, and it's billed against the same shared Cloudflare Worker/Apps
+   Script quota as everything else (see the QA Checklist app's D1 quota
+   incident for what an over-aggressive poll like this can turn into). */
+let dashAutoRefreshTimer = null;
 function openDashboard(){
   document.getElementById('dashOverlay').classList.add('open');
   if (!dashData) loadDashboardData();
+  clearInterval(dashAutoRefreshTimer);
+  dashAutoRefreshTimer = setInterval(loadDashboardData, 180000);
 }
 function closeDashboard(){
   document.getElementById('dashOverlay').classList.remove('open');
+  clearInterval(dashAutoRefreshTimer);
+  dashAutoRefreshTimer = null;
 }
 function setDashTab(tab){
   dashTab = tab;
