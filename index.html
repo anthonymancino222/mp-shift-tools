@@ -1943,9 +1943,13 @@ function activateCurrentJob(){
 /* Active Job popup (see .active-job-row / #activeJobModalOverlay). Opening
    just shows current state; renderJobList() (already called on every job
    state change) keeps the list/badge inside it up to date whether or not
-   it's open. */
+   it's open. Also fires one discovery pull (see syncActiveEntries /
+   _discoverRemoteJobs) — this is the moment someone's actually about to
+   look at "what jobs exist," so it's worth a fresh check right here rather
+   than making them wait for the next 3-minute background tick. */
 function openActiveJobModal(){
   document.getElementById('activeJobModalOverlay').classList.add('open');
+  syncActiveEntries(false);
 }
 function closeActiveJobModal(){
   document.getElementById('activeJobModalOverlay').classList.remove('open');
@@ -5096,16 +5100,30 @@ _initScheduleAutoPull();
 // first try. Retry whenever the browser regains connectivity, and on a
 // timer regardless (the 'online' event doesn't always fire reliably on
 // every device/browser), so nothing depends on someone remembering to tap
-// the Sync button.
-// Paired with syncActiveEntries() (a PULL) on the same schedule — retryPendingSyncs
-// alone only ever pushes this device's own pending rows, so a job started on
-// someone else's phone/tablet would otherwise never appear here until this
-// device happened to load/switch to that exact PO+Pass itself. See
-// _discoverRemoteJobs's own comment for why that gap existed.
-function _syncTick(){ retryPendingSyncs().then(renderGlobalSyncStatus); syncActiveEntries(false); }
-window.addEventListener('online', _syncTick);
-setInterval(_syncTick, 30000);
-_syncTick();
+// the Sync button. Cheap to run this often: retryPendingSyncs() makes ZERO
+// network calls whenever nothing is actually pending (the common case).
+window.addEventListener('online', function(){ retryPendingSyncs().then(renderGlobalSyncStatus); });
+setInterval(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 30000);
+retryPendingSyncs().then(renderGlobalSyncStatus);
+
+// Discovery pull (syncActiveEntries — see _discoverRemoteJobs) is a DIFFERENT
+// cost profile from the retry above: doGet on the Apps Script side reads
+// every row of Reports/ActiveEntries/Pallets/Notes/PalletPresets in full on
+// every single call, unconditionally, whether or not anything actually
+// changed (see sheetToObjects() in apps_script_backend.gs) — Cloudflare
+// Worker free-tier requests and Apps Script execution time are both real,
+// shared-account limits (see the QA Checklist app's own D1 quota incident
+// for what happens when a background poll like this is too aggressive).
+// A 3-minute interval still turns "a job on someone's phone never shows up
+// on the desktop without manually recreating it" into "shows up within 3
+// minutes on its own," at roughly 1/6th the request volume 30s would cost
+// across every open device, all day. Also fires once whenever anyone opens
+// the Active Job list (below) for on-demand, zero-ambient-cost freshness in
+// the moment someone's actually looking to check.
+function _discoveryTick(){ syncActiveEntries(false); }
+window.addEventListener('online', _discoveryTick);
+setInterval(_discoveryTick, 180000);
+_discoveryTick();
 </script>
 
 </body>
