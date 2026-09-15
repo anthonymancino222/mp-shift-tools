@@ -2262,9 +2262,18 @@ function createJob(){
     const existingPallets = (existing.pallets||[]).filter(p=>!p.voided).length;
     const passText = passLabel(newJobPass, isEs);
     const proceed = confirm(isEs
-      ? `Ya existe un trabajo para "${po}" (${passText}) — ${existingGood.toLocaleString()} piezas buenas y ${existingPallets} tarima(s) ya registradas. ¿Continuar ESE trabajo en vez de crear uno nuevo?\n\n(No se puede crear un trabajo duplicado con el mismo Número de Trabajo/OC y Pasada — esto solo abre el que ya existe.)`
-      : `A job for "${po}" (${passText}) already exists — ${existingGood.toLocaleString()} good pieces and ${existingPallets} pallet(s) already logged. Continue THAT job instead of creating a new one?\n\n(A duplicate job with the same Job/PO Number and Pass can't be created — this just opens the one that already exists.)`);
+      ? `Ya existe un trabajo para "${po}" (${passText}) — ${existingGood.toLocaleString()} piezas buenas y ${existingPallets} tarima(s) ya registradas. ¿Continuar ESE trabajo en vez de crear uno nuevo?\n\nSu Meta/Overs se actualizarán a lo que acaba de ingresar en este formulario.\n\n(No se puede crear un trabajo duplicado con el mismo Número de Trabajo/OC y Pasada — esto solo abre el que ya existe.)`
+      : `A job for "${po}" (${passText}) already exists — ${existingGood.toLocaleString()} good pieces and ${existingPallets} pallet(s) already logged. Continue THAT job instead of creating a new one?\n\nIts Target/Overs will be updated to whatever you just entered on this form.\n\n(A duplicate job with the same Job/PO Number and Pass can't be created — this just opens the one that already exists.)`);
     if (!proceed) return;
+    // Per Anthony, 2026-09-15: resuming silently kept whatever Target/Overs
+    // the job already had, discarding whatever was just typed/selected on
+    // this form — so re-picking Overs on an existing job (e.g. it didn't
+    // have Overs set the first time) had no visible effect at all. The
+    // confirm above already tells them this will happen; apply it.
+    existing.product = product || existing.product;
+    existing.target = target ? parseInt(target, 10) : existing.target;
+    existing.oversPercent = newJobOvers || 0;
+    saveAll();
   } else {
     jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, oversPercent: newJobOvers || 0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false } };
     saveAll();
