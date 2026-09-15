@@ -452,17 +452,24 @@
      buttons: tighter padding, a shallow shadow instead of a bevel. Border
      dropped (per Anthony — border + shadow together read as too busy);
      the background fill + shadow alone now carry "this is a button." */
+  /* Squeezed to a single compact line (was a two-line stacked title+values
+     block, ~2x this tall) — Anthony flagged this row as eating up to half
+     the visible screen on a phone for something only tapped once per job,
+     while the frequently-tapped +1 Pallet button sits below the fold. Title,
+     step badge, and values all share one flex line now and wrap only if a
+     narrow screen truly can't fit them. */
   .pallet-setup-summary{
-    display:flex;align-items:center;gap:10px;border:none;border-radius:12px;
-    padding:10px 14px;margin-bottom:16px;background:var(--pink-soft);cursor:pointer;
-    box-shadow:0 2px 6px rgba(0,0,0,0.1);transition:box-shadow 0.08s ease,transform 0.08s ease;
+    display:flex;align-items:center;gap:8px;border:none;border-radius:10px;
+    padding:6px 10px;margin-bottom:8px;background:var(--pink-soft);cursor:pointer;
+    box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:box-shadow 0.08s ease,transform 0.08s ease;
   }
   .pallet-setup-summary:active{transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,0.1);}
-  .pallet-setup-summary-icon{font-size:1.15rem;}
-  .pallet-setup-summary-text{flex:1;min-width:0;}
-  .pallet-setup-summary-title{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-weight:800;font-size:0.92rem;color:var(--navy);}
-  .pallet-setup-summary-values{font-size:0.82rem;font-weight:700;color:var(--text-strong-secondary);margin-top:2px;}
-  .pallet-setup-summary-edit{background:var(--navy);border:none;border-radius:20px;padding:6px 12px;font-weight:800;font-size:0.8rem;color:#fff;cursor:pointer;flex-shrink:0;box-shadow:0 2px 4px rgba(0,0,0,0.15);}
+  .pallet-setup-summary-icon{font-size:0.95rem;flex-shrink:0;}
+  .pallet-setup-summary-text{flex:1;min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;column-gap:6px;row-gap:2px;}
+  .pallet-setup-summary-title{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-weight:800;font-size:0.78rem;color:var(--navy);}
+  .pallet-setup-summary-values{font-size:0.74rem;font-weight:700;color:var(--text-strong-secondary);}
+  .pallet-setup-summary-values::before{content:"— ";}
+  .pallet-setup-summary-edit{background:var(--navy);border:none;border-radius:16px;padding:4px 10px;font-weight:800;font-size:0.72rem;color:#fff;cursor:pointer;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.15);}
   /* Marks this row as the required first step before pallets/boxes can be
      logged at all — only shown while unconfirmed; once Packing Setup is
      confirmed there's nothing left to flag as "still needs doing." This
@@ -471,8 +478,8 @@
      out which pass types it applies to — just that it's step one. */
   .pallet-setup-step-badge{
     display:inline-block;flex-shrink:0;background:var(--warn);color:#3a2900;
-    font-size:0.7rem;font-weight:900;letter-spacing:0.4px;text-transform:uppercase;
-    border-radius:20px;padding:4px 10px;
+    font-size:0.62rem;font-weight:900;letter-spacing:0.3px;text-transform:uppercase;
+    border-radius:16px;padding:2px 8px;
   }
   .pallet-setup-summary-edit:active{background:var(--navy-light);}
 
@@ -3424,26 +3431,27 @@ function scheduleSilentSync(){
   silentSyncTimer = setTimeout(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 7000);
 }
 
-/* Pulls active (not-yet-finished) entries for the current PO from the
-   backend and merges any not already present locally, deduped by entryId.
-   Called automatically on job load, and via the global Sync button. */
-function syncActiveEntries(manual){
-  if (!currentJobId) return Promise.resolve();
-  const job = jobs[currentJobId];
-  return fetchLive()
-    .then(res => {
-      if (res.result !== 'success') throw new Error(res.message || 'unknown error');
-      const jobPO = normalizePO(job.po);
-      // Pass is part of what makes 1st Pass and 2nd Pass separate jobs now —
-      // match on it too, or a pull would merge the OTHER pass's entries into
-      // this one. Jobs created before Pass existed have no job.pass, so they
-      // fall back to matching by PO alone (unchanged prior behavior).
-      const jobPass = job.pass || '';
-      const remote = (res.active || []).filter(e =>
-        normalizePO(e.PO) === jobPO && (!jobPass || String(e.Pass||'') === jobPass));
-      const existingIds = new Set(job.entries.map(e => e.id));
-      let added = 0;
-      remote.forEach(e => {
+/* Pulls active (not-yet-finished) entries/pallets/notes for ONE job's own
+   PO+Pass from the already-fetched fetchLive() response and merges any not
+   already present locally, deduped by id. Split out of syncActiveEntries
+   below so the exact same merge logic can run both for the device's own
+   currently-open job AND for any job _discoverRemoteJobs finds that this
+   device doesn't know about yet — one merge implementation, not two copies
+   that could quietly drift apart. Returns how many rows were actually added
+   (0 means nothing new — caller uses this to decide whether to saveAll()). */
+function _mergeRemoteIntoJob(job, res){
+  const jobPO = normalizePO(job.po);
+  // Pass is part of what makes 1st Pass and 2nd Pass separate jobs now —
+  // match on it too, or a pull would merge the OTHER pass's entries into
+  // this one. Jobs created before Pass existed have no job.pass, so they
+  // fall back to matching by PO alone (unchanged prior behavior).
+  const jobPass = job.pass || '';
+  let added = 0;
+  {
+    const remote = (res.active || []).filter(e =>
+      normalizePO(e.PO) === jobPO && (!jobPass || String(e.Pass||'') === jobPass));
+    const existingIds = new Set(job.entries.map(e => e.id));
+    remote.forEach(e => {
         // Legacy rows written before the entryId/idempotency feature existed
         // have no EntryId. A random fallback id here would defeat this very
         // dedup check on every future pull (existingIds never remembers an id
@@ -3485,63 +3493,135 @@ function syncActiveEntries(manual){
         existingIds.add(id);
         added++;
       });
-      const remotePallets = (res.pallets || []).filter(p =>
-        normalizePO(p.PO) === jobPO && (!jobPass || String(p.Pass||'') === jobPass));
-      // Includes already-voided local pallets so a locally-undone tap can
-      // never get resurrected by the next pull (see undoPallet()).
-      const existingPalletIds = new Set(job.pallets.map(p => p.id));
-      remotePallets.forEach(p => {
-        const id = p.EntryId || ('legacy_' + [p.Date, p.Time, p.Shift].join('_'));
-        if (existingPalletIds.has(id)) return;
-        const loggedAt = p.Timestamp ? new Date(p.Timestamp).getTime() : Date.now();
-        const dt = new Date(loggedAt);
-        job.pallets.push({
-          id,
-          shift: String(p.Shift),
-          date: dt.toISOString().slice(0, 10),
-          time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          loggedAt: loggedAt,
-          synced: true,
-          voided: false
-        });
-        existingPalletIds.add(id);
-        added++;
+  }
+  {
+    const remotePallets = (res.pallets || []).filter(p =>
+      normalizePO(p.PO) === jobPO && (!jobPass || String(p.Pass||'') === jobPass));
+    // Includes already-voided local pallets so a locally-undone tap can
+    // never get resurrected by the next pull (see undoPallet()).
+    const existingPalletIds = new Set(job.pallets.map(p => p.id));
+    remotePallets.forEach(p => {
+      const id = p.EntryId || ('legacy_' + [p.Date, p.Time, p.Shift].join('_'));
+      if (existingPalletIds.has(id)) return;
+      const loggedAt = p.Timestamp ? new Date(p.Timestamp).getTime() : Date.now();
+      const dt = new Date(loggedAt);
+      job.pallets.push({
+        id,
+        shift: String(p.Shift),
+        date: dt.toISOString().slice(0, 10),
+        time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        loggedAt: loggedAt,
+        synced: true,
+        voided: false
       });
-      const remoteNotes = (res.notes || []).filter(n =>
-        normalizePO(n.PO) === jobPO && (!jobPass || String(n.Pass||'') === jobPass));
-      const existingJobNoteIds = new Set(job.notes.map(n => n.id));
-      remoteNotes.filter(n => n.Scope === 'job').forEach(n => {
-        const id = n.NoteId;
-        if (!id || existingJobNoteIds.has(id)) return;
-        job.notes.push({
-          id, text: n.Text || '',
-          loggedAt: n.Timestamp ? new Date(n.Timestamp).getTime() : Date.now(),
-          synced: true
-        });
-        existingJobNoteIds.add(id);
-        added++;
+      existingPalletIds.add(id);
+      added++;
+    });
+  }
+  {
+    const remoteNotes = (res.notes || []).filter(n =>
+      normalizePO(n.PO) === jobPO && (!jobPass || String(n.Pass||'') === jobPass));
+    const existingJobNoteIds = new Set(job.notes.map(n => n.id));
+    remoteNotes.filter(n => n.Scope === 'job').forEach(n => {
+      const id = n.NoteId;
+      if (!id || existingJobNoteIds.has(id)) return;
+      job.notes.push({
+        id, text: n.Text || '',
+        loggedAt: n.Timestamp ? new Date(n.Timestamp).getTime() : Date.now(),
+        synced: true
       });
-      // Entry-level notes need their parent entry to exist locally first —
-      // if the entry hasn't synced down yet, its notes just wait for a later
-      // pull once the entry itself is here (same eventual-consistency model
-      // as everything else in this app).
-      remoteNotes.filter(n => n.Scope === 'entry').forEach(n => {
-        const entry = job.entries.find(e => e.id === n.EntryId);
-        if (!entry) return;
-        if (!entry.notes) entry.notes = [];
-        const id = n.NoteId;
-        if (!id || entry.notes.some(x => x.id === id)) return;
-        entry.notes.push({
-          id, text: n.Text || '',
-          loggedAt: n.Timestamp ? new Date(n.Timestamp).getTime() : Date.now(),
-          synced: true
-        });
-        added++;
+      existingJobNoteIds.add(id);
+      added++;
+    });
+    // Entry-level notes need their parent entry to exist locally first —
+    // if the entry hasn't synced down yet, its notes just wait for a later
+    // pull once the entry itself is here (same eventual-consistency model
+    // as everything else in this app).
+    remoteNotes.filter(n => n.Scope === 'entry').forEach(n => {
+      const entry = job.entries.find(e => e.id === n.EntryId);
+      if (!entry) return;
+      if (!entry.notes) entry.notes = [];
+      const id = n.NoteId;
+      if (!id || entry.notes.some(x => x.id === id)) return;
+      entry.notes.push({
+        id, text: n.Text || '',
+        loggedAt: n.Timestamp ? new Date(n.Timestamp).getTime() : Date.now(),
+        synced: true
       });
+      added++;
+    });
+  }
+  return added;
+}
+
+// Finds any PO+Pass the server's ActiveEntries sheet still has open that
+// this device has never seen — e.g. a job started on someone else's phone —
+// and brings it into this device's own `jobs` dict (as a fresh, unconfirmed-
+// Packing-Setup job stub) so it shows up in the Active Job list without
+// anyone having to manually recreate it with a matching PO/Pass/Station.
+// Product/Station/Target come straight off the ActiveEntries row itself
+// (see getOrCreateActiveEntriesSheet's column list in apps_script_backend.gs)
+// — the same row that already carries everything createJob() would've asked
+// for by hand. Deliberately only reads res.active (never res.reports) — a
+// job that's already been finished and reported has no business coming back
+// as "active" on every other device just because its old rows still exist
+// somewhere.
+function _discoverRemoteJobs(res){
+  let added = 0;
+  const seen = {};
+  (res.active || []).forEach(function(e){
+    const po = normalizePO(e.PO);
+    if (!po) return;
+    const pass = String(e.Pass || '');
+    const id = po + '_p' + pass;
+    if (jobs[id] || seen[id]) return;
+    seen[id] = true;
+    jobs[id] = {
+      po: e.PO, product: e.Product || '', machine: e.Station || '', pass: pass,
+      target: Number(e.Target) || 0, oversPercent: 0, createdAt: Date.now(),
+      entries: [], pallets: [], notes: [],
+      palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false }
+    };
+    added += _mergeRemoteIntoJob(jobs[id], res) + 1; // +1 so a discovered job with e.g. only a note (0 "added" rows from the merge) still triggers saveAll()/refreshJobSelect() below
+  });
+  return added;
+}
+
+/* Pulls active (not-yet-finished) entries/pallets/notes from the backend —
+   merges them into the current job (if any) AND discovers/imports any other
+   still-open PO+Pass this device doesn't have yet (see _discoverRemoteJobs).
+   Called automatically on job load, via the global Sync button, and on the
+   same 30s/online timers that already retry pending pushes (see bottom of
+   file) — discovery in particular needs to run on a timer, not just on job
+   load, since a device sitting on "No active job" would otherwise never
+   have a reason to ask the server about jobs it doesn't know exist yet. */
+function syncActiveEntries(manual){
+  return fetchLive()
+    .then(res => {
+      if (res.result !== 'success') throw new Error(res.message || 'unknown error');
+      let added = 0;
+      if (currentJobId && jobs[currentJobId]) added += _mergeRemoteIntoJob(jobs[currentJobId], res);
+      added += _discoverRemoteJobs(res);
       if (added) saveAll();
+      // If this device had no active job yet and discovery just found one
+      // (or more), pick one to show — same "newest by createdAt" tie-break
+      // refreshJobSelect() uses, inlined rather than calling it directly:
+      // refreshJobSelect() -> activateCurrentJob() -> syncActiveEntries()
+      // again, which would turn every sync into an infinite fetch loop.
+      // A no-op whenever currentJobId is already valid.
+      if (!currentJobId || !jobs[currentJobId]) {
+        const ids = Object.keys(jobs);
+        if (ids.length) {
+          currentJobId = ids.slice().sort((a,b)=> jobs[b].createdAt - jobs[a].createdAt)[0];
+          jobSectionsHidden = false;
+          clearEntryForm();
+          restoreDraft();
+        }
+      }
       renderJob();
+      renderJobList();
     })
-    .catch(function(){ /* current job's pull failed — retryPendingSyncs still covers pushing pending entries */ });
+    .catch(function(){ /* pull failed — retryPendingSyncs still covers pushing pending entries */ });
 }
 
 /* Quantity to Produce is only ever set once, at Create Job — this is the
@@ -4974,9 +5054,15 @@ _initScheduleAutoPull();
 // timer regardless (the 'online' event doesn't always fire reliably on
 // every device/browser), so nothing depends on someone remembering to tap
 // the Sync button.
-window.addEventListener('online', function(){ retryPendingSyncs().then(renderGlobalSyncStatus); });
-setInterval(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 30000);
-retryPendingSyncs().then(renderGlobalSyncStatus);
+// Paired with syncActiveEntries() (a PULL) on the same schedule — retryPendingSyncs
+// alone only ever pushes this device's own pending rows, so a job started on
+// someone else's phone/tablet would otherwise never appear here until this
+// device happened to load/switch to that exact PO+Pass itself. See
+// _discoverRemoteJobs's own comment for why that gap existed.
+function _syncTick(){ retryPendingSyncs().then(renderGlobalSyncStatus); syncActiveEntries(false); }
+window.addEventListener('online', _syncTick);
+setInterval(_syncTick, 30000);
+_syncTick();
 </script>
 
 </body>
