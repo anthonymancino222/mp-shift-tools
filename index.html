@@ -3839,6 +3839,24 @@ function sendReport(){
   const job = jobs[currentJobId];
   const isEs = document.body.classList.contains('es');
 
+  // A job can end up with no Station saved on it — e.g. auto-discovered
+  // from another device's ActiveEntries row that had a blank Station
+  // column (see _discoverRemoteJobs) — which the Cloudflare Worker rejects
+  // outright ("Missing required fields") since it requires station on
+  // every POST. That's silent and confusing: it also means every pending
+  // entry/pallet push for this job (they all send job.machine too) has been
+  // failing the same way, which is why they'd still show up as "not yet
+  // synced" no matter how many retries ran. Repair it right here instead of
+  // failing — this is the only thing missing, nothing else about the job
+  // (entries/pallets/notes/pending sync) is touched.
+  if (!job.machine){
+    const isShort = confirm(isEs
+      ? 'A este trabajo le falta la Estación guardada (Pegadora Larga/Corta) — sin eso el reporte no se puede enviar.\n\n¿Es la PEGADORA CORTA? (Aceptar = Corta, Cancelar = Larga)'
+      : 'This job is missing its saved Station (Long/Short Gluer) — the report can\'t send without it.\n\nIs this the SHORT GLUER? (OK = Short Gluer, Cancel = Long Gluer)');
+    job.machine = isShort ? 'Short Gluer' : 'Long Gluer';
+    saveAll();
+  }
+
   const passText = passLabel(job.pass, isEs);
   const confirmMsg = isEs
     ? `¿Terminar este trabajo y enviar el reporte a Jayro?\n\nTrabajo: ${job.po}\nEstación: ${job.machine}\nPasada: ${passText || 'N/A'}`
