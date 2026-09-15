@@ -470,6 +470,21 @@
   .pallet-setup-summary-values{font-size:0.74rem;font-weight:700;color:var(--text-strong-secondary);}
   .pallet-setup-summary-values::before{content:"— ";}
   .pallet-setup-summary-edit{background:var(--navy);border:none;border-radius:16px;padding:4px 10px;font-weight:800;font-size:0.72rem;color:#fff;cursor:pointer;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+  /* The compact single-line size right above was sized down for PHONE
+     screens (per a prior request — it was eating up to half the screen
+     there). On an iPad/tablet there's no such space pressure, and at that
+     same compact size it read as nearly invisible instead — this is the
+     required first step (see the Step 1 badge), it needs to actually be
+     seen. Tablet-and-up gets a noticeably bigger row; phone keeps the
+     compact one. */
+  @media (min-width:700px){
+    .pallet-setup-summary{padding:16px 18px;border-radius:12px;gap:12px;}
+    .pallet-setup-summary-icon{font-size:1.5rem;}
+    .pallet-setup-summary-title{font-size:1.05rem;gap:10px;}
+    .pallet-setup-step-badge{font-size:0.78rem;padding:5px 12px;}
+    .pallet-setup-summary-values{font-size:0.92rem;}
+    .pallet-setup-summary-edit{padding:9px 16px;font-size:0.9rem;border-radius:20px;}
+  }
   /* Marks this row as the required first step before pallets/boxes can be
      logged at all — only shown while unconfirmed; once Packing Setup is
      confirmed there's nothing left to flag as "still needs doing." This
@@ -747,6 +762,17 @@
      being reachable underneath — most obvious way to make it clickable. */
   .modal-header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;}
   .modal-header-row h3{margin:0;flex:1;}
+  /* Circle-X close, in the upper-right of every popup alongside its other
+     header buttons — per Anthony, Cancel doesn't read as fast/obvious
+     enough when someone's in a hurry; a close corner is the more familiar
+     pattern. Same size as .help-icon-btn for visual consistency, red-toned
+     instead of navy so it doesn't get lost among the other round buttons. */
+  .modal-close-x{
+    width:26px;height:26px;min-width:26px;border-radius:50%;border:2px solid var(--accent);
+    background:var(--card);color:var(--accent);font-size:0.95rem;font-weight:900;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex-shrink:0;
+  }
+  .modal-close-x:active{background:var(--accent);color:#fff;}
   .lang-toggle.small{padding:6px 12px;font-size:0.8rem;white-space:nowrap;}
   .modal-box p{font-size:0.9rem;color:var(--text-strong-secondary);margin-bottom:16px;line-height:1.4;}
   .modal-box button{margin-bottom:8px;}
@@ -1139,6 +1165,7 @@
       <h3><span data-en>Active Job</span><span data-es>Trabajo Activo</span></h3>
       <button type="button" class="help-icon-btn" onclick="showActiveJobHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="closeActiveJobModal()" title="Close">✕</button>
     </div>
     <p style="font-size:0.85rem;color:var(--text-secondary);margin:-8px 0 14px;"><span data-en>The job you're currently logging counts for.</span><span data-es>El trabajo para el que está registrando conteos ahora.</span></p>
     <div id="jobListWrap"></div>
@@ -1221,6 +1248,7 @@
       <h3><span data-en>Sync before starting a new job</span><span data-es>Sincronizar antes de iniciar un nuevo trabajo</span></h3>
       <button type="button" class="help-icon-btn" onclick="showSyncGateHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="syncGateCancel()" title="Close">✕</button>
     </div>
     <p id="syncGateMsg"></p>
     <button class="global-sync-btn" id="syncGateSyncBtn" onclick="syncGateAttempt()">🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span></button>
@@ -1239,6 +1267,7 @@
     <div class="modal-header-row">
       <h3 id="helpModalTitle"></h3>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span id="helpModalLangLabel">Español</span></button>
+      <button type="button" class="modal-close-x" onclick="closeHelpModal()" title="Close">✕</button>
     </div>
     <p id="helpModalBody" style="white-space:pre-wrap;"></p>
     <button class="btn-submit" onclick="closeHelpModal()"><span data-en>OK</span><span data-es>Aceptar</span></button>
@@ -1255,6 +1284,7 @@
       <h3 id="notesModalTitle">Notes</h3>
       <button type="button" class="help-icon-btn" onclick="showNotesHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="closeNotesModal()" title="Close">✕</button>
     </div>
     <div class="notes-list" id="notesModalList"></div>
     <label><span data-en>Add a note (for your manager)</span><span data-es>Agregar una nota (para su gerente)</span></label>
@@ -1274,6 +1304,7 @@
       <h3><span data-en>📋 Select a Job</span><span data-es>📋 Seleccionar Trabajo</span></h3>
       <button type="button" class="help-icon-btn" onclick="showJobPickerHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="closeJobPicker()" title="Close">✕</button>
     </div>
     <div id="jobPickerJobPanel">
       <input type="text" class="job-picker-search" id="jobPickerSearch" oninput="renderJobPickerList()"
@@ -1304,6 +1335,7 @@
       <h3>⚙️ <span data-en>Packing Setup</span><span data-es>Configuración de Empaque</span></h3>
       <button type="button" class="help-icon-btn" onclick="showPalletSetupPopupHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="closePalletSetupModal()" title="Close">✕</button>
     </div>
     <div class="pallet-setup-row">
       <div class="pallet-setup-field">
@@ -1336,6 +1368,7 @@
       <h3>➗ <span data-en>Partial Pallet</span><span data-es>Tarima Parcial</span></h3>
       <button type="button" class="help-icon-btn" onclick="showPartialPalletPopupHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="cancelPartialPallet()" title="Close">✕</button>
     </div>
     <!-- Shown when Packing Setup is confirmed — count in boxes (tap +1 Box
          or type it), plus an optional leftover partial-box quantity for
@@ -1378,6 +1411,7 @@
       <h3>📟 <span data-en>Log Machine Count</span><span data-es>Registrar Conteo de Máquina</span></h3>
       <button type="button" class="help-icon-btn" onclick="showMachineCountHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="closeMachineCountModal()" title="Close">✕</button>
     </div>
     <label><span data-en>Machine Count Reading</span><span data-es>Lectura del Conteo de Máquina</span></label>
     <input id="machineCountInput" type="text" inputmode="numeric" oninput="formatThousands(this)" data-ph-en="Cumulative total on the machine right now" data-ph-es="Total acumulado en la máquina ahora" placeholder="Cumulative total on the machine right now">
@@ -1402,6 +1436,7 @@
       <h3><span data-en>📂 Saved Pallet Counts</span><span data-es>📂 Configs de Tarima Guardadas</span></h3>
       <button type="button" class="help-icon-btn" onclick="showPalletPresetsHelp()" title="How this works">?</button>
       <button type="button" class="lang-toggle small" onclick="toggleLang()">🌐 <span data-en>Español</span><span data-es>English</span></button>
+      <button type="button" class="modal-close-x" onclick="closePalletPresets()" title="Close">✕</button>
     </div>
     <div class="job-picker-list" id="palletPresetsList"></div>
     <button class="modal-cancel-btn" onclick="closePalletPresets()"><span data-en>Close</span><span data-es>Cerrar</span></button>
@@ -1415,7 +1450,10 @@
      new job with the same details, then sync" step needed afterward. -->
 <div class="modal-overlay" id="reopenJobOverlay">
   <div class="modal-box">
-    <h3><span data-en>🔓 Reopen Job</span><span data-es>🔓 Reabrir Trabajo</span></h3>
+    <div class="modal-header-row">
+      <h3><span data-en>🔓 Reopen Job</span><span data-es>🔓 Reabrir Trabajo</span></h3>
+      <button type="button" class="modal-close-x" onclick="closeReopenJobModal()" title="Close">✕</button>
+    </div>
     <p id="reopenJobDesc"></p>
     <label><span data-en>Station</span><span data-es>Estación</span></label>
     <div class="station-grid">
@@ -2216,7 +2254,12 @@ function startOver(){
   if(!confirm(msg1)) return;
   const msg2 = isEs ? '¿Confirmar borrado permanente?' : 'Confirm permanent delete?';
   if(!confirm(msg2)) return;
-  const po = job.po, pass = job.pass;
+  // Local-only, no PIN — per Anthony, Start Over is a floor-level "I typed
+  // this job wrong, let me redo it" action and should never be gated behind
+  // an admin PIN, just the two confirm() dialogs above. If this job ever
+  // pushed live entries to the server, those rows stay behind in Live
+  // Jobs — an admin can clear them from the Dashboard's own "Delete Job"
+  // button (PIN-gated there, on purpose) if that's ever actually needed.
   delete jobs[currentJobId];
   // Without this, a later job created with this exact same PO+Pass (same
   // id = po + '_p' + pass) would silently "restore" this old draft — wrong
@@ -2227,28 +2270,6 @@ function startOver(){
   currentJobId = null;
   jobSectionsHidden = false;
   refreshJobSelect();
-  // This job's local copy is gone, but if it ever pushed live entries to the
-  // server, those rows (ActiveEntries/Pallets) stay behind and keep showing
-  // up in the Dashboard's Live Jobs list forever — orphaned, since deleting
-  // it here never told the server. Offer to clean that up too, right now,
-  // instead of leaving it for someone to notice in the Dashboard later. This
-  // is optional/best-effort (needs the same admin PIN as Delete Job) — a
-  // floor worker without the PIN can just tap Cancel and the local clear
-  // above still went through fine.
-  const cleanupMsg = isEs
-    ? '¿Eliminar también este trabajo del servidor (para que no siga apareciendo en "Trabajos Activos" del Panel)? Requiere PIN. Toque Cancelar para omitir.'
-    : 'Also remove this job from the server (so it stops showing up in the Dashboard\'s Live Jobs list)? Requires the admin PIN. Tap Cancel to skip.';
-  if(!confirm(cleanupMsg)) return;
-  const pin = prompt(isEs ? 'Ingrese el PIN de eliminación:' : 'Enter the delete PIN:');
-  if (pin === null) return;
-  fetch(REPORT_ENDPOINT_URL, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'delete_job', po, pass, pin, station: 'admin' })
-  }).then(res => res.json()).then(res => {
-    if (res.result !== 'success') alert((isEs ? 'Error: ' : 'Error: ') + (res.message || 'unknown error'));
-  }).catch(err => {
-    alert((isEs ? 'No se pudo conectar: ' : 'Could not connect: ') + err.message);
-  });
 }
 
 /* draftNotice's text is regenerated from these two data attributes rather
@@ -2903,12 +2924,32 @@ function createAutoEntryFromPallet(job, good, partial){
   return entry;
 }
 
+/* Guards +1 Pallet Complete / Add Partial Pallet / Log Machine Count against
+   firing twice for one tap — real production data showed the exact same
+   reading logged twice, seconds (sometimes under a second) apart, on more
+   than one occasion (including inside an already-sent report from Sept 11,
+   so this wasn't new/one-off). Touchscreens are prone to a single tap
+   dispatching more than one click event during a fast re-render — none of
+   these three actions had anything stopping a second call from going
+   through while the first was still settling. 700ms is generous enough to
+   absorb a double-fire pair (which land well under 300ms apart in the data)
+   without getting in the way of someone genuinely tapping again a moment
+   later for a real second pallet/count. */
+let logActionBusy = false;
+function withLogActionGuard(fn){
+  if (logActionBusy) return;
+  logActionBusy = true;
+  setTimeout(() => { logActionBusy = false; }, 700);
+  fn();
+}
+
 /* A single fast tap — no confirm dialog — since this is the common case
    (a full, standard pallet). When a packing setup is configured, it also
    auto-adds that many pieces to Good Count via a linked entry; undoPallet
    reverses both together. With no setup, this is just a plain tally, same
    as before the feature existed. */
-function addPallet(){
+function addPallet(){ withLogActionGuard(_addPallet); }
+function _addPallet(){
   if(!currentJobId) return;
   const job = jobs[currentJobId];
   const ppp = piecesPerPalletFor(job);
@@ -3000,7 +3041,8 @@ function updatePartialPalletComputed(){
     ? `= ${total.toLocaleString()} piezas en total`
     : `= ${total.toLocaleString()} pieces total`;
 }
-function confirmPartialPallet(){
+function confirmPartialPallet(){ withLogActionGuard(_confirmPartialPallet); }
+function _confirmPartialPallet(){
   if(!currentJobId) return;
   const isEs = document.body.classList.contains('es');
   const job = jobs[currentJobId];
@@ -3107,7 +3149,8 @@ function closeMachineCountModal(){
    reading is unusual enough (machine reset? typo?) that it's worth a
    confirm instead of silently accepting it, since it would otherwise make
    Good Count go backwards. */
-function confirmMachineCount(){
+function confirmMachineCount(){ withLogActionGuard(_confirmMachineCount); }
+function _confirmMachineCount(){
   if(!currentJobId) return;
   const isEs = document.body.classList.contains('es');
   const job = jobs[currentJobId];
