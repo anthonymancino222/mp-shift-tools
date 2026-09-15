@@ -3496,27 +3496,61 @@ function pushLiveEntry(job, entry){
   return p;
 }
 
+/* Pushes one job's pending entries/pallets/notes SEQUENTIALLY — await each
+   before starting the next, NOT Promise.all. The server now processes
+   writes one at a time (see LockService in apps_script_backend.gs, added
+   2026-09-15 to stop a different silent-data-loss bug), so firing every
+   pending item as one big parallel batch just makes them all queue up
+   waiting for the same lock. Measured directly: 15 items fired at once
+   ranged from ~2.4s (1st) up to ~13s (15th) just waiting their turn — with
+   a real backlog of ~20+ items, the ones near the back of that queue
+   routinely exceeded this client's own 20s fetch timeout (see
+   fetchWithTimeout), got marked failed, and piled right back into the
+   front of the exact same oversized parallel batch 30s later. That's why
+   only a handful of a large backlog ever actually landed no matter how
+   many retry cycles ran. Sequential means each push only ever waits on the
+   ONE request ahead of it from THIS device — no artificial queue for the
+   timeout to race against. Shared by retryPendingSyncs() (every job) and
+   forceResyncCurrentJob() (one job, bypassing the sweep-in-progress guard
+   below on purpose — an explicit user tap shouldn't silently no-op just
+   because the background sweep happens to be mid-drain). */
+async function _pushJobSequentially(job){
+  for (const entry of (job.entries||[])){
+    if (entry.synced !== true) await pushLiveEntry(job, entry);
+    for (const note of (entry.notes||[])){
+      if (note.synced !== true) await pushLiveNote(job, note, 'entry', entry.id);
+    }
+  }
+  for (const pallet of (job.pallets||[])){
+    if (pallet.synced !== true) await pushLivePallet(job, pallet);
+  }
+  for (const note of (job.notes||[])){
+    if (note.synced !== true) await pushLiveNote(job, note, 'job', null);
+  }
+}
+
 /* Retries every entry across every local job that hasn't been confirmed
    synced yet. Called automatically (reconnect + timer) and by the manual
-   Sync button — never blocks anything, just keeps trying in the background. */
-function retryPendingSyncs(){
-  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve();
-  const pushes = [];
-  Object.values(jobs).forEach(job => {
-    (job.entries||[]).forEach(entry => {
-      if (entry.synced !== true) pushes.push(pushLiveEntry(job, entry));
-      (entry.notes||[]).forEach(note => {
-        if (note.synced !== true) pushes.push(pushLiveNote(job, note, 'entry', entry.id));
-      });
-    });
-    (job.pallets||[]).forEach(pallet => {
-      if (pallet.synced !== true) pushes.push(pushLivePallet(job, pallet));
-    });
-    (job.notes||[]).forEach(note => {
-      if (note.synced !== true) pushes.push(pushLiveNote(job, note, 'job', null));
-    });
-  });
-  return Promise.all(pushes);
+   Sync button — never blocks anything, just keeps trying in the background.
+   Guarded against overlapping with itself — a large backlog can now take
+   longer to sequentially drain than the 30s timer interval, and without
+   this a second sweep starting mid-drain would run its own independent
+   walk over the same list in parallel with the first, partly undoing the
+   point of going sequential in the first place. Simply skipping a sweep
+   that finds one already in progress is enough — nothing pending gets
+   missed, it just waits for the next tick. */
+let retrySyncInProgress = false;
+async function retryPendingSyncs(){
+  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return;
+  if (retrySyncInProgress) return;
+  retrySyncInProgress = true;
+  try {
+    for (const job of Object.values(jobs)){
+      await _pushJobSequentially(job);
+    }
+  } finally {
+    retrySyncInProgress = false;
+  }
 }
 
 /* Force-resyncs EVERYTHING for the current job, ignoring each item's own
@@ -3547,7 +3581,11 @@ function forceResyncCurrentJob(){
   renderGlobalSyncStatus();
   const statusEl = document.getElementById('globalSyncStatus');
   if (statusEl) statusEl.textContent = isEs ? '⏳ Reenviando…' : '⏳ Resending…';
-  retryPendingSyncs().then(() => {
+  // _pushJobSequentially directly, NOT retryPendingSyncs() — that has its
+  // own overlap guard (skips itself if a background sweep is already mid-
+  // drain), which would make an explicit tap of this button silently do
+  // nothing if the timing was unlucky. This bypasses that on purpose.
+  _pushJobSequentially(job).then(() => {
     renderGlobalSyncStatus();
     alert(isEs ? '✅ Reenvío completo.' : '✅ Resend complete.');
   });
