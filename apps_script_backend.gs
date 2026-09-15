@@ -128,13 +128,18 @@ function doPost(e) {
           .createTextOutput(JSON.stringify({ result: 'error', message: 'No matching report found' }))
           .setMimeType(ContentService.MimeType.JSON);
       }
+      // Station comes from the client's choice (Anthony wanted the option to
+      // bring a job back on either Long or Short Gluer, not just whichever it
+      // ran on before) — falls back to the report's original station only if
+      // the client somehow didn't send one.
+      var reopenStation = data.station || reportRow.station;
       var activeSheetR = getOrCreateActiveEntriesSheet(ss);
       var now = new Date();
       var logLines = String(reportRow.fullLog || '').split('\n').filter(function (l) { return l.trim(); });
       logLines.forEach(function (line, idx) {
         var parsed = parseLogLine(line);
         activeSheetR.appendRow([
-          now, reportRow.po, reportRow.product, reportRow.station, reportRow.target,
+          now, reportRow.po, reportRow.product, reopenStation, reportRow.target,
           parsed.shift, parsed.date, parsed.time, parsed.good, parsed.reject, parsed.flags,
           'reopen_' + now.getTime() + '_' + idx, reportRow.pass
         ]);
@@ -147,7 +152,7 @@ function doPost(e) {
         var todayTime = Utilities.formatDate(now, tz, 'hh:mm a');
         for (var pIdx = 0; pIdx < totalPallets; pIdx++) {
           palletsSheetR.appendRow([
-            now, reportRow.po, reportRow.product, reportRow.station,
+            now, reportRow.po, reportRow.product, reopenStation,
             '1', todayDate, todayTime, 'reopen_pallet_' + now.getTime() + '_' + pIdx, reportRow.pass
           ]);
         }

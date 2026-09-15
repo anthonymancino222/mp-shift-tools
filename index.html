@@ -1387,6 +1387,31 @@
   </div>
 </div>
 
+<!-- REOPEN JOB — one modal covers the whole thing: pick which station it goes
+     back onto, enter the PIN, tap Reopen. On success the job is created
+     locally right here, paused exactly like a Save Progress job (so it shows
+     up in the Active Job list with a Resume button) — no separate "start a
+     new job with the same details, then sync" step needed afterward. -->
+<div class="modal-overlay" id="reopenJobOverlay">
+  <div class="modal-box">
+    <h3><span data-en>🔓 Reopen Job</span><span data-es>🔓 Reabrir Trabajo</span></h3>
+    <p id="reopenJobDesc"></p>
+    <label><span data-en>Station</span><span data-es>Estación</span></label>
+    <div class="station-grid">
+      <button type="button" class="station-btn" id="reopenStLongBtn" onclick="selectReopenStation('Long Gluer')">
+        <span data-en>Long Gluer</span><span data-es>Pegadora Larga</span>
+      </button>
+      <button type="button" class="station-btn" id="reopenStShortBtn" onclick="selectReopenStation('Short Gluer')">
+        <span data-en>Short Gluer</span><span data-es>Pegadora Corta</span>
+      </button>
+    </div>
+    <label><span data-en>Admin PIN</span><span data-es>PIN de Administrador</span></label>
+    <input type="password" id="reopenJobPin" inputmode="numeric" data-ph-en="Enter PIN" data-ph-es="Ingrese el PIN" placeholder="Enter PIN">
+    <button class="btn-submit" id="reopenJobConfirmBtn" onclick="confirmReopenJob()"><span data-en>Reopen Job</span><span data-es>Reabrir Trabajo</span></button>
+    <button class="modal-cancel-btn" onclick="closeReopenJobModal()"><span data-en>Cancel</span><span data-es>Cancelar</span></button>
+  </div>
+</div>
+
 <!-- DASHBOARD — History (past sent reports), Live Jobs (active on any device), Data (charts) -->
 <div class="dash-overlay" id="dashOverlay">
   <div class="dash-header">
@@ -3426,7 +3451,16 @@ function syncActiveEntries(manual){
           loggedAt: loggedAt,
           edited: false, originalGood: null, originalReject: null,
           synced: true, // came from the backend — already known to be there
-          notes: []
+          notes: [],
+          // ActiveEntries has no isMachineCount column (ALL entries push the
+          // same log_entry shape) — but every entry under a 1st Pass job IS
+          // a machine-count reading by construction, so it's safe to infer
+          // straight from job.pass. Without this, computeTotalGood() (which
+          // only sums entries flagged isMachineCount for Pass 1) silently
+          // showed 0 for any 1st Pass job pulled down onto a device that
+          // didn't log those readings itself — e.g. a second tablet syncing
+          // in, or a job brought back via Reopen Job.
+          isMachineCount: job.pass === '1'
         });
         existingIds.add(id);
         added++;
@@ -4126,41 +4160,113 @@ function deleteEntryPrompt(entryId, entryType){
   });
 }
 
-/* Admin reopen — same PIN as Delete Job/Delete Entry. Brings a finished
-   report back into Live Jobs: the server reconstructs ActiveEntries rows
-   from that report's own Full Log (Good/Reject/date/time/shift restored
-   exactly) plus Total Pallets worth of new Pallets rows (the count is
-   right, but individual pallet timestamps from before finishing weren't
-   kept, so these get today's date/time instead of their originals), then
-   removes the Reports row. Matched by PO+Pass+Timestamp, not PO+Pass alone —
-   the same PO+Pass can have more than one finished report over time.
+/* Admin reopen — same PIN as Delete Job/Delete Entry, one modal instead of
+   a confirm()+prompt() chain. Brings a finished report back into Live Jobs:
+   the server reconstructs ActiveEntries rows from that report's own Full
+   Log (Good/Reject/date/time/shift restored exactly) plus Total Pallets
+   worth of new Pallets rows (the count is right, but individual pallet
+   timestamps from before finishing weren't kept, so these get today's
+   date/time instead of their originals), then removes the Reports row.
+   Matched by PO+Pass+Timestamp, not PO+Pass alone — the same PO+Pass can
+   have more than one finished report over time. Station is chosen here
+   (defaulting to whichever it ran on before) rather than assumed, since
+   Anthony wants the option to bring a job back on the OTHER station.
    reportIndex is this report's own index into dashData.reports (stable
    even though the History list itself is filtered/reordered), not an
    index into whatever's currently displayed. */
-function reopenJobPrompt(reportIndex){
-  const isEs = document.body.classList.contains('es');
+let reopenJobContext = null;
+
+function openReopenJobModal(reportIndex){
   const report = dashData.reports[reportIndex];
   if (!report) return;
+  const isEs = document.body.classList.contains('es');
+  reopenJobContext = { reportIndex, station: report.Station === 'Short Gluer' ? 'Short Gluer' : 'Long Gluer' };
   const passText = report.Pass ? passLabel(String(report.Pass), isEs) : '';
   const label = report.PO + (passText ? ' ('+passText+')' : '');
-  const confirmMsg = isEs
-    ? `¿Reabrir el trabajo "${label}"? Esto lo regresa a Trabajos Activos (con sus conteos Bueno/Retenido y el total de tarimas restaurados) y lo QUITA de Historial. Requiere PIN.\n\nPara seguir registrando conteos en una tableta: cree un Nuevo Trabajo con el mismo PO/Pasada/Estación/Meta, luego toque "Sincronizar Ahora" para traer todo lo restaurado.`
-    : `Reopen job "${label}"? This puts it back in Live Jobs (with its Good/Hold counts and pallet total restored) and REMOVES it from History. Requires PIN.\n\nTo keep logging counts on a tablet: start a New Job with the same PO/Pass/Station/Target, then tap "Sync Now" to pull everything restored back in.`;
-  if (!confirm(confirmMsg)) return;
-  const pin = prompt(isEs ? 'Ingrese el PIN para reabrir este trabajo:' : 'Enter the PIN to reopen this job:');
-  if (pin === null) return;
+  document.getElementById('reopenJobDesc').textContent = isEs
+    ? `Esto regresa "${label}" a Trabajos Activos (con sus conteos Bueno/Retenido y el total de tarimas restaurados), lo pone en su lista de Trabajo Activo listo para reanudar, y lo QUITA de Historial.`
+    : `This puts "${label}" back in Live Jobs (with its Good/Hold counts and pallet total restored), into your Active Job list ready to resume, and REMOVES it from History.`;
+  document.getElementById('reopenJobPin').value = '';
+  _updateReopenStationButtons();
+  document.getElementById('reopenJobOverlay').classList.add('open');
+}
+function selectReopenStation(station){
+  if (!reopenJobContext) return;
+  reopenJobContext.station = station;
+  _updateReopenStationButtons();
+}
+function _updateReopenStationButtons(){
+  document.getElementById('reopenStLongBtn').classList.toggle('selected', !!reopenJobContext && reopenJobContext.station === 'Long Gluer');
+  document.getElementById('reopenStShortBtn').classList.toggle('selected', !!reopenJobContext && reopenJobContext.station === 'Short Gluer');
+}
+function closeReopenJobModal(){
+  document.getElementById('reopenJobOverlay').classList.remove('open');
+  reopenJobContext = null;
+}
+function confirmReopenJob(){
+  if (!reopenJobContext) return;
+  const isEs = document.body.classList.contains('es');
+  const report = dashData.reports[reopenJobContext.reportIndex];
+  if (!report){ closeReopenJobModal(); return; }
+  const pin = document.getElementById('reopenJobPin').value;
+  if (!pin){
+    alert(isEs ? 'Ingrese el PIN.' : 'Enter the PIN.');
+    return;
+  }
+  const station = reopenJobContext.station;
+  const btn = document.getElementById('reopenJobConfirmBtn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = isEs ? '⏳ Reabriendo…' : '⏳ Reopening…';
   fetch(REPORT_ENDPOINT_URL, {
     method: 'POST',
-    body: JSON.stringify({ action: 'reopen_job', po: report.PO, pass: report.Pass || '', station: report.Station || 'admin', timestamp: report.Timestamp, pin })
+    body: JSON.stringify({ action: 'reopen_job', po: report.PO, pass: report.Pass || '', station, timestamp: report.Timestamp, pin })
   }).then(res => res.json()).then(res => {
-    if (res.result === 'success'){
-      alert(isEs ? '✅ Trabajo reabierto — ahora está en Trabajos Activos.' : '✅ Job reopened — it\'s now in Live Jobs.');
-      loadDashboardData();
-    } else {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+    if (res.result !== 'success'){
       alert((isEs ? 'Error: ' : 'Error: ') + (res.message || 'unknown error'));
+      return;
     }
+    closeReopenJobModal();
+    _bringReopenedJobLocal(report, station);
+    loadDashboardData();
   }).catch(err => {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
     alert((isEs ? 'No se pudo conectar: ' : 'Could not connect: ') + err.message);
+  });
+}
+
+/* Creates (or, if this device already happens to have it, reuses) this job
+   locally, then pulls down everything the server just reconstructed —
+   reuses syncActiveEntries()'s existing pull/dedup logic rather than
+   re-deriving entries from the Full Log a second time here, so there's only
+   ONE place that ever has to agree with the server's entry-id scheme. Left
+   PAUSED (jobSectionsHidden = true, set before the pull so its own
+   renderJob() call already renders the paused view) — same state as tapping
+   Save Progress, so it shows up with a Resume button instead of jumping
+   straight to the front over whatever the operator was already doing. */
+function _bringReopenedJobLocal(report, station){
+  const isEs = document.body.classList.contains('es');
+  const passRaw = String(report.Pass || '');
+  const pass = (passRaw === '1' || passRaw === '2' || passRaw === 'S') ? passRaw : 'S';
+  const po = normalizePO(report.PO);
+  const id = po + '_p' + pass;
+  if (!jobs[id]){
+    jobs[id] = {
+      po, product: report.Product || '', machine: station, pass,
+      target: Number(report.Target) || 0, createdAt: Date.now(),
+      entries: [], pallets: [], notes: [],
+      palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false }
+    };
+    saveAll();
+  }
+  currentJobId = id;
+  jobSectionsHidden = true;
+  syncActiveEntries(true).then(() => {
+    renderJobList();
+    alert(isEs ? '✅ Trabajo reabierto — está en su lista de Trabajo Activo, listo para reanudar.' : '✅ Job reopened — it\'s in your Active Job list, ready to resume.');
   });
 }
 
@@ -4359,7 +4465,7 @@ function renderDashHistory(){
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parsedEntries)}</div>
-      <button class="dash-reopen-job-btn" onclick="reopenJobPrompt(${dashData.reports.indexOf(r)})">🔓 ${isEs?'Reabrir Trabajo':'Reopen Job'}</button>
+      <button class="dash-reopen-job-btn" onclick="openReopenJobModal(${dashData.reports.indexOf(r)})">🔓 ${isEs?'Reabrir Trabajo':'Reopen Job'}</button>
     </div>`;
     } catch (rowErr) {
       return `<div class="dash-job-card"><div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span></div><div class="dash-empty">${isEs?'No se pudo mostrar este reporte (datos inesperados).':'Could not display this report (unexpected data).'}</div></div>`;
