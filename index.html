@@ -5067,6 +5067,13 @@ function renderDashHistory(){
 function getReportDerivedStats(r){
   const target = Number(r.Target) || 0;
   const totalGood = Number(r['Total Good']) || 0;
+  // Whether this row was sent before the History-fields columns existed
+  // (added 2026-09-16) at all, vs. a new row that genuinely has 0% Overs —
+  // EffectiveTarget is always written together with OversPercent by
+  // sendReport(), so a blank EffectiveTarget reliably marks a pre-history
+  // row. Matters because "Overs: None" is a real fact for a new row, but
+  // would be a false claim for an old one where it was simply never asked.
+  const hasHistoryFields = r.EffectiveTarget !== '' && r.EffectiveTarget != null;
   const oversPercent = Number(r.OversPercent) || 0;
   const effectiveTarget = Number(r.EffectiveTarget) || (oversPercent > 0 ? Math.round(target * (1 + oversPercent/100)) : target);
   const piecesPerBox = Number(r.PiecesPerBox) || 0;
@@ -5078,15 +5085,24 @@ function getReportDerivedStats(r){
   const palletsNeeded = Number(r.PalletsNeeded) || computed.palletsNeeded;
   const pctShortVsTarget = (r.PctShortVsTarget !== '' && r.PctShortVsTarget != null) ? Number(r.PctShortVsTarget) : computed.pctShortVsTarget;
   const pctShortVsEffectiveTarget = (r.PctShortVsEffectiveTarget !== '' && r.PctShortVsEffectiveTarget != null) ? Number(r.PctShortVsEffectiveTarget) : computed.pctShortVsEffectiveTarget;
-  const shifts = String(r.Shifts || '').split(',').map(s => s.trim()).filter(Boolean);
-  return { target, totalGood, oversPercent, effectiveTarget, piecesPerBox, boxesPerPallet, piecesPerPalletUnit: computed.piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget, shifts };
+  // Shifts: prefer the stored column, but fall back to parsing the Full
+  // Log's own per-line "| Shift N |" markers for any report sent before
+  // this column existed — that data was always in the log text itself
+  // (every entry has always carried its shift), just never pulled into
+  // its own field until now. Recovers the real answer instead of a blank.
+  let shifts = String(r.Shifts || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!shifts.length){
+    shifts = [...new Set(parseFullLogText(r['Full Log']).map(e => e.shift))];
+  }
+  return { target, totalGood, oversPercent, effectiveTarget, piecesPerBox, boxesPerPallet, piecesPerPalletUnit: computed.piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget, shifts, hasHistoryFields };
 }
 
 function renderHistoryExtraDetails(r, isEs){
   const s = getReportDerivedStats(r);
   const rows = [];
   rows.push([isEs?'Turno(s)':'Shift(s)', s.shifts.length ? s.shifts.map(x => (isEs?'Turno ':'Shift ')+x).join(', ') : 'N/A']);
-  rows.push([isEs?'Overs':'Overs', s.oversPercent > 0 ? `${s.oversPercent}% (${isEs?'meta efectiva':'effective target'} ${s.effectiveTarget.toLocaleString()})` : (isEs?'Ninguno':'None')]);
+  const oversNoneLabel = s.hasHistoryFields ? (isEs?'Ninguno':'None') : (isEs?'No registrado (reporte anterior)':'Not recorded (older report)');
+  rows.push([isEs?'Overs':'Overs', s.oversPercent > 0 ? `${s.oversPercent}% (${isEs?'meta efectiva':'effective target'} ${s.effectiveTarget.toLocaleString()})` : oversNoneLabel]);
   if (s.piecesPerPalletUnit > 0){
     rows.push([isEs?'Config. de Empaque':'Packing Setup', `${s.piecesPerBox.toLocaleString()} ${isEs?'pzs/caja':'pcs/box'} × ${s.boxesPerPallet.toLocaleString()} ${isEs?'cajas/tarima':'boxes/pallet'}`]);
     rows.push([isEs?'Tarimas Necesarias vs Producidas':'Pallets Needed vs Produced', `${s.palletsNeeded.toLocaleString()} ${isEs?'vs':'vs'} ${Number(r['Total Pallets']||0).toLocaleString()}`]);
