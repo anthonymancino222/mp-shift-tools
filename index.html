@@ -2963,6 +2963,21 @@ function computeTotalGood(job){
    actual finish line the job is run to once Overs is factored in. Used
    for the progress bar/pallet grid's 100% mark and for "target reached"
    checks — everywhere job.target alone used to mean "the target." */
+// Coerces to a finite number, treating anything that isn't one (a garbled
+// cell from an old Reports-sheet schema mismatch, blank, undefined, etc.)
+// as 0 instead of NaN. Matters because a pattern like `Number(x||0)` does
+// NOT actually guard this: `||0` only catches a FALSY x (undefined/''/0),
+// not a truthy-but-garbage string — Number() on that still returns NaN,
+// which then silently poisons every running total it's added into (found
+// 2026-09-16: one old Reports row with a garbled "Total Pallets" cell —
+// see the sheet-schema-mismatch comment on parseFullLogText — turned an
+// entire PowerPoint export's Total Pallets KPI into "NaN"). Always coerce
+// AFTER Number(), unconditionally, not before.
+function safeNum(v){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function effectiveTargetFor(job){
   const base = job.target || 0;
   const oversPercent = job.oversPercent || 0;
@@ -5063,10 +5078,10 @@ function renderDashHistory(){
       <div class="dash-job-top"><span>${escapeHtml(r.PO||'—')}</span><span>${escapeHtml(r.Station||'')}${r.Pass ? ' · '+escapeHtml(passLabel(String(r.Pass), isEs)) : ''}</span></div>
       <div class="dash-job-meta">${escapeHtml(r.Product||'')}${r.Product?' · ':''}<span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · <span data-en>Sent</span><span data-es>Enviado</span>: ${sentTs}</div>
       <div class="dash-job-counts">
-        <div><b style="color:var(--good)">${Number(r['Total Good']||0).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
-        <div><b style="color:var(--accent)">${Number(r['Total Reject']||0).toLocaleString()}</b>${isEs?'Retenido':'Hold'}</div>
-        <div><b>${Number(r.Target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
-        <div><b style="color:var(--navy)">${Number(r['Total Pallets']||0).toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
+        <div><b style="color:var(--good)">${safeNum(r['Total Good']).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
+        <div><b style="color:var(--accent)">${safeNum(r['Total Reject']).toLocaleString()}</b>${isEs?'Retenido':'Hold'}</div>
+        <div><b>${safeNum(r.Target).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
+        <div><b style="color:var(--navy)">${safeNum(r['Total Pallets']).toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
       <div class="dash-history-actions">
         <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
@@ -5095,8 +5110,8 @@ function renderDashHistory(){
    Needed (that one has no way to be reconstructed without PiecesPerBox/
    BoxesPerPallet, which old rows never recorded). */
 function getReportDerivedStats(r){
-  const target = Number(r.Target) || 0;
-  const totalGood = Number(r['Total Good']) || 0;
+  const target = safeNum(r.Target);
+  const totalGood = safeNum(r['Total Good']);
   // Whether this row was sent before the History-fields columns existed
   // (added 2026-09-16) at all, vs. a new row that genuinely has 0% Overs —
   // EffectiveTarget is always written together with OversPercent by
@@ -5135,7 +5150,7 @@ function renderHistoryExtraDetails(r, isEs){
   rows.push([isEs?'Overs':'Overs', s.oversPercent > 0 ? `${s.oversPercent}% (${isEs?'meta efectiva':'effective target'} ${s.effectiveTarget.toLocaleString()})` : oversNoneLabel]);
   if (s.piecesPerPalletUnit > 0){
     rows.push([isEs?'Config. de Empaque':'Packing Setup', `${s.piecesPerBox.toLocaleString()} ${isEs?'pzs/caja':'pcs/box'} × ${s.boxesPerPallet.toLocaleString()} ${isEs?'cajas/tarima':'boxes/pallet'}`]);
-    rows.push([isEs?'Tarimas Necesarias vs Producidas':'Pallets Needed vs Produced', `${s.palletsNeeded.toLocaleString()} ${isEs?'vs':'vs'} ${Number(r['Total Pallets']||0).toLocaleString()}`]);
+    rows.push([isEs?'Tarimas Necesarias vs Producidas':'Pallets Needed vs Produced', `${s.palletsNeeded.toLocaleString()} ${isEs?'vs':'vs'} ${safeNum(r['Total Pallets']).toLocaleString()}`]);
   }
   rows.push([isEs?'% Corto vs Meta (sin overs)':'% Short vs Target (no overs)', s.pctShortVsTarget + '%']);
   if (s.oversPercent > 0){
@@ -5259,10 +5274,10 @@ function renderDashData(){
   };
 
   const labels = reports.map(r => String(r.PO||'—'));
-  const targets = reports.map(r => Number(r.Target)||0);
-  const goods = reports.map(r => Number(r['Total Good'])||0);
-  const rejects = reports.map(r => Number(r['Total Reject'])||0);
-  const pallets = reports.map(r => Number(r['Total Pallets'])||0);
+  const targets = reports.map(r => safeNum(r.Target));
+  const goods = reports.map(r => safeNum(r['Total Good']));
+  const rejects = reports.map(r => safeNum(r['Total Reject']));
+  const pallets = reports.map(r => safeNum(r['Total Pallets']));
 
   dashCharts.push(new Chart(document.getElementById('dashChartByJob'), {
     type: 'bar',
@@ -5282,9 +5297,9 @@ function renderDashData(){
   reports.forEach(r => {
     const st = r.Station || (isEs?'Desconocido':'Unknown');
     if (!byStation[st]) byStation[st] = { target: 0, good: 0, reject: 0 };
-    byStation[st].target += Number(r.Target)||0;
-    byStation[st].good += Number(r['Total Good'])||0;
-    byStation[st].reject += Number(r['Total Reject'])||0;
+    byStation[st].target += safeNum(r.Target);
+    byStation[st].good += safeNum(r['Total Good']);
+    byStation[st].reject += safeNum(r['Total Reject']);
   });
   const stLabels = Object.keys(byStation);
   dashCharts.push(new Chart(document.getElementById('dashChartByStation'), {
@@ -5308,9 +5323,9 @@ function renderDashData(){
     if (!r.Timestamp) return;
     const dateKey = new Date(r.Timestamp).toISOString().slice(0,10);
     if (!byDate[dateKey]) byDate[dateKey] = { target: 0, good: 0, reject: 0 };
-    byDate[dateKey].target += Number(r.Target)||0;
-    byDate[dateKey].good += Number(r['Total Good'])||0;
-    byDate[dateKey].reject += Number(r['Total Reject'])||0;
+    byDate[dateKey].target += safeNum(r.Target);
+    byDate[dateKey].good += safeNum(r['Total Good']);
+    byDate[dateKey].reject += safeNum(r['Total Reject']);
   });
   const dateLabels = Object.keys(byDate).sort();
   dashCharts.push(new Chart(document.getElementById('dashChartByDate'), {
@@ -5461,9 +5476,9 @@ function exportToExcel(){
         [isEs?'Pzs/Caja':'Pieces/Box']: s.piecesPerBox || '',
         [isEs?'Cajas/Tarima':'Boxes/Pallet']: s.boxesPerPallet || '',
         [isEs?'Tarimas Necesarias':'Pallets Needed']: s.palletsNeeded || '',
-        [isEs?'Tarimas Producidas':'Pallets Produced']: Number(r['Total Pallets']||0),
-        [isEs?'Bueno Total':'Total Good']: Number(r['Total Good']||0),
-        [isEs?'Retenido Total':'Total Reject']: Number(r['Total Reject']||0),
+        [isEs?'Tarimas Producidas':'Pallets Produced']: safeNum(r['Total Pallets']),
+        [isEs?'Bueno Total':'Total Good']: safeNum(r['Total Good']),
+        [isEs?'Retenido Total':'Total Reject']: safeNum(r['Total Reject']),
         [isEs?'% Corto vs Meta':'% Short vs Target']: s.pctShortVsTarget,
         [isEs?'% Corto vs Meta+Overs':'% Short vs Target+Overs']: s.pctShortVsEffectiveTarget
       };
@@ -5479,6 +5494,26 @@ function exportToExcel(){
   });
 }
 
+/* Draws one KPI tile: a colored rounded-rect card with an icon, a big
+   number, and a label — the "dashboard card" look Anthony asked for
+   (matching the SlideEgg/SlideBazaar-style references), not a plain
+   centered number floating on a blank slide. */
+function _addKpiCard(slide, x, y, w, h, icon, value, label, color){
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.12, fill: { color: 'FFFFFF' }, line: { color: 'E5E5E5', width: 1 },
+    shadow: { type: 'outer', color: '000000', opacity: 0.12, blur: 6, offset: 2, angle: 90 } });
+  slide.addShape('roundRect', { x, y, w, h: 0.1, rectRadius: 0, fill: { color }, line: { type: 'none' } });
+  slide.addText(icon, { x, y: y + 0.22, w, h: 0.5, fontSize: 22, align: 'center' });
+  slide.addText(String(value), { x, y: y + 0.68, w, h: 0.62, fontSize: 30, bold: true, color: '0A0A0A', align: 'center' });
+  slide.addText(label, { x, y: y + h - 0.42, w, h: 0.36, fontSize: 11, color: '666666', align: 'center' });
+}
+
+/* Draws a section header bar for a chart panel — the small colored label
+   strip every card in the reference dashboards uses to title its content. */
+function _addPanelHeader(slide, x, y, w, title, color){
+  slide.addShape('roundRect', { x, y, w, h: 0.42, rectRadius: 0.08, fill: { color }, line: { type: 'none' } });
+  slide.addText(title, { x, y, w, h: 0.42, fontSize: 13, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
+}
+
 function exportToPowerPoint(){
   const isEs = document.body.classList.contains('es');
   const status = document.getElementById('exportStatus');
@@ -5489,25 +5524,30 @@ function exportToPowerPoint(){
   }
   status.textContent = isEs ? '⏳ Generando PowerPoint…' : '⏳ Generating PowerPoint…';
   _loadScriptOnce(PPTXGENJS_CDN_URL).then(() => {
-    // Summary/KPI-only deck (Anthony's choice) — a handful of slides with
-    // big numbers and a couple of breakdown charts, meant to be read by
-    // someone who'd never open the underlying spreadsheet.
+    // Summary/KPI-only deck (Anthony's choice) — a dashboard-style slide of
+    // big numbers and charts, meant to be read by someone who'd never open
+    // the underlying spreadsheet. Every total here is a SUM across reports,
+    // never an average of per-job percentages — a single old/corrupted
+    // Reports row (a real one exists: garbled Target/Total Pallets cells
+    // from a past sheet-schema mismatch, see safeNum()'s comment) can only
+    // ever contribute a bounded amount to a sum, whereas averaging ratios
+    // lets one bad row's absurd percentage dominate the whole result (this
+    // is exactly how a real export once showed "-131114.4%").
     const totals = reports.reduce((acc, r) => {
-      const s = getReportDerivedStats(r);
-      acc.good += Number(r['Total Good']||0);
-      acc.reject += Number(r['Total Reject']||0);
-      acc.pallets += Number(r['Total Pallets']||0);
-      acc.shortPct.push(s.pctShortVsTarget);
+      acc.good += safeNum(r['Total Good']);
+      acc.reject += safeNum(r['Total Reject']);
+      acc.pallets += safeNum(r['Total Pallets']);
+      acc.target += safeNum(r.Target);
       return acc;
-    }, { good:0, reject:0, pallets:0, shortPct:[] });
-    const avgShortPct = totals.shortPct.length ? Math.round((totals.shortPct.reduce((a,b)=>a+b,0)/totals.shortPct.length)*10)/10 : 0;
+    }, { good:0, reject:0, pallets:0, target:0 });
+    const fillRatePct = totals.target > 0 ? Math.round((totals.good / totals.target) * 1000) / 10 : 0;
 
     const byStation = {};
     reports.forEach(r => {
       const st = r.Station || (isEs?'Desconocido':'Unknown');
       if (!byStation[st]) byStation[st] = { good:0, target:0, jobs:0 };
-      byStation[st].good += Number(r['Total Good']||0);
-      byStation[st].target += Number(r.Target||0);
+      byStation[st].good += safeNum(r['Total Good']);
+      byStation[st].target += safeNum(r.Target);
       byStation[st].jobs++;
     });
 
@@ -5515,6 +5555,7 @@ function exportToPowerPoint(){
     const NAVY = '0A0A0A';
     const GOOD = '2E7D4F';
     const ACCENT = 'C8393A';
+    const AMBER = 'E8A020';
 
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name: 'MP', width: 13.33, height: 7.5 });
@@ -5523,6 +5564,7 @@ function exportToPowerPoint(){
     // Title slide
     let slide = pptx.addSlide();
     slide.background = { color: NAVY };
+    slide.addShape('rect', { x: 0, y: 3.9, w: 3.2, h: 0.12, fill: { color: PINK }, line: { type: 'none' } });
     slide.addText(isEs ? 'Reporte de Producción — Pegadora' : 'Gluer Shift Production Report', {
       x: 0.6, y: 2.6, w: 12, h: 1.2, fontSize: 36, bold: true, color: 'FFFFFF'
     });
@@ -5531,35 +5573,47 @@ function exportToPowerPoint(){
       ? `${f.dateFrom || (isEs?'Inicio':'Start')} → ${f.dateTo || (isEs?'Hoy':'Today')}`
       : (isEs ? 'Todo el historial' : 'All history');
     slide.addText(rangeLabel + ' · ' + reports.length + (isEs?' reportes':' reports'), {
-      x: 0.6, y: 3.7, w: 12, h: 0.6, fontSize: 18, color: PINK
+      x: 0.6, y: 4.15, w: 12, h: 0.6, fontSize: 18, color: PINK
     });
 
-    // KPI slide
+    // Dashboard slide — KPI card row + two chart panels, all on one slide
+    // (the "everything visible at a glance" look Anthony pointed to in the
+    // reference screenshots, rather than one plain number per slide).
     slide = pptx.addSlide();
-    slide.background = { color: 'FFFFFF' };
-    slide.addText(isEs ? 'Resumen' : 'Summary', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 28, bold: true, color: NAVY });
-    const kpis = [
-      [isEs?'Bueno Total':'Total Good', totals.good.toLocaleString(), GOOD],
-      [isEs?'Retenido Total':'Total Hold', totals.reject.toLocaleString(), ACCENT],
-      [isEs?'Tarimas Total':'Total Pallets', totals.pallets.toLocaleString(), NAVY],
-      [isEs?'% Corto Promedio vs Meta':'Avg % Short vs Target', avgShortPct + '%', PINK]
-    ];
-    kpis.forEach((k, i) => {
-      const x = 0.6 + (i % 2) * 6.2;
-      const y = 1.3 + Math.floor(i / 2) * 2.4;
-      slide.addText(k[1], { x, y, w: 5.8, h: 1.3, fontSize: 44, bold: true, color: k[2], align: 'center' });
-      slide.addText(k[0], { x, y: y + 1.3, w: 5.8, h: 0.5, fontSize: 14, color: NAVY, align: 'center' });
+    slide.background = { color: 'F5F5F3' };
+    slide.addText(isEs ? 'Panel de Producción' : 'Production Dashboard', { x: 0.5, y: 0.25, w: 12, h: 0.6, fontSize: 24, bold: true, color: NAVY });
+
+    const cardW = 2.92, cardGap = 0.18, cardY = 1.05, cardH = 1.55;
+    const cardX = i => 0.5 + i * (cardW + cardGap);
+    _addKpiCard(slide, cardX(0), cardY, cardW, cardH, '📦', totals.good.toLocaleString(), isEs?'Bueno Total':'Total Good', GOOD);
+    _addKpiCard(slide, cardX(1), cardY, cardW, cardH, '⚠️', totals.reject.toLocaleString(), isEs?'Retenido Total':'Total Hold', ACCENT);
+    _addKpiCard(slide, cardX(2), cardY, cardW, cardH, '🧱', totals.pallets.toLocaleString(), isEs?'Tarimas Total':'Total Pallets', NAVY);
+    _addKpiCard(slide, cardX(3), cardY, cardW, cardH, '🎯', fillRatePct + '%', isEs?'Tasa de Cumplimiento':'Overall Fill Rate', PINK);
+
+    // Left panel: Good vs Hold split (donut)
+    const panelY = 2.95, panelH = 4.15, panelW = 5.9;
+    _addPanelHeader(slide, 0.5, panelY, panelW, isEs?'Bueno vs Retenido':'Good vs Hold', GOOD);
+    slide.addChart(pptx.ChartType.doughnut, [
+      { name: isEs?'Piezas':'Pieces', labels: [isEs?'Bueno':'Good', isEs?'Retenido':'Hold'], values: [totals.good, totals.reject] }
+    ], {
+      x: 0.7, y: panelY + 0.55, w: panelW - 0.4, h: panelH - 0.75,
+      chartColors: [GOOD, ACCENT], showLegend: true, legendPos: 'b', showValue: false,
+      dataLabelColor: 'FFFFFF', showPercent: true, holeSize: 55
     });
 
-    // Station breakdown chart slide
+    // Right panel: Target vs Good by Station (bar)
+    const panel2X = 0.5 + panelW + 0.3;
+    const panel2W = 12.33 - panel2X - 0.5;
     if (Object.keys(byStation).length){
-      slide = pptx.addSlide();
-      slide.addText(isEs ? 'Meta vs Bueno por Estación' : 'Target vs Good by Station', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 24, bold: true, color: NAVY });
+      _addPanelHeader(slide, panel2X, panelY, panel2W, isEs?'Meta vs Bueno por Estación':'Target vs Good by Station', NAVY);
       const stationLabels = Object.keys(byStation);
       slide.addChart(pptx.ChartType.bar, [
         { name: isEs?'Meta':'Target', labels: stationLabels, values: stationLabels.map(s => byStation[s].target) },
         { name: isEs?'Bueno':'Good', labels: stationLabels, values: stationLabels.map(s => byStation[s].good) }
-      ], { x: 0.6, y: 1.2, w: 12, h: 5.5, barGrouping: 'clustered', chartColors: [NAVY, GOOD], showLegend: true, legendPos: 'b' });
+      ], { x: panel2X + 0.2, y: panelY + 0.55, w: panel2W - 0.4, h: panelH - 0.75, barGrouping: 'clustered', chartColors: [NAVY, GOOD], showLegend: true, legendPos: 'b' });
+    } else {
+      _addPanelHeader(slide, panel2X, panelY, panel2W, isEs?'Por Estación':'By Station', AMBER);
+      slide.addText(isEs?'Sin datos de estación.':'No station data.', { x: panel2X, y: panelY + 1.5, w: panel2W, h: 0.6, align: 'center', color: '888888', fontSize: 14 });
     }
 
     const filename = 'Gluer_Shift_Report_' + new Date().toISOString().slice(0,10) + '.pptx';
