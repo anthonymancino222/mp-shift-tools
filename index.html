@@ -913,10 +913,26 @@
   .export-filters{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
   .export-filter-row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
   .export-filter-row label{flex:1;min-width:130px;display:block;font-size:0.8rem;font-weight:700;color:var(--label-color);}
-  .export-filter-row input,.export-filter-row select{
+  .export-filter-row input{
     display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
     font-size:0.9rem;background:var(--input-bg);color:var(--text);box-sizing:border-box;
   }
+  /* Station/Pass/Shift/Overs pick from a small fixed set — same tappable
+     button-group pattern the rest of the app already uses for this exact
+     kind of choice (see .station-btn on the New Job form), not a native
+     <select>. Deliberate: a native <select> is literally never used
+     anywhere else in this app (see the Saved-job-picker comment further up)
+     for stylability reasons, and separately, Anthony hit a real Android
+     Chrome bug where these dropdowns opened as a blank gray strip with no
+     visible options — switching to buttons sidesteps that outright instead
+     of chasing a native-control rendering quirk. */
+  .export-choice-field{flex:1;min-width:130px;font-size:0.8rem;font-weight:700;color:var(--label-color);}
+  .export-choice-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+  .export-choice-btn{
+    padding:8px 12px;font-size:0.82rem;font-weight:700;border-radius:8px;
+    border:2px solid var(--navy);background:var(--card);color:var(--navy);cursor:pointer;
+  }
+  .export-choice-btn.selected{background:var(--navy);color:#fff;}
   .export-match-count{font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;text-align:center;}
   .export-btn{
     display:block;width:100%;margin-bottom:10px;padding:12px 14px;font-weight:800;font-size:0.95rem;
@@ -1573,33 +1589,41 @@
             <input type="time" id="exportTimeTo"></label>
         </div>
         <div class="export-filter-row">
-          <label><span data-en>Station</span><span data-es>Estación</span>
-            <select id="exportStationFilter">
-              <option value="" data-en="All Stations" data-es="Todas las Estaciones">All Stations</option>
-              <option value="Long Gluer" data-en="Long Gluer" data-es="Pegadora Larga">Long Gluer</option>
-              <option value="Short Gluer" data-en="Short Gluer" data-es="Pegadora Corta">Short Gluer</option>
-            </select></label>
-          <label><span data-en>Pass</span><span data-es>Pasada</span>
-            <select id="exportPassFilter">
-              <option value="" data-en="All Passes" data-es="Todas las Pasadas">All Passes</option>
-              <option value="1" data-en="1st Pass" data-es="1ra Pasada">1st Pass</option>
-              <option value="2" data-en="2nd Pass" data-es="2da Pasada">2nd Pass</option>
-              <option value="S" data-en="Single Pass" data-es="Pasada Única">Single Pass</option>
-            </select></label>
+          <div class="export-choice-field">
+            <span data-en>Station</span><span data-es>Estación</span>
+            <div class="export-choice-group" id="exportStationChoices">
+              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('station','',this)"><span data-en>All Stations</span><span data-es>Todas las Estaciones</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('station','Long Gluer',this)"><span data-en>Long Gluer</span><span data-es>Pegadora Larga</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('station','Short Gluer',this)"><span data-en>Short Gluer</span><span data-es>Pegadora Corta</span></button>
+            </div>
+          </div>
+          <div class="export-choice-field">
+            <span data-en>Pass</span><span data-es>Pasada</span>
+            <div class="export-choice-group" id="exportPassChoices">
+              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('pass','',this)"><span data-en>All Passes</span><span data-es>Todas las Pasadas</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('pass','1',this)"><span data-en>1st Pass</span><span data-es>1ra Pasada</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('pass','2',this)"><span data-en>2nd Pass</span><span data-es>2da Pasada</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('pass','S',this)"><span data-en>Single Pass</span><span data-es>Pasada Única</span></button>
+            </div>
+          </div>
         </div>
         <div class="export-filter-row">
-          <label><span data-en>Shift</span><span data-es>Turno</span>
-            <select id="exportShiftFilter">
-              <option value="" data-en="All Shifts" data-es="Todos los Turnos">All Shifts</option>
-              <option value="1" data-en="Shift 1" data-es="Turno 1">Shift 1</option>
-              <option value="2" data-en="Shift 2" data-es="Turno 2">Shift 2</option>
-            </select></label>
-          <label><span data-en>Overs</span><span data-es>Overs</span>
-            <select id="exportOversFilter">
-              <option value="" data-en="All Jobs" data-es="Todos los Trabajos">All Jobs</option>
-              <option value="yes" data-en="With Overs" data-es="Con Overs">With Overs</option>
-              <option value="no" data-en="No Overs" data-es="Sin Overs">No Overs</option>
-            </select></label>
+          <div class="export-choice-field">
+            <span data-en>Shift</span><span data-es>Turno</span>
+            <div class="export-choice-group" id="exportShiftChoices">
+              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('shift','',this)"><span data-en>All Shifts</span><span data-es>Todos los Turnos</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('shift','1',this)"><span data-en>Shift 1</span><span data-es>Turno 1</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('shift','2',this)"><span data-en>Shift 2</span><span data-es>Turno 2</span></button>
+            </div>
+          </div>
+          <div class="export-choice-field">
+            <span data-en>Overs</span><span data-es>Overs</span>
+            <div class="export-choice-group" id="exportOversChoices">
+              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('overs','',this)"><span data-en>All Jobs</span><span data-es>Todos los Trabajos</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('overs','yes',this)"><span data-en>With Overs</span><span data-es>Con Overs</span></button>
+              <button type="button" class="export-choice-btn" onclick="setExportFilter('overs','no',this)"><span data-en>No Overs</span><span data-es>Sin Overs</span></button>
+            </div>
+          </div>
         </div>
         <div class="export-filter-row">
           <label style="flex:1;"><span data-en>Job/PO or Product #</span><span data-es>Trabajo/OC o # Producto</span>
@@ -1815,13 +1839,6 @@ function toggleLang(){
   if (helpLangLabel) helpLangLabel.textContent = isEs ? 'English' : 'Español';
   document.querySelectorAll('[data-ph-en]').forEach(el=>{
     el.placeholder = isEs ? el.dataset.phEs : el.dataset.phEn;
-  });
-  // <option> text can't be wrapped in <span data-en>/<span data-es> like
-  // everything else (options only take plain text) — same idea as the
-  // placeholder swap just above, but reading data-en/data-es as VALUES
-  // rather than as presence-only markers.
-  document.querySelectorAll('option[data-en]').forEach(el=>{
-    el.textContent = isEs ? el.dataset.es : el.dataset.en;
   });
   // Static markup re-localizes automatically via the [data-en]/[data-es] CSS
   // rule, but text that was generated once in JS (status messages) doesn't —
@@ -5331,17 +5348,29 @@ function _loadScriptOnce(src){
   });
 }
 
+// Station/Pass/Shift/Overs state for the Export tab's button-group filters
+// (see setExportFilter() below) — not read from a <select> since this app
+// deliberately doesn't use native <select> anywhere (see the CSS comment
+// on .export-choice-field).
+let exportFilterState = { station:'', pass:'', shift:'', overs:'' };
+function setExportFilter(key, value, btnEl){
+  exportFilterState[key] = value;
+  btnEl.parentElement.querySelectorAll('.export-choice-btn').forEach(b => b.classList.remove('selected'));
+  btnEl.classList.add('selected');
+  updateExportMatchCount();
+}
+
 function getExportFilters(){
   return {
     dateFrom: document.getElementById('exportDateFrom').value || '',
     dateTo: document.getElementById('exportDateTo').value || '',
     timeFrom: document.getElementById('exportTimeFrom').value || '',
     timeTo: document.getElementById('exportTimeTo').value || '',
-    station: document.getElementById('exportStationFilter').value || '',
-    pass: document.getElementById('exportPassFilter').value || '',
-    shift: document.getElementById('exportShiftFilter').value || '',
+    station: exportFilterState.station,
+    pass: exportFilterState.pass,
+    shift: exportFilterState.shift,
     search: (document.getElementById('exportSearchInput').value || '').trim().toLowerCase(),
-    overs: document.getElementById('exportOversFilter').value || ''
+    overs: exportFilterState.overs
   };
 }
 
@@ -5399,8 +5428,10 @@ function updateExportMatchCount(){
 // export tap — lets a manager see "0 reports match" before wasting a click.
 // These inputs already exist in the DOM by the time this script runs (they
 // sit earlier in the HTML, above this <script> tag), so no need to wait
-// for any load event.
-['exportDateFrom','exportDateTo','exportTimeFrom','exportTimeTo','exportStationFilter','exportPassFilter','exportShiftFilter','exportSearchInput','exportOversFilter'].forEach(id => {
+// for any load event. Station/Pass/Shift/Overs aren't listed here — their
+// buttons already call updateExportMatchCount() directly via
+// setExportFilter().
+['exportDateFrom','exportDateTo','exportTimeFrom','exportTimeTo','exportSearchInput'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('input', updateExportMatchCount);
 });
