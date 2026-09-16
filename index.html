@@ -842,8 +842,13 @@
   }
   .dash-header h2{margin:0;font-size:1.2rem;}
   .dash-close{background:transparent;border:2px solid #fff;color:#fff;border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer;}
-  .dash-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px;max-width:900px;margin:0 auto;}
+  .dash-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;max-width:900px;margin:0 auto;}
   .dash-tab{padding:12px 8px;font-weight:800;border-radius:10px;border:3px solid var(--navy);background:var(--card);color:var(--navy);font-size:0.95rem;cursor:pointer;}
+  /* 4 equal tabs get tight on a phone-width screen — 2x2 keeps each tab's
+     label readable instead of squeezing all four into one row. */
+  @media (max-width:520px){
+    .dash-tabs{grid-template-columns:1fr 1fr;}
+  }
   .dash-tab.active{background:var(--navy);color:#fff;}
   .dash-body{max-width:900px;margin:0 auto;padding:0 12px 24px;}
   .dash-tab-explainer{font-size:0.82rem;color:var(--text-secondary);background:var(--pink-soft);border-radius:8px;padding:8px 12px;margin-bottom:10px;line-height:1.4;}
@@ -1560,8 +1565,8 @@
           <label><span data-en>Station</span><span data-es>Estación</span>
             <select id="exportStationFilter">
               <option value="" data-en="All Stations" data-es="Todas las Estaciones">All Stations</option>
-              <option value="Long Gluer">Long Gluer</option>
-              <option value="Short Gluer">Short Gluer</option>
+              <option value="Long Gluer" data-en="Long Gluer" data-es="Pegadora Larga">Long Gluer</option>
+              <option value="Short Gluer" data-en="Short Gluer" data-es="Pegadora Corta">Short Gluer</option>
             </select></label>
           <label><span data-en>Pass</span><span data-es>Pasada</span>
             <select id="exportPassFilter">
@@ -1819,6 +1824,11 @@ function toggleLang(){
   // The History tab's year/month nav labels are JS-generated too (like the
   // above), so they'd stay stuck in the old language without this.
   if (dashData) renderDashboard();
+  // The Export tab's match-count line is also JS-generated (renderDashboard()
+  // doesn't cover it — its filter inputs are static markup, only this one
+  // line of text is written by JS) and would otherwise stay stuck in
+  // whatever language it was last rendered in.
+  if (dashTab === 'export') updateExportMatchCount();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -2929,6 +2939,28 @@ function effectiveTargetFor(job){
   const base = job.target || 0;
   const oversPercent = job.oversPercent || 0;
   return oversPercent > 0 ? Math.round(base * (1 + oversPercent / 100)) : base;
+}
+
+/* Single source of truth for the "extra History fields" math (Anthony,
+   2026-09-16) — used both when a job FINISHES (sendReport(), computing
+   fresh values to send) and when reading a Reports row back later
+   (getReportDerivedStats(), falling back to this for any older row that
+   predates these columns). Keeping this in one place means a future tweak
+   to the rounding/target-vs-effective-target logic can't silently drift
+   between what gets sent and what gets displayed. */
+function computeShortfallStats(target, totalGood, effectiveTarget, piecesPerBox, boxesPerPallet){
+  const piecesPerPalletUnit = piecesPerBox * boxesPerPallet;
+  // Measured against the EFFECTIVE target (target + overs) — that's the
+  // real production goal once overs are added on top, not just the number
+  // typed into the New Job form before overs.
+  const palletsNeeded = piecesPerPalletUnit > 0 ? Math.ceil(effectiveTarget / piecesPerPalletUnit) : 0;
+  // Positive = short of that target; negative = exceeded it. Guarded
+  // against a 0 target/effective-target (division by zero) — shouldn't
+  // happen (createJob() requires target > 0) but a discovered/reopened job
+  // built from bad data could still have one.
+  const pctShortVsTarget = target > 0 ? Math.round(((target - totalGood) / target) * 1000) / 10 : 0;
+  const pctShortVsEffectiveTarget = effectiveTarget > 0 ? Math.round(((effectiveTarget - totalGood) / effectiveTarget) * 1000) / 10 : 0;
+  return { piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget };
 }
 // Just the per-box count (not the full pallet count) — Partial Pallet uses
 // this alone, since a split-shipment's last pallet is counted in boxes
@@ -4085,17 +4117,8 @@ function sendReport(){
   // through the raw Shift Log by hand.
   const piecesPerBox = (job.palletConfig && job.palletConfig.piecesPerBox) || 0;
   const boxesPerPallet = (job.palletConfig && job.palletConfig.boxesPerPallet) || 0;
-  const piecesPerPalletUnit = piecesPerBox * boxesPerPallet;
-  // Measured against the EFFECTIVE target (target + overs) — that's the
-  // real production goal once overs are added on top, not just the number
-  // typed into the New Job form before overs.
-  const palletsNeeded = piecesPerPalletUnit > 0 ? Math.ceil(jobEffectiveTarget / piecesPerPalletUnit) : 0;
-  // Positive = short of that target; negative = exceeded it. Guarded
-  // against a 0 target/effective-target (division by zero) — shouldn't
-  // happen (createJob() requires target > 0) but a discovered/reopened job
-  // built from bad data could still have one.
-  const pctShortVsTarget = job.target > 0 ? Math.round(((job.target - totalGood) / job.target) * 1000) / 10 : 0;
-  const pctShortVsEffectiveTarget = jobEffectiveTarget > 0 ? Math.round(((jobEffectiveTarget - totalGood) / jobEffectiveTarget) * 1000) / 10 : 0;
+  const { piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget } =
+    computeShortfallStats(job.target || 0, totalGood, jobEffectiveTarget, piecesPerBox, boxesPerPallet);
   // Every distinct shift that actually logged a count on this job (a job
   // can span both shifts over multiple days), in first-seen order.
   const shiftsInvolved = [...new Set(sorted.map(e => e.shift === '2' ? '2' : '1'))];
@@ -5048,16 +5071,15 @@ function getReportDerivedStats(r){
   const effectiveTarget = Number(r.EffectiveTarget) || (oversPercent > 0 ? Math.round(target * (1 + oversPercent/100)) : target);
   const piecesPerBox = Number(r.PiecesPerBox) || 0;
   const boxesPerPallet = Number(r.BoxesPerPallet) || 0;
-  const piecesPerPalletUnit = piecesPerBox * boxesPerPallet;
-  const palletsNeeded = Number(r.PalletsNeeded) || (piecesPerPalletUnit > 0 ? Math.ceil(effectiveTarget / piecesPerPalletUnit) : 0);
-  const pctShortVsTarget = (r.PctShortVsTarget !== '' && r.PctShortVsTarget != null)
-    ? Number(r.PctShortVsTarget)
-    : (target > 0 ? Math.round(((target - totalGood) / target) * 1000) / 10 : 0);
-  const pctShortVsEffectiveTarget = (r.PctShortVsEffectiveTarget !== '' && r.PctShortVsEffectiveTarget != null)
-    ? Number(r.PctShortVsEffectiveTarget)
-    : (effectiveTarget > 0 ? Math.round(((effectiveTarget - totalGood) / effectiveTarget) * 1000) / 10 : 0);
+  const computed = computeShortfallStats(target, totalGood, effectiveTarget, piecesPerBox, boxesPerPallet);
+  // Prefer whatever the backend already stored for this row (set once when
+  // the job finished) over recomputing — only a report sent BEFORE these
+  // columns existed needs the fallback computed just above.
+  const palletsNeeded = Number(r.PalletsNeeded) || computed.palletsNeeded;
+  const pctShortVsTarget = (r.PctShortVsTarget !== '' && r.PctShortVsTarget != null) ? Number(r.PctShortVsTarget) : computed.pctShortVsTarget;
+  const pctShortVsEffectiveTarget = (r.PctShortVsEffectiveTarget !== '' && r.PctShortVsEffectiveTarget != null) ? Number(r.PctShortVsEffectiveTarget) : computed.pctShortVsEffectiveTarget;
   const shifts = String(r.Shifts || '').split(',').map(s => s.trim()).filter(Boolean);
-  return { target, totalGood, oversPercent, effectiveTarget, piecesPerBox, boxesPerPallet, piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget, shifts };
+  return { target, totalGood, oversPercent, effectiveTarget, piecesPerBox, boxesPerPallet, piecesPerPalletUnit: computed.piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget, shifts };
 }
 
 function renderHistoryExtraDetails(r, isEs){
@@ -5415,11 +5437,9 @@ function exportToPowerPoint(){
       acc.good += Number(r['Total Good']||0);
       acc.reject += Number(r['Total Reject']||0);
       acc.pallets += Number(r['Total Pallets']||0);
-      acc.target += s.target;
-      acc.effectiveTarget += s.effectiveTarget;
       acc.shortPct.push(s.pctShortVsTarget);
       return acc;
-    }, { good:0, reject:0, pallets:0, target:0, effectiveTarget:0, shortPct:[] });
+    }, { good:0, reject:0, pallets:0, shortPct:[] });
     const avgShortPct = totals.shortPct.length ? Math.round((totals.shortPct.reduce((a,b)=>a+b,0)/totals.shortPct.length)*10)/10 : 0;
 
     const byStation = {};
