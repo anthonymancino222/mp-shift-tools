@@ -1667,6 +1667,53 @@ function forceUpdateApp(){
   location.href = url.toString();
 }
 
+// Cheap non-cryptographic hash (djb2-ish) — plenty for "did this text change
+// since last time," and far lighter than storing/comparing the full ~300KB
+// page text in localStorage on every check.
+function _simpleHash(str){
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return hash.toString(36);
+}
+var APP_VERSION_HASH_KEY = 'gluer-app-version-hash';
+
+/* Checks whether the deployed index.html has actually changed since the
+   last time this ran, and force-reloads (see forceUpdateApp) ONLY if it
+   has — never unconditionally. Wired into the Sync Gate's "Sync Now"
+   (syncGateAttempt below) per Anthony's request that syncing also pick up
+   the latest app version, but deliberately NOT into any background/
+   periodic sync (_syncTick/_discoveryTick) — an unannounced reload while
+   someone's mid-typing a count or a new job's fields would discard input
+   that hasn't been submitted into `jobs` yet, even though already-synced
+   data itself would survive fine (see forceUpdateApp's own comment).
+   Resolves true if a reload was just triggered (caller should stop —
+   the page is navigating away) or false if already current (caller
+   proceeds exactly as before; this is the common case, so ordinary Sync
+   Now behavior is unchanged whenever no update is actually pending).
+   Fails soft (resolves false) if offline/blocked — a failed version check
+   should never be the reason a sync attempt appears to fail. */
+function _checkForAppUpdateAndReloadIfNeeded(){
+  return fetch(location.pathname, { cache: 'no-store' })
+    .then(function(res){ return res.text(); })
+    .then(function(html){
+      var freshHash = _simpleHash(html);
+      var lastKnown = null;
+      try { lastKnown = localStorage.getItem(APP_VERSION_HASH_KEY); } catch(e){}
+      try { localStorage.setItem(APP_VERSION_HASH_KEY, freshHash); } catch(e){}
+      // No stored hash yet (first time this check has ever run on this
+      // device) — just record the current one as the baseline rather than
+      // reloading; there's nothing meaningful to compare against yet.
+      if (lastKnown && lastKnown !== freshHash) {
+        forceUpdateApp();
+        return true;
+      }
+      return false;
+    })
+    .catch(function(){ return false; });
+}
+
 function toggleLang(){
   document.body.classList.toggle('es');
   const isEs = document.body.classList.contains('es');
@@ -2182,20 +2229,31 @@ function syncGateAttempt(){
   btn.disabled = true;
   btn.textContent = isEs ? '⏳ Sincronizando…' : '⏳ Syncing…';
   Promise.all([retryPendingSyncs(), syncActiveEntries(true)]).then(() => {
-    renderGlobalSyncStatus();
-    btn.disabled = false;
-    btn.innerHTML = '🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span>';
-    const pending = currentJobId && jobs[currentJobId] ? pendingCountForJob(jobs[currentJobId]) : 0;
-    const msgEl = document.getElementById('syncGateMsg');
-    if (pending === 0){
-      msgEl.textContent = isEs ? '✅ ¡Todo sincronizado!' : '✅ All synced!';
-      syncGateContinue(); // fully synced — no need to make them tap again
-    } else {
-      msgEl.textContent = isEs
-        ? `⚠ Aún ${pending} sin sincronizar (sin conexión). Puede continuar — se seguirá intentando automáticamente en segundo plano.`
-        : `⚠ Still ${pending} not synced (no connection). You can continue — it'll keep retrying automatically in the background.`;
-      document.getElementById('syncGateContinueBtn').style.display = 'block';
-    }
+    // Piggybacks the app-update check on "Sync Now" — see
+    // _checkForAppUpdateAndReloadIfNeeded's own comment. If it finds a real
+    // update, it reloads the page right here and resolves true; everything
+    // below (status text, syncGateContinue) never runs in that case since
+    // the page is already navigating away, which is fine — there's nothing
+    // left here to update once the fresh page loads. If there's no update
+    // (the common case), it resolves false and everything below runs
+    // exactly as it always has.
+    return _checkForAppUpdateAndReloadIfNeeded().then(function(reloading){
+      if (reloading) return;
+      renderGlobalSyncStatus();
+      btn.disabled = false;
+      btn.innerHTML = '🔄 <span data-en>Sync Now</span><span data-es>Sincronizar Ahora</span>';
+      const pending = currentJobId && jobs[currentJobId] ? pendingCountForJob(jobs[currentJobId]) : 0;
+      const msgEl = document.getElementById('syncGateMsg');
+      if (pending === 0){
+        msgEl.textContent = isEs ? '✅ ¡Todo sincronizado!' : '✅ All synced!';
+        syncGateContinue(); // fully synced — no need to make them tap again
+      } else {
+        msgEl.textContent = isEs
+          ? `⚠ Aún ${pending} sin sincronizar (sin conexión). Puede continuar — se seguirá intentando automáticamente en segundo plano.`
+          : `⚠ Still ${pending} not synced (no connection). You can continue — it'll keep retrying automatically in the background.`;
+        document.getElementById('syncGateContinueBtn').style.display = 'block';
+      }
+    });
   });
 }
 
