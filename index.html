@@ -5498,11 +5498,36 @@ function exportToExcel(){
    number, and a label — the "dashboard card" look Anthony asked for
    (matching the SlideEgg/SlideBazaar-style references), not a plain
    centered number floating on a blank slide. */
-function _addKpiCard(slide, x, y, w, h, icon, value, label, color){
+/* Flat line-icon glyphs drawn from plain shapes — NOT emoji. Anthony:
+   "can the icons be more like tech icons, not realistic rendition" — an
+   emoji renders as a small colorful illustration (varies by OS/font too),
+   which reads as decorative rather than a dashboard icon. These are single-
+   color outline shapes instead, the same visual language as any flat-icon
+   dashboard (a status ring, a caution triangle, stacked layers, a target).
+   Each is centered at (cx, cy) inside a `size`-inch square. */
+function _addIcon(slide, type, cx, cy, size, color){
+  const half = size / 2;
+  if (type === 'circle'){
+    slide.addShape('ellipse', { x: cx-half, y: cy-half, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.5 } });
+  } else if (type === 'triangle'){
+    slide.addShape('triangle', { x: cx-half, y: cy-half, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.5 } });
+    slide.addShape('ellipse', { x: cx-0.028, y: cy+half*0.32, w: 0.056, h: 0.056, fill: { color }, line: { type: 'none' } });
+  } else if (type === 'layers'){
+    const s = size * 0.62;
+    slide.addShape('roundRect', { x: cx-s/2-0.09, y: cy-s/2+0.09, w: s, h: s, rectRadius: 0.03, fill: { type: 'none' }, line: { color, width: 2.2 } });
+    slide.addShape('roundRect', { x: cx-s/2+0.09, y: cy-s/2-0.09, w: s, h: s, rectRadius: 0.03, fill: { color: 'FFFFFF' }, line: { color, width: 2.2 } });
+  } else if (type === 'target'){
+    slide.addShape('ellipse', { x: cx-half, y: cy-half, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.2 } });
+    slide.addShape('ellipse', { x: cx-half*0.55, y: cy-half*0.55, w: size*0.55, h: size*0.55, fill: { type: 'none' }, line: { color, width: 2.2 } });
+    slide.addShape('ellipse', { x: cx-size*0.06, y: cy-size*0.06, w: size*0.12, h: size*0.12, fill: { color }, line: { type: 'none' } });
+  }
+}
+
+function _addKpiCard(slide, x, y, w, h, iconType, value, label, color){
   slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.12, fill: { color: 'FFFFFF' }, line: { color: 'E5E5E5', width: 1 },
     shadow: { type: 'outer', color: '000000', opacity: 0.12, blur: 6, offset: 2, angle: 90 } });
   slide.addShape('roundRect', { x, y, w, h: 0.1, rectRadius: 0, fill: { color }, line: { type: 'none' } });
-  slide.addText(icon, { x, y: y + 0.22, w, h: 0.5, fontSize: 22, align: 'center' });
+  _addIcon(slide, iconType, x + w/2, y + 0.5, 0.34, color);
   slide.addText(String(value), { x, y: y + 0.68, w, h: 0.62, fontSize: 30, bold: true, color: '0A0A0A', align: 'center' });
   slide.addText(label, { x, y: y + h - 0.42, w, h: 0.36, fontSize: 11, color: '666666', align: 'center' });
 }
@@ -5585,10 +5610,10 @@ function exportToPowerPoint(){
 
     const cardW = 2.92, cardGap = 0.18, cardY = 1.05, cardH = 1.55;
     const cardX = i => 0.5 + i * (cardW + cardGap);
-    _addKpiCard(slide, cardX(0), cardY, cardW, cardH, '📦', totals.good.toLocaleString(), isEs?'Bueno Total':'Total Good', GOOD);
-    _addKpiCard(slide, cardX(1), cardY, cardW, cardH, '⚠️', totals.reject.toLocaleString(), isEs?'Retenido Total':'Total Hold', ACCENT);
-    _addKpiCard(slide, cardX(2), cardY, cardW, cardH, '🧱', totals.pallets.toLocaleString(), isEs?'Tarimas Total':'Total Pallets', NAVY);
-    _addKpiCard(slide, cardX(3), cardY, cardW, cardH, '🎯', fillRatePct + '%', isEs?'Tasa de Cumplimiento':'Overall Fill Rate', PINK);
+    _addKpiCard(slide, cardX(0), cardY, cardW, cardH, 'circle', totals.good.toLocaleString(), isEs?'Bueno Total':'Total Good', GOOD);
+    _addKpiCard(slide, cardX(1), cardY, cardW, cardH, 'triangle', totals.reject.toLocaleString(), isEs?'Retenido Total':'Total Hold', ACCENT);
+    _addKpiCard(slide, cardX(2), cardY, cardW, cardH, 'layers', totals.pallets.toLocaleString(), isEs?'Tarimas Total':'Total Pallets', NAVY);
+    _addKpiCard(slide, cardX(3), cardY, cardW, cardH, 'target', fillRatePct + '%', isEs?'Tasa de Cumplimiento':'Overall Fill Rate', PINK);
 
     // Left panel: Good vs Hold split (donut)
     const panelY = 2.95, panelH = 4.15, panelW = 5.9;
