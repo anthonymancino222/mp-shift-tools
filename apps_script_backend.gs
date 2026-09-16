@@ -200,21 +200,27 @@ function doPostLocked(e) {
 
     // ---- Final report ("Finish, Send Report") ----
     var reportsSheet = ss.getSheets()[0];
-    if (reportsSheet.getLastRow() === 0) {
-      reportsSheet.appendRow(['Timestamp', 'PO', 'Product', 'Station', 'Target', 'Total Good', 'Total Reject', 'Total Pallets', 'Full Log', 'Pass']);
-    }
-    reportsSheet.appendRow([
-      new Date(),
-      data.po,
-      data.product,
-      data.station,
-      data.target,
-      data.totalGood,
-      data.totalReject,
-      data.totalPallets,
-      data.fullLog,
-      data.pass || ''
-    ]);
+    ensureReportsHeaders(reportsSheet);
+    appendRowByHeaders(reportsSheet, {
+      'Timestamp': new Date(),
+      'PO': data.po,
+      'Product': data.product,
+      'Station': data.station,
+      'Target': data.target,
+      'Total Good': data.totalGood,
+      'Total Reject': data.totalReject,
+      'Total Pallets': data.totalPallets,
+      'Full Log': data.fullLog,
+      'Pass': data.pass || '',
+      'OversPercent': data.oversPercent || 0,
+      'EffectiveTarget': data.effectiveTarget || data.target || 0,
+      'PiecesPerBox': data.piecesPerBox || '',
+      'BoxesPerPallet': data.boxesPerPallet || '',
+      'PalletsNeeded': data.palletsNeeded || '',
+      'PctShortVsTarget': data.pctShortVsTarget,
+      'PctShortVsEffectiveTarget': data.pctShortVsEffectiveTarget,
+      'Shifts': data.shifts || ''
+    });
 
     // Job is done — drop it out of the live "still active" list on every
     // device. Pass is included: a PO's 1st Pass and 2nd Pass run are now
@@ -246,22 +252,34 @@ function doPostLocked(e) {
 function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var reportsSheet = ss.getSheets()[0];
     var activeSheet = ss.getSheetByName('ActiveEntries');
-
     var palletsSheet = ss.getSheetByName('Pallets');
     var notesSheet = ss.getSheetByName('Notes');
-    var presetsSheet = ss.getSheetByName('PalletPresets');
+
+    var result = {
+      result: 'success',
+      active: activeSheet ? sheetToObjects(activeSheet) : [],
+      pallets: palletsSheet ? sheetToObjects(palletsSheet) : [],
+      notes: notesSheet ? sheetToObjects(notesSheet) : []
+    };
+
+    // "fast" mode (see fetchLive() in index.html) — the Live Jobs tab only
+    // ever reads active/pallets/notes above, never Reports or PalletPresets,
+    // so skip both here. Reports in particular grows by one row every time
+    // ANY job finishes, forever — reading it in full on every poll is what
+    // makes a short interval expensive; this lets the Dashboard poll Live
+    // Jobs every ~25s (Anthony wants a new job visible within 30s) without
+    // that cost scaling with all-time history. A plain (non-fast) call
+    // still returns everything, unchanged, for History/Data/exports.
+    if (!(e && e.parameter && e.parameter.fast === '1')) {
+      var reportsSheet = ss.getSheets()[0];
+      var presetsSheet = ss.getSheetByName('PalletPresets');
+      result.reports = sheetToObjects(reportsSheet);
+      result.palletPresets = presetsSheet ? sheetToObjects(presetsSheet) : [];
+    }
 
     return ContentService
-      .createTextOutput(JSON.stringify({
-        result: 'success',
-        reports: sheetToObjects(reportsSheet),
-        active: activeSheet ? sheetToObjects(activeSheet) : [],
-        pallets: palletsSheet ? sheetToObjects(palletsSheet) : [],
-        notes: notesSheet ? sheetToObjects(notesSheet) : [],
-        palletPresets: presetsSheet ? sheetToObjects(presetsSheet) : []
-      }))
+      .createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
@@ -477,6 +495,43 @@ function sheetToObjects(sheet) {
     headers.forEach(function (h, i) { obj[h] = row[i]; });
     return obj;
   });
+}
+
+// The Reports sheet's full column list — as of 2026-09-16 this includes the
+// extra history fields (packing setup, pallets needed, shortfall %, shifts)
+// Anthony asked to have captured alongside every finished job. Real
+// production history already exists under just the first 10 of these
+// columns; ensureReportsHeaders() appends whichever of the rest are still
+// missing to the END of row 1, exactly once, and never touches/reorders any
+// existing header — sheetToObjects() maps by header NAME, not position, so
+// old rows simply read back blank for the new ones, no migration needed.
+var REPORTS_HEADERS = ['Timestamp', 'PO', 'Product', 'Station', 'Target', 'Total Good', 'Total Reject', 'Total Pallets', 'Full Log', 'Pass',
+  'OversPercent', 'EffectiveTarget', 'PiecesPerBox', 'BoxesPerPallet', 'PalletsNeeded', 'PctShortVsTarget', 'PctShortVsEffectiveTarget', 'Shifts'];
+function ensureReportsHeaders(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(REPORTS_HEADERS);
+    return;
+  }
+  var lastCol = sheet.getLastColumn();
+  var existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var have = {};
+  existing.forEach(function (h) { have[h] = true; });
+  var missing = REPORTS_HEADERS.filter(function (h) { return !have[h]; });
+  if (missing.length) {
+    sheet.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
+  }
+}
+
+// Appends one row built from a {headerName: value} map, in whatever column
+// order the sheet's OWN header row currently has — safer than a fixed
+// positional array once a sheet's columns can grow over time (see
+// ensureReportsHeaders above). Any header the map doesn't mention is left
+// blank for that row.
+function appendRowByHeaders(sheet, valuesByHeader) {
+  var lastCol = sheet.getLastColumn();
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var row = headerRow.map(function (h) { return (h in valuesByHeader) ? valuesByHeader[h] : ''; });
+  sheet.appendRow(row);
 }
 
 function success() {

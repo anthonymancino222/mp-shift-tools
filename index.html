@@ -885,9 +885,32 @@
   .dash-reopen-job-btn:active{background:var(--good);color:#fff;}
   .dash-log-body{margin-top:8px;display:none;}
   .dash-log-body.open{display:block;}
+  .dash-history-details{background:var(--row-bg);border-radius:8px;padding:8px 10px;}
+  .dash-history-detail-row{display:flex;justify-content:space-between;gap:10px;font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);}
+  .dash-history-detail-row:last-child{border-bottom:none;}
+  .dash-history-detail-row span{color:var(--text-secondary);}
+  .dash-history-detail-row b{text-align:right;color:var(--navy);}
   .dash-chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;}
   .dash-chart-wrap h3{margin:0 0 10px;font-size:1rem;color:var(--navy);}
   .dash-empty{text-align:center;color:var(--text-tertiary);padding:30px 10px;}
+
+  .export-filters{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .export-filter-row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .export-filter-row label{flex:1;min-width:130px;display:block;font-size:0.8rem;font-weight:700;color:var(--label-color);}
+  .export-filter-row input,.export-filter-row select{
+    display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+    font-size:0.9rem;background:var(--input-bg);color:var(--text);box-sizing:border-box;
+  }
+  .export-match-count{font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px;text-align:center;}
+  .export-btn{
+    display:block;width:100%;margin-bottom:10px;padding:12px 14px;font-weight:800;font-size:0.95rem;
+    border-radius:10px;cursor:pointer;border:none;
+  }
+  .export-btn-excel{background:var(--good);color:#fff;}
+  .export-btn-excel:active{background:var(--good-light);}
+  .export-btn-pptx{background:var(--navy);color:#fff;}
+  .export-btn-pptx:active{background:var(--navy-light);}
+  .export-status{text-align:center;font-size:0.85rem;color:var(--text-secondary);min-height:1.2em;}
 
   [data-es]{display:none;}
   body.es [data-en]{display:none;}
@@ -1498,6 +1521,7 @@
     <button class="dash-tab active" id="dashTabHistoryBtn" onclick="setDashTab('history')"><span data-en>History</span><span data-es>Historial</span></button>
     <button class="dash-tab" id="dashTabLiveBtn" onclick="setDashTab('live')"><span data-en>Live Jobs</span><span data-es>Trabajos Activos</span></button>
     <button class="dash-tab" id="dashTabDataBtn" onclick="setDashTab('data')"><span data-en>Data</span><span data-es>Datos</span></button>
+    <button class="dash-tab" id="dashTabExportBtn" onclick="setDashTab('export')"><span data-en>Export</span><span data-es>Exportar</span></button>
   </div>
   <div class="dash-body">
     <div class="dash-tab-explainer" id="dashTabExplainer">
@@ -1518,6 +1542,59 @@
     </div>
     <div id="dashTabLive" style="display:none;"></div>
     <div id="dashTabData" style="display:none;"></div>
+    <div id="dashTabExport" style="display:none;">
+      <div class="export-filters">
+        <div class="export-filter-row">
+          <label><span data-en>Date From</span><span data-es>Fecha Desde</span>
+            <input type="date" id="exportDateFrom"></label>
+          <label><span data-en>Date To</span><span data-es>Fecha Hasta</span>
+            <input type="date" id="exportDateTo"></label>
+        </div>
+        <div class="export-filter-row">
+          <label><span data-en>Time From (optional)</span><span data-es>Hora Desde (opcional)</span>
+            <input type="time" id="exportTimeFrom"></label>
+          <label><span data-en>Time To (optional)</span><span data-es>Hora Hasta (opcional)</span>
+            <input type="time" id="exportTimeTo"></label>
+        </div>
+        <div class="export-filter-row">
+          <label><span data-en>Station</span><span data-es>Estación</span>
+            <select id="exportStationFilter">
+              <option value="" data-en="All Stations" data-es="Todas las Estaciones">All Stations</option>
+              <option value="Long Gluer">Long Gluer</option>
+              <option value="Short Gluer">Short Gluer</option>
+            </select></label>
+          <label><span data-en>Pass</span><span data-es>Pasada</span>
+            <select id="exportPassFilter">
+              <option value="" data-en="All Passes" data-es="Todas las Pasadas">All Passes</option>
+              <option value="1" data-en="1st Pass" data-es="1ra Pasada">1st Pass</option>
+              <option value="2" data-en="2nd Pass" data-es="2da Pasada">2nd Pass</option>
+              <option value="S" data-en="Single Pass" data-es="Pasada Única">Single Pass</option>
+            </select></label>
+        </div>
+        <div class="export-filter-row">
+          <label><span data-en>Shift</span><span data-es>Turno</span>
+            <select id="exportShiftFilter">
+              <option value="" data-en="All Shifts" data-es="Todos los Turnos">All Shifts</option>
+              <option value="1" data-en="Shift 1" data-es="Turno 1">Shift 1</option>
+              <option value="2" data-en="Shift 2" data-es="Turno 2">Shift 2</option>
+            </select></label>
+          <label><span data-en>Overs</span><span data-es>Overs</span>
+            <select id="exportOversFilter">
+              <option value="" data-en="All Jobs" data-es="Todos los Trabajos">All Jobs</option>
+              <option value="yes" data-en="With Overs" data-es="Con Overs">With Overs</option>
+              <option value="no" data-en="No Overs" data-es="Sin Overs">No Overs</option>
+            </select></label>
+        </div>
+        <div class="export-filter-row">
+          <label style="flex:1;"><span data-en>Job/PO or Product #</span><span data-es>Trabajo/OC o # Producto</span>
+            <input type="text" id="exportSearchInput" data-ph-en="Optional…" data-ph-es="Opcional…" placeholder="Optional…"></label>
+        </div>
+      </div>
+      <div id="exportMatchCount" class="export-match-count"></div>
+      <button class="export-btn export-btn-excel" onclick="exportToExcel()">📊 <span data-en>Export to Excel</span><span data-es>Exportar a Excel</span></button>
+      <button class="export-btn export-btn-pptx" onclick="exportToPowerPoint()">📽️ <span data-en>Export to PowerPoint</span><span data-es>Exportar a PowerPoint</span></button>
+      <div id="exportStatus" class="export-status"></div>
+    </div>
   </div>
 </div>
 
@@ -1722,6 +1799,13 @@ function toggleLang(){
   if (helpLangLabel) helpLangLabel.textContent = isEs ? 'English' : 'Español';
   document.querySelectorAll('[data-ph-en]').forEach(el=>{
     el.placeholder = isEs ? el.dataset.phEs : el.dataset.phEn;
+  });
+  // <option> text can't be wrapped in <span data-en>/<span data-es> like
+  // everything else (options only take plain text) — same idea as the
+  // placeholder swap just above, but reading data-en/data-es as VALUES
+  // rather than as presence-only markers.
+  document.querySelectorAll('option[data-en]').forEach(el=>{
+    el.textContent = isEs ? el.dataset.es : el.dataset.en;
   });
   // Static markup re-localizes automatically via the [data-en]/[data-es] CSS
   // rule, but text that was generated once in JS (status messages) doesn't —
@@ -3461,8 +3545,8 @@ function pushLivePallet(job, pallet){
    stale response here silently hides other devices' entries. cache:'no-store'
    plus a cache-busting query param covers both the browser's own cache and
    any intermediate cache that ignores Cache-Control. */
-function fetchLive(){
-  const bust = REPORT_ENDPOINT_URL + (REPORT_ENDPOINT_URL.includes('?') ? '&' : '?') + '_=' + Date.now();
+function fetchLive(fast){
+  const bust = REPORT_ENDPOINT_URL + (REPORT_ENDPOINT_URL.includes('?') ? '&' : '?') + '_=' + Date.now() + (fast ? '&fast=1' : '');
   return fetchWithTimeout(bust, { method: 'GET', cache: 'no-store' }).then(res => res.json());
 }
 
@@ -3994,7 +4078,39 @@ function sendReport(){
   const oversLine = jobOversPercent > 0
     ? `Overs: ${jobOversPercent}% (${jobEffectiveTarget.toLocaleString()} total incl. overs)\n`
     : '';
-  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nQuantity to Produce: ${job.target || 'N/A'}\n${oversLine}\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
+
+  // Extra History fields (Anthony, 2026-09-16): what got chosen at Packing
+  // Setup, and how the finished counts actually landed relative to target —
+  // captured here so History/exports can show it without anyone digging
+  // through the raw Shift Log by hand.
+  const piecesPerBox = (job.palletConfig && job.palletConfig.piecesPerBox) || 0;
+  const boxesPerPallet = (job.palletConfig && job.palletConfig.boxesPerPallet) || 0;
+  const piecesPerPalletUnit = piecesPerBox * boxesPerPallet;
+  // Measured against the EFFECTIVE target (target + overs) — that's the
+  // real production goal once overs are added on top, not just the number
+  // typed into the New Job form before overs.
+  const palletsNeeded = piecesPerPalletUnit > 0 ? Math.ceil(jobEffectiveTarget / piecesPerPalletUnit) : 0;
+  // Positive = short of that target; negative = exceeded it. Guarded
+  // against a 0 target/effective-target (division by zero) — shouldn't
+  // happen (createJob() requires target > 0) but a discovered/reopened job
+  // built from bad data could still have one.
+  const pctShortVsTarget = job.target > 0 ? Math.round(((job.target - totalGood) / job.target) * 1000) / 10 : 0;
+  const pctShortVsEffectiveTarget = jobEffectiveTarget > 0 ? Math.round(((jobEffectiveTarget - totalGood) / jobEffectiveTarget) * 1000) / 10 : 0;
+  // Every distinct shift that actually logged a count on this job (a job
+  // can span both shifts over multiple days), in first-seen order.
+  const shiftsInvolved = [...new Set(sorted.map(e => e.shift === '2' ? '2' : '1'))];
+  const shiftsLabel = shiftsInvolved.map(s => (isEs ? 'Turno ' : 'Shift ') + s).join(', ') || 'N/A';
+
+  const packingLine = piecesPerPalletUnit > 0
+    ? `Packing Setup: ${piecesPerBox.toLocaleString()} pcs/box × ${boxesPerPallet.toLocaleString()} boxes/pallet (${piecesPerPalletUnit.toLocaleString()} pcs/pallet)\n`
+    : '';
+  const palletsNeededLine = palletsNeeded > 0
+    ? `Pallets Needed (vs ${jobOversPercent>0?'target incl. overs':'target'}): ${palletsNeeded.toLocaleString()} — Produced: ${totalPallets.toLocaleString()}\n`
+    : '';
+  const shortfallLine = `Shortfall vs Target (no overs): ${pctShortVsTarget}%\n`
+    + (jobOversPercent > 0 ? `Shortfall vs Target incl. Overs: ${pctShortVsEffectiveTarget}%\n` : '');
+
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nShift(s): ${shiftsLabel}\nQuantity to Produce: ${job.target || 'N/A'}\n${oversLine}${packingLine}${palletsNeededLine}${shortfallLine}\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
 
   const payload = {
     action: 'finish_report',
@@ -4005,6 +4121,10 @@ function sendReport(){
     target: job.target || 0,
     oversPercent: jobOversPercent,
     effectiveTarget: jobEffectiveTarget,
+    piecesPerBox, boxesPerPallet,
+    palletsNeeded,
+    pctShortVsTarget, pctShortVsEffectiveTarget,
+    shifts: shiftsInvolved.join(','),
     totalGood, totalReject, totalPallets,
     subject, body,
     fullLog
@@ -4466,26 +4586,62 @@ let dashCharts = [];
    Script quota as everything else (see the QA Checklist app's D1 quota
    incident for what an over-aggressive poll like this can turn into). */
 let dashAutoRefreshTimer = null;
+// A second, much faster timer scoped ONLY to the Live Jobs tab (Anthony
+// wants a job started elsewhere visible within 30s while someone's actually
+// watching Live Jobs — see refreshLiveJobsFast() below). This does NOT run
+// globally on every idle tablet the way _discoveryTick() does further down;
+// it only ever does anything while the Dashboard is open AND the Live tab
+// is the one currently showing, which keeps the added request volume tiny
+// (one manager's open Dashboard, not every device all day) despite the
+// short interval.
+let dashFastRefreshTimer = null;
 function openDashboard(){
   document.getElementById('dashOverlay').classList.add('open');
   if (!dashData) loadDashboardData();
   clearInterval(dashAutoRefreshTimer);
   dashAutoRefreshTimer = setInterval(loadDashboardData, 180000);
+  clearInterval(dashFastRefreshTimer);
+  dashFastRefreshTimer = setInterval(function(){ if (dashTab === 'live') refreshLiveJobsFast(); }, 25000);
 }
 function closeDashboard(){
   document.getElementById('dashOverlay').classList.remove('open');
   clearInterval(dashAutoRefreshTimer);
   dashAutoRefreshTimer = null;
+  clearInterval(dashFastRefreshTimer);
+  dashFastRefreshTimer = null;
 }
 function setDashTab(tab){
   dashTab = tab;
   document.getElementById('dashTabHistoryBtn').classList.toggle('active', tab==='history');
   document.getElementById('dashTabLiveBtn').classList.toggle('active', tab==='live');
   document.getElementById('dashTabDataBtn').classList.toggle('active', tab==='data');
+  document.getElementById('dashTabExportBtn').classList.toggle('active', tab==='export');
   document.getElementById('dashTabHistory').style.display = tab==='history' ? 'block' : 'none';
   document.getElementById('dashTabLive').style.display = tab==='live' ? 'block' : 'none';
   document.getElementById('dashTabData').style.display = tab==='data' ? 'block' : 'none';
+  document.getElementById('dashTabExport').style.display = tab==='export' ? 'block' : 'none';
   if (dashData) renderDashboard();
+  if (tab === 'export') updateExportMatchCount();
+  // Instant refresh the moment someone switches TO Live Jobs, instead of
+  // making them wait for the next 25s tick just to see today's latest.
+  if (tab === 'live' && dashData) refreshLiveJobsFast();
+}
+
+/* Cheap Live-Jobs-only refresh — fetches just active/pallets/notes (never
+   Reports, which grows forever) via fetchLive(true)'s "fast" flag, so this
+   can run on a much shorter interval than the full loadDashboardData()
+   without the request cost scaling with all-time history. Silent on
+   failure — this is a background convenience poll layered on top of the
+   real (visible-errors) 180s full refresh, not a replacement for it. */
+function refreshLiveJobsFast(){
+  if (!dashData) return; // full load hasn't established a baseline yet
+  fetchLive(true).then(res => {
+    if (res.result !== 'success') return;
+    dashData.active = res.active;
+    dashData.pallets = res.pallets;
+    dashData.notes = res.notes;
+    if (dashTab === 'live') renderDashLive();
+  }).catch(function(){});
 }
 
 function loadDashboardData(){
@@ -4849,6 +5005,7 @@ function renderDashHistory(){
     try {
     const sentTs = r.Timestamp ? new Date(r.Timestamp).toLocaleString() : '—';
     const logId = 'dashlog_' + i;
+    const detailsId = 'dashdetails_' + i;
     const parsedEntries = parseFullLogText(r['Full Log']);
     const startedLabel = parsedEntries.length ? [parsedEntries[0].date, parsedEntries[0].time].filter(Boolean).join(' ') : '—';
     return `<div class="dash-job-card">
@@ -4862,6 +5019,8 @@ function renderDashHistory(){
       </div>
       <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parsedEntries)}</div>
+      <button class="dash-log-toggle" onclick="document.getElementById('${detailsId}').classList.toggle('open')">${isEs?'Detalles del trabajo':'Job details'} ▾</button>
+      <div class="dash-log-body" id="${detailsId}">${renderHistoryExtraDetails(r, isEs)}</div>
       <button class="dash-reopen-job-btn" onclick="openReopenJobModal(${dashData.reports.indexOf(r)})">🔓 ${isEs?'Reabrir Trabajo':'Reopen Job'}</button>
     </div>`;
     } catch (rowErr) {
@@ -4871,6 +5030,52 @@ function renderDashHistory(){
   } catch (err) {
     el.innerHTML = `<div class="dash-empty">List debug error: ${escapeHtml(err.message)}</div>`;
   }
+}
+
+/* Derives the "extra history" numbers for one Reports row — shared by
+   renderHistoryExtraDetails() below and the Excel/PowerPoint exports.
+   Reads the backend-computed columns when present (see sendReport() in
+   this file and ensureReportsHeaders()/appendRowByHeaders() in
+   apps_script_backend.gs), but falls back to computing them straight from
+   Target/Total Good/Total Pallets for any report sent BEFORE those columns
+   existed — old history still gets a shortfall %, just not a Pallets
+   Needed (that one has no way to be reconstructed without PiecesPerBox/
+   BoxesPerPallet, which old rows never recorded). */
+function getReportDerivedStats(r){
+  const target = Number(r.Target) || 0;
+  const totalGood = Number(r['Total Good']) || 0;
+  const oversPercent = Number(r.OversPercent) || 0;
+  const effectiveTarget = Number(r.EffectiveTarget) || (oversPercent > 0 ? Math.round(target * (1 + oversPercent/100)) : target);
+  const piecesPerBox = Number(r.PiecesPerBox) || 0;
+  const boxesPerPallet = Number(r.BoxesPerPallet) || 0;
+  const piecesPerPalletUnit = piecesPerBox * boxesPerPallet;
+  const palletsNeeded = Number(r.PalletsNeeded) || (piecesPerPalletUnit > 0 ? Math.ceil(effectiveTarget / piecesPerPalletUnit) : 0);
+  const pctShortVsTarget = (r.PctShortVsTarget !== '' && r.PctShortVsTarget != null)
+    ? Number(r.PctShortVsTarget)
+    : (target > 0 ? Math.round(((target - totalGood) / target) * 1000) / 10 : 0);
+  const pctShortVsEffectiveTarget = (r.PctShortVsEffectiveTarget !== '' && r.PctShortVsEffectiveTarget != null)
+    ? Number(r.PctShortVsEffectiveTarget)
+    : (effectiveTarget > 0 ? Math.round(((effectiveTarget - totalGood) / effectiveTarget) * 1000) / 10 : 0);
+  const shifts = String(r.Shifts || '').split(',').map(s => s.trim()).filter(Boolean);
+  return { target, totalGood, oversPercent, effectiveTarget, piecesPerBox, boxesPerPallet, piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget, shifts };
+}
+
+function renderHistoryExtraDetails(r, isEs){
+  const s = getReportDerivedStats(r);
+  const rows = [];
+  rows.push([isEs?'Turno(s)':'Shift(s)', s.shifts.length ? s.shifts.map(x => (isEs?'Turno ':'Shift ')+x).join(', ') : 'N/A']);
+  rows.push([isEs?'Overs':'Overs', s.oversPercent > 0 ? `${s.oversPercent}% (${isEs?'meta efectiva':'effective target'} ${s.effectiveTarget.toLocaleString()})` : (isEs?'Ninguno':'None')]);
+  if (s.piecesPerPalletUnit > 0){
+    rows.push([isEs?'Config. de Empaque':'Packing Setup', `${s.piecesPerBox.toLocaleString()} ${isEs?'pzs/caja':'pcs/box'} × ${s.boxesPerPallet.toLocaleString()} ${isEs?'cajas/tarima':'boxes/pallet'}`]);
+    rows.push([isEs?'Tarimas Necesarias vs Producidas':'Pallets Needed vs Produced', `${s.palletsNeeded.toLocaleString()} ${isEs?'vs':'vs'} ${Number(r['Total Pallets']||0).toLocaleString()}`]);
+  }
+  rows.push([isEs?'% Corto vs Meta (sin overs)':'% Short vs Target (no overs)', s.pctShortVsTarget + '%']);
+  if (s.oversPercent > 0){
+    rows.push([isEs?'% Corto vs Meta (con overs)':'% Short vs Target (incl. overs)', s.pctShortVsEffectiveTarget + '%']);
+  }
+  return `<div class="dash-history-details">${rows.map(([label,val]) =>
+    `<div class="dash-history-detail-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(String(val))}</b></div>`
+  ).join('')}</div>`;
 }
 
 function renderDashLive(){
@@ -5052,6 +5257,238 @@ function renderDashData(){
     },
     options: chartOptions
   }));
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   EXPORT — Excel (SheetJS) and PowerPoint (pptxgenjs), both entirely
+   client-side against dashData.reports (already-loaded History data), so
+   exporting costs zero extra backend/quota calls. Both libraries are only
+   loaded from CDN the first time either export button is actually tapped
+   (see _loadScriptOnce) — no reason to make every tablet download them on
+   every page load for a feature only a manager on the Dashboard ever uses.
+══════════════════════════════════════════════════════════════════ */
+const XLSX_CDN_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+const PPTXGENJS_CDN_URL = 'https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js';
+function _loadScriptOnce(src){
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('script[src="'+src+'"]')) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+function getExportFilters(){
+  return {
+    dateFrom: document.getElementById('exportDateFrom').value || '',
+    dateTo: document.getElementById('exportDateTo').value || '',
+    timeFrom: document.getElementById('exportTimeFrom').value || '',
+    timeTo: document.getElementById('exportTimeTo').value || '',
+    station: document.getElementById('exportStationFilter').value || '',
+    pass: document.getElementById('exportPassFilter').value || '',
+    shift: document.getElementById('exportShiftFilter').value || '',
+    search: (document.getElementById('exportSearchInput').value || '').trim().toLowerCase(),
+    overs: document.getElementById('exportOversFilter').value || ''
+  };
+}
+
+/* Applies every Export tab filter to dashData.reports. Date/time filters
+   read the report's own Timestamp (when it was sent) — Time From/To are
+   OPTIONAL (Anthony explicitly didn't want them mandatory) and, when set,
+   filter by that Timestamp's time-of-day rather than adding a second
+   independent range. Shift/Overs read the derived stats (getReportDerivedStats)
+   since those aren't raw sheet columns on every row (older reports predate
+   them and fall back to being computed there). */
+function getFilteredReportsForExport(){
+  const f = getExportFilters();
+  const all = (dashData && dashData.reports) || [];
+  return all.filter(r => {
+    if (!r.Timestamp) return false;
+    const d = new Date(r.Timestamp);
+    if (isNaN(d.getTime())) return false;
+    if (f.dateFrom && d < new Date(f.dateFrom + 'T00:00:00')) return false;
+    if (f.dateTo && d > new Date(f.dateTo + 'T23:59:59')) return false;
+    if (f.timeFrom || f.timeTo){
+      const mins = d.getHours()*60 + d.getMinutes();
+      if (f.timeFrom){
+        const parts = f.timeFrom.split(':').map(Number);
+        if (mins < parts[0]*60 + parts[1]) return false;
+      }
+      if (f.timeTo){
+        const parts = f.timeTo.split(':').map(Number);
+        if (mins > parts[0]*60 + parts[1]) return false;
+      }
+    }
+    if (f.station && String(r.Station||'') !== f.station) return false;
+    if (f.pass && String(r.Pass||'') !== f.pass) return false;
+    if (f.shift){
+      const s = getReportDerivedStats(r);
+      if (!s.shifts.includes(f.shift)) return false;
+    }
+    if (f.search && !(String(r.PO||'').toLowerCase().includes(f.search) || String(r.Product||'').toLowerCase().includes(f.search))) return false;
+    if (f.overs === 'yes' && !(Number(r.OversPercent) > 0)) return false;
+    if (f.overs === 'no' && Number(r.OversPercent) > 0) return false;
+    return true;
+  });
+}
+
+function updateExportMatchCount(){
+  const isEs = document.body.classList.contains('es');
+  const el = document.getElementById('exportMatchCount');
+  if (!el) return;
+  const total = (dashData && dashData.reports) ? dashData.reports.length : 0;
+  const matched = getFilteredReportsForExport().length;
+  el.textContent = isEs
+    ? `${matched} de ${total} reportes coinciden con los filtros`
+    : `${matched} of ${total} reports match these filters`;
+}
+// Re-check the match count live as filters change, without waiting for an
+// export tap — lets a manager see "0 reports match" before wasting a click.
+// These inputs already exist in the DOM by the time this script runs (they
+// sit earlier in the HTML, above this <script> tag), so no need to wait
+// for any load event.
+['exportDateFrom','exportDateTo','exportTimeFrom','exportTimeTo','exportStationFilter','exportPassFilter','exportShiftFilter','exportSearchInput','exportOversFilter'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateExportMatchCount);
+});
+
+function exportToExcel(){
+  const isEs = document.body.classList.contains('es');
+  const status = document.getElementById('exportStatus');
+  const reports = getFilteredReportsForExport();
+  if (!reports.length){
+    status.textContent = isEs ? 'No hay reportes que coincidan con estos filtros.' : 'No reports match these filters.';
+    return;
+  }
+  status.textContent = isEs ? '⏳ Generando Excel…' : '⏳ Generating Excel…';
+  _loadScriptOnce(XLSX_CDN_URL).then(() => {
+    const rows = reports.map(r => {
+      const s = getReportDerivedStats(r);
+      return {
+        [isEs?'Fecha Enviado':'Sent']: r.Timestamp ? new Date(r.Timestamp).toLocaleString() : '',
+        'PO': r.PO || '',
+        [isEs?'Producto':'Product']: r.Product || '',
+        [isEs?'Estación':'Station']: r.Station || '',
+        [isEs?'Pasada':'Pass']: r.Pass ? passLabel(String(r.Pass), isEs) : '',
+        [isEs?'Turno(s)':'Shift(s)']: s.shifts.join(', '),
+        [isEs?'Meta':'Target']: s.target,
+        [isEs?'% Overs':'Overs %']: s.oversPercent,
+        [isEs?'Meta Efectiva':'Effective Target']: s.effectiveTarget,
+        [isEs?'Pzs/Caja':'Pieces/Box']: s.piecesPerBox || '',
+        [isEs?'Cajas/Tarima':'Boxes/Pallet']: s.boxesPerPallet || '',
+        [isEs?'Tarimas Necesarias':'Pallets Needed']: s.palletsNeeded || '',
+        [isEs?'Tarimas Producidas':'Pallets Produced']: Number(r['Total Pallets']||0),
+        [isEs?'Bueno Total':'Total Good']: Number(r['Total Good']||0),
+        [isEs?'Retenido Total':'Total Reject']: Number(r['Total Reject']||0),
+        [isEs?'% Corto vs Meta':'% Short vs Target']: s.pctShortVsTarget,
+        [isEs?'% Corto vs Meta+Overs':'% Short vs Target+Overs']: s.pctShortVsEffectiveTarget
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, isEs ? 'Historial' : 'History');
+    const filename = 'Gluer_Shift_Report_' + new Date().toISOString().slice(0,10) + '.xlsx';
+    XLSX.writeFile(wb, filename);
+    status.textContent = isEs ? `✅ ${rows.length} reportes exportados.` : `✅ Exported ${rows.length} reports.`;
+  }).catch(err => {
+    status.textContent = (isEs ? '❌ Error: ' : '❌ Error: ') + err.message;
+  });
+}
+
+function exportToPowerPoint(){
+  const isEs = document.body.classList.contains('es');
+  const status = document.getElementById('exportStatus');
+  const reports = getFilteredReportsForExport();
+  if (!reports.length){
+    status.textContent = isEs ? 'No hay reportes que coincidan con estos filtros.' : 'No reports match these filters.';
+    return;
+  }
+  status.textContent = isEs ? '⏳ Generando PowerPoint…' : '⏳ Generating PowerPoint…';
+  _loadScriptOnce(PPTXGENJS_CDN_URL).then(() => {
+    // Summary/KPI-only deck (Anthony's choice) — a handful of slides with
+    // big numbers and a couple of breakdown charts, meant to be read by
+    // someone who'd never open the underlying spreadsheet.
+    const totals = reports.reduce((acc, r) => {
+      const s = getReportDerivedStats(r);
+      acc.good += Number(r['Total Good']||0);
+      acc.reject += Number(r['Total Reject']||0);
+      acc.pallets += Number(r['Total Pallets']||0);
+      acc.target += s.target;
+      acc.effectiveTarget += s.effectiveTarget;
+      acc.shortPct.push(s.pctShortVsTarget);
+      return acc;
+    }, { good:0, reject:0, pallets:0, target:0, effectiveTarget:0, shortPct:[] });
+    const avgShortPct = totals.shortPct.length ? Math.round((totals.shortPct.reduce((a,b)=>a+b,0)/totals.shortPct.length)*10)/10 : 0;
+
+    const byStation = {};
+    reports.forEach(r => {
+      const st = r.Station || (isEs?'Desconocido':'Unknown');
+      if (!byStation[st]) byStation[st] = { good:0, target:0, jobs:0 };
+      byStation[st].good += Number(r['Total Good']||0);
+      byStation[st].target += Number(r.Target||0);
+      byStation[st].jobs++;
+    });
+
+    const PINK = 'FF1F8F';
+    const NAVY = '0A0A0A';
+    const GOOD = '2E7D4F';
+    const ACCENT = 'C8393A';
+
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'MP', width: 13.33, height: 7.5 });
+    pptx.layout = 'MP';
+
+    // Title slide
+    let slide = pptx.addSlide();
+    slide.background = { color: NAVY };
+    slide.addText(isEs ? 'Reporte de Producción — Pegadora' : 'Gluer Shift Production Report', {
+      x: 0.6, y: 2.6, w: 12, h: 1.2, fontSize: 36, bold: true, color: 'FFFFFF'
+    });
+    const f = getExportFilters();
+    const rangeLabel = (f.dateFrom || f.dateTo)
+      ? `${f.dateFrom || (isEs?'Inicio':'Start')} → ${f.dateTo || (isEs?'Hoy':'Today')}`
+      : (isEs ? 'Todo el historial' : 'All history');
+    slide.addText(rangeLabel + ' · ' + reports.length + (isEs?' reportes':' reports'), {
+      x: 0.6, y: 3.7, w: 12, h: 0.6, fontSize: 18, color: PINK
+    });
+
+    // KPI slide
+    slide = pptx.addSlide();
+    slide.background = { color: 'FFFFFF' };
+    slide.addText(isEs ? 'Resumen' : 'Summary', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 28, bold: true, color: NAVY });
+    const kpis = [
+      [isEs?'Bueno Total':'Total Good', totals.good.toLocaleString(), GOOD],
+      [isEs?'Retenido Total':'Total Hold', totals.reject.toLocaleString(), ACCENT],
+      [isEs?'Tarimas Total':'Total Pallets', totals.pallets.toLocaleString(), NAVY],
+      [isEs?'% Corto Promedio vs Meta':'Avg % Short vs Target', avgShortPct + '%', PINK]
+    ];
+    kpis.forEach((k, i) => {
+      const x = 0.6 + (i % 2) * 6.2;
+      const y = 1.3 + Math.floor(i / 2) * 2.4;
+      slide.addText(k[1], { x, y, w: 5.8, h: 1.3, fontSize: 44, bold: true, color: k[2], align: 'center' });
+      slide.addText(k[0], { x, y: y + 1.3, w: 5.8, h: 0.5, fontSize: 14, color: NAVY, align: 'center' });
+    });
+
+    // Station breakdown chart slide
+    if (Object.keys(byStation).length){
+      slide = pptx.addSlide();
+      slide.addText(isEs ? 'Meta vs Bueno por Estación' : 'Target vs Good by Station', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 24, bold: true, color: NAVY });
+      const stationLabels = Object.keys(byStation);
+      slide.addChart(pptx.ChartType.bar, [
+        { name: isEs?'Meta':'Target', labels: stationLabels, values: stationLabels.map(s => byStation[s].target) },
+        { name: isEs?'Bueno':'Good', labels: stationLabels, values: stationLabels.map(s => byStation[s].good) }
+      ], { x: 0.6, y: 1.2, w: 12, h: 5.5, barGrouping: 'clustered', chartColors: [NAVY, GOOD], showLegend: true, legendPos: 'b' });
+    }
+
+    const filename = 'Gluer_Shift_Report_' + new Date().toISOString().slice(0,10) + '.pptx';
+    pptx.writeFile({ fileName: filename }).then(() => {
+      status.textContent = isEs ? `✅ Presentación generada (${reports.length} reportes).` : `✅ Presentation generated (${reports.length} reports).`;
+    });
+  }).catch(err => {
+    status.textContent = (isEs ? '❌ Error: ' : '❌ Error: ') + err.message;
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════════
