@@ -875,19 +875,30 @@
   .dash-job-counts{display:flex;gap:18px;font-size:0.9rem;}
   .dash-job-counts b{display:block;font-size:1.3rem;}
   .dash-log-toggle{background:transparent;border:none;color:var(--navy);font-weight:700;font-size:0.85rem;margin-top:6px;padding:0;cursor:pointer;}
+  /* View full log / Job details are what someone actually uses on every
+     History card — Reopen Job is the opposite (Anthony: "a feature that
+     shouldn't be used often"), so this row keeps those two as the visually
+     primary actions instead of letting a full-width Reopen button below
+     read as the main thing on the card. */
+  .dash-history-actions{display:flex;gap:18px;flex-wrap:wrap;}
+  .dash-history-actions .dash-log-toggle{margin-top:0;}
   .dash-delete-job-btn{
     display:block;width:100%;margin-top:10px;padding:8px 12px;font-size:0.85rem;font-weight:700;
     background:var(--accent-soft-bg);color:var(--accent);border:1px solid var(--accent);border-radius:8px;cursor:pointer;
   }
   .dash-delete-job-btn:active{background:var(--accent);color:#fff;}
   /* Reopen — brings a finished report back into Live Jobs, same PIN gate as
-     Delete Job but colored as a positive action (good/green) instead of a
-     destructive one (accent/red). */
+     Delete Job. Deliberately a plain text link, not a colored full-width
+     button like it used to be — this is a rarely-used recovery action, not
+     something that should visually compete with View full log/Job details
+     for attention on every single History card. Still a comfortable tap
+     target (padding, not just line-height) since it's the same PIN-gated
+     feature either way, just visually secondary now. */
   .dash-reopen-job-btn{
-    display:block;width:100%;margin-top:10px;padding:8px 12px;font-size:0.85rem;font-weight:700;
-    background:var(--good-soft-bg);color:var(--good);border:1px solid var(--good);border-radius:8px;cursor:pointer;
+    display:block;width:100%;margin-top:10px;padding:6px 0;font-size:0.8rem;font-weight:700;
+    background:transparent;color:var(--good);border:none;cursor:pointer;text-align:left;
   }
-  .dash-reopen-job-btn:active{background:var(--good);color:#fff;}
+  .dash-reopen-job-btn:active{color:var(--good-light);}
   .dash-log-body{margin-top:8px;display:none;}
   .dash-log-body.open{display:block;}
   .dash-history-details{background:var(--row-bg);border-radius:8px;padding:8px 10px;}
@@ -5040,9 +5051,11 @@ function renderDashHistory(){
         <div><b>${Number(r.Target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
         <div><b style="color:var(--navy)">${Number(r['Total Pallets']||0).toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
-      <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
+      <div class="dash-history-actions">
+        <button class="dash-log-toggle" onclick="document.getElementById('${logId}').classList.toggle('open')">${isEs?'Ver registro completo':'View full log'} ▾</button>
+        <button class="dash-log-toggle" onclick="document.getElementById('${detailsId}').classList.toggle('open')">${isEs?'Detalles del trabajo':'Job details'} ▾</button>
+      </div>
       <div class="dash-log-body" id="${logId}">${renderLogEntryCards(parsedEntries)}</div>
-      <button class="dash-log-toggle" onclick="document.getElementById('${detailsId}').classList.toggle('open')">${isEs?'Detalles del trabajo':'Job details'} ▾</button>
       <div class="dash-log-body" id="${detailsId}">${renderHistoryExtraDetails(r, isEs)}</div>
       <button class="dash-reopen-job-btn" onclick="openReopenJobModal(${dashData.reports.indexOf(r)})">🔓 ${isEs?'Reabrir Trabajo':'Reopen Job'}</button>
     </div>`;
