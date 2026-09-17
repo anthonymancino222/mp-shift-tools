@@ -683,6 +683,14 @@
   .job-item-tag.active{color:var(--good); background:var(--good-soft-bg-strong);}
   .job-item-resume-btn{font-size:0.8rem; font-weight:800; color:#fff; background:var(--navy); border:none; border-radius:20px; padding:7px 14px; flex-shrink:0; margin-left:10px; cursor:pointer; white-space:nowrap;}
   .job-item-resume-btn:active{background:var(--navy-light);}
+  /* Removes a saved-but-not-current job from THIS DEVICE's own list only —
+     added 2026-09-17 after a real desktop ended up with a job stuck in its
+     Active Job list that was actually only meant to be worked on a tablet
+     (a leftover local copy from before cross-device auto-merge was removed;
+     see the DEVICE_ID comment). There was previously no way to clear a
+     stray local job at all short of finishing or reopening it. */
+  .job-item-remove-btn{font-size:0.9rem; font-weight:800; color:var(--accent); background:transparent; border:none; padding:4px 8px; flex-shrink:0; margin-left:6px; cursor:pointer;}
+  .job-item-remove-btn:active{color:var(--accent-soft-bg);}
 
   /* Active Job — compact label that opens the job switcher/Start New Job
      popup (see #activeJobModalOverlay), instead of that content always
@@ -2203,7 +2211,13 @@ function renderJobList(){
     } else if (isActive){
       tagHtml = `<span class="job-item-tag active">✓ ${isEs?'Actual':'Current'}</span>`;
     } else {
-      tagHtml = `<span class="job-item-tag">📋 ${isEs?'Guardado':'Saved'}</span>`;
+      // Not the current job — safe to offer removing it from just THIS
+      // device's list (never touches the server/any other device; see
+      // removeSavedJobPrompt). Only shown for non-current cards on purpose:
+      // removing the job you're actively looking at needs Start Over
+      // instead, which also clears the on-screen counts/progress state.
+      tagHtml = `<span class="job-item-tag">📋 ${isEs?'Guardado':'Saved'}</span>` +
+        `<button type="button" class="job-item-remove-btn" onclick="event.stopPropagation();removeSavedJobPrompt('${id}');" title="${isEs?'Quitar de este dispositivo':'Remove from this device'}">✕</button>`;
     }
     // A <div>, not a <button> — needs to contain the real nested Resume
     // button above, which isn't valid inside another <button>.
@@ -2220,6 +2234,46 @@ function selectJobCard(id){
   pendingJobId = id;
   renderJobList();
   renderJob();
+}
+
+/* Removes ONE saved (not currently open) job from THIS DEVICE's own local
+   list — nothing sent to the server, nothing about any other device
+   touched. Added for the exact case Anthony hit 2026-09-17: a desktop had
+   a job cached locally from before cross-device auto-merge was removed
+   (see the DEVICE_ID comment near the top) — that job was really only
+   meant to be worked on a tablet, but sat confusingly in the desktop's own
+   Active Job list with no way to clear it short of Reopen/Finish. If the
+   job still has real local pallets/entries logged (rare for a stray one,
+   but possible), the confirm names exactly what would be lost so this
+   can't accidentally discard real unsynced work. */
+function removeSavedJobPrompt(id){
+  const job = jobs[id];
+  if (!job) return;
+  const isEs = document.body.classList.contains('es');
+  const activePallets = (job.pallets||[]).filter(p=>!p.voided).length;
+  const goodCount = computeTotalGood(job);
+  const hasUnsynced = (job.entries||[]).some(e=>!e.synced) || (job.pallets||[]).some(p=>!p.synced);
+  const passText = passLabel(job.pass, isEs);
+  const label = job.po + (passText ? ' ('+passText+')' : '');
+  let msg = isEs
+    ? `¿Quitar "${label}" de la lista de este dispositivo?\n\nEsto NO afecta el servidor ni ningún otro dispositivo — solo deja de aparecer aquí.`
+    : `Remove "${label}" from this device's list?\n\nThis does NOT affect the server or any other device — it just stops showing up here.`;
+  if (goodCount > 0 || activePallets > 0){
+    msg += isEs
+      ? `\n\n${goodCount.toLocaleString()} piezas buenas y ${activePallets} tarima(s) están guardadas localmente para este trabajo.`
+      : `\n\n${goodCount.toLocaleString()} good pieces and ${activePallets} pallet(s) are saved locally for this job.`;
+  }
+  if (hasUnsynced){
+    msg += isEs
+      ? `\n\n⚠ Algunos registros aún no se han sincronizado — si continúan sin sincronizar en otro lugar, ese trabajo se perderá.`
+      : `\n\n⚠ Some of it hasn't synced yet — if it isn't captured somewhere else, that work will be lost.`;
+  }
+  if (!confirm(msg)) return;
+  delete jobs[id];
+  saveAll();
+  clearDraft(id);
+  renderJobList();
+  updateActiveJobBadge();
 }
 
 function confirmContinueJob(){
