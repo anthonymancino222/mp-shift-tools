@@ -940,6 +940,19 @@
   .export-btn-pptx:active{background:var(--navy-light);}
   .export-status{text-align:center;font-size:0.85rem;color:var(--text-secondary);min-height:1.2em;}
 
+  .preview-heading{font-size:0.95rem;font-weight:800;color:var(--navy);margin:18px 0 10px;padding-top:14px;border-top:2px dashed var(--border);}
+  .preview-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .preview-section h3{margin:0 0 8px;font-size:0.95rem;color:var(--navy);}
+  .preview-stat{font-size:0.85rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px;}
+  .preview-note{font-size:0.75rem;color:var(--text-tertiary);margin-bottom:10px;font-style:italic;}
+  .preview-chart-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:600px){ .preview-chart-pair{grid-template-columns:1fr;} }
+  .preview-chart-sublabel{font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-align:center;margin-bottom:4px;}
+  .pallet-job-picker{max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:10px;background:var(--row-bg);}
+  .pallet-job-picker label{display:flex;align-items:center;gap:8px;font-size:0.82rem;padding:5px 4px;cursor:pointer;}
+  .pallet-job-picker input[type="checkbox"]{width:16px;height:16px;flex-shrink:0;}
+  .pallet-job-picker-empty{font-size:0.82rem;color:var(--text-tertiary);text-align:center;padding:8px;}
+
   [data-es]{display:none;}
   body.es [data-en]{display:none;}
   body.es [data-es]{display:inline;}
@@ -1627,6 +1640,48 @@
         </div>
       </div>
       <div id="exportMatchCount" class="export-match-count"></div>
+
+      <div class="preview-heading"><span data-en>Live Preview — what will be exported</span><span data-es>Vista Previa en Vivo — lo que se exportará</span></div>
+
+      <div class="preview-section">
+        <h3><span data-en>Good vs Target Over Time</span><span data-es>Bueno vs Meta a Través del Tiempo</span></h3>
+        <div class="preview-stat" id="prevStatOverTime"></div>
+        <canvas id="prevChartOverTime" height="220"></canvas>
+      </div>
+
+      <div class="preview-section">
+        <h3><span data-en>Good vs Target: Long Gluer vs Short Gluer</span><span data-es>Bueno vs Meta: Pegadora Larga vs Corta</span></h3>
+        <div class="preview-stat" id="prevStatStationCompare"></div>
+        <div class="preview-chart-pair">
+          <div><div class="preview-chart-sublabel" data-en>Long Gluer</div><div class="preview-chart-sublabel" data-es hidden>Pegadora Larga</div><canvas id="prevChartLongGluer" height="220"></canvas></div>
+          <div><div class="preview-chart-sublabel" data-en>Short Gluer</div><div class="preview-chart-sublabel" data-es hidden>Pegadora Corta</div><canvas id="prevChartShortGluer" height="220"></canvas></div>
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <h3><span data-en>Pallets Progression</span><span data-es>Progresión de Tarimas</span></h3>
+        <div class="preview-note"><span data-en>Approximate — derived from each job's logged Good counts over time divided by its Packing Setup (pcs/pallet). Jobs without a confirmed Packing Setup can't be shown here.</span><span data-es>Aproximado — derivado de los conteos Buenos registrados de cada trabajo a través del tiempo, dividido por su Configuración de Empaque (pzs/tarima). Los trabajos sin Configuración de Empaque confirmada no se pueden mostrar aquí.</span></div>
+        <div class="export-choice-field" style="margin-bottom:8px;">
+          <span data-en>Color lines by</span><span data-es>Colorear líneas por</span>
+          <div class="export-choice-group" id="palletColorModeChoices">
+            <button type="button" class="export-choice-btn selected" onclick="setPalletColorMode('job',this)"><span data-en>Job</span><span data-es>Trabajo</span></button>
+            <button type="button" class="export-choice-btn" onclick="setPalletColorMode('pass',this)"><span data-en>Pass (1st/2nd/Single)</span><span data-es>Pasada (1ra/2da/Única)</span></button>
+          </div>
+        </div>
+        <div id="palletJobPicker" class="pallet-job-picker"></div>
+        <canvas id="prevChartPallets" height="260"></canvas>
+      </div>
+
+      <div class="preview-section">
+        <h3><span data-en>Target vs Good by Job</span><span data-es>Meta vs Bueno por Trabajo</span></h3>
+        <canvas id="prevChartByJob" height="260"></canvas>
+      </div>
+
+      <div class="preview-section">
+        <h3><span data-en>Totals by Station</span><span data-es>Totales por Estación</span></h3>
+        <canvas id="prevChartByStation" height="220"></canvas>
+      </div>
+
       <button class="export-btn export-btn-excel" onclick="exportToExcel()">📊 <span data-en>Export to Excel</span><span data-es>Exportar a Excel</span></button>
       <button class="export-btn export-btn-pptx" onclick="exportToPowerPoint()">📽️ <span data-en>Export to PowerPoint</span><span data-es>Exportar a PowerPoint</span></button>
       <div id="exportStatus" class="export-status"></div>
@@ -1785,6 +1840,7 @@ function toggleTheme(){
   // whatever's currently drawn so the Data tab doesn't keep showing
   // black bars/lines against a now-dark card.
   if (dashData && dashTab === 'data') renderDashData();
+  if (dashData && dashTab === 'export') renderExportPreview();
 }
 
 /* Forces a fresh load of index.html instead of whatever the tablet's
@@ -5531,6 +5587,271 @@ function updateExportMatchCount(){
   el.textContent = isEs
     ? `${matched} de ${total} reportes coinciden con los filtros`
     : `${matched} of ${total} reports match these filters`;
+  renderExportPreview();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   EXPORT LIVE PREVIEW (Anthony, 2026-09-17) — every chart here reads the
+   SAME getFilteredReportsForExport() the actual Excel/PowerPoint exports
+   use, so what's shown on screen is exactly what gets exported. Rebuilt
+   on every filter change via updateExportMatchCount() above. Chart.js is
+   already loaded globally for the Data tab (see the <script> tag near the
+   top of <head>) — no lazy-load needed here, unlike XLSX/pptxgenjs.
+══════════════════════════════════════════════════════════════════ */
+let previewCharts = [];
+function _destroyPreviewCharts(){
+  previewCharts.forEach(c => c.destroy());
+  previewCharts = [];
+  if (window.__prevPalletChart){ window.__prevPalletChart.destroy(); window.__prevPalletChart = null; }
+}
+
+// Chart.js bakes colors in at creation time (same reasoning as
+// renderDashData's own copy of this) — dark mode needs its own axis/grid
+// colors, not just whatever the page's CSS variables currently say.
+function _chartTextColors(){
+  const isDark = document.body.classList.contains('dark-mode');
+  return {
+    axis: isDark ? '#c7cad0' : '#444',
+    grid: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+    target: isDark ? '#e8e9eb' : '#0a0a0a'
+  };
+}
+
+function _byDateAgg(reports){
+  const byDate = {};
+  reports.forEach(r => {
+    if (!r.Timestamp) return;
+    const dateKey = new Date(r.Timestamp).toISOString().slice(0,10);
+    if (!byDate[dateKey]) byDate[dateKey] = { target:0, good:0 };
+    byDate[dateKey].target += safeNum(r.Target);
+    byDate[dateKey].good += safeNum(r['Total Good']);
+  });
+  const labels = Object.keys(byDate).sort();
+  return { labels, targets: labels.map(d=>byDate[d].target), goods: labels.map(d=>byDate[d].good) };
+}
+
+function _fillPcts(targets, goods){
+  return targets.map((t,i) => t>0 ? Math.round((goods[i]/t)*1000)/10 : 0);
+}
+
+// Shared by "Good vs Target Over Time" and each half of the station
+// comparison — a bar (Target, Good) + line (Fill %, secondary axis) combo,
+// grouped by the date each report was sent. Returns the underlying totals
+// so the caller can build its own summary stat line.
+function _renderGoodTargetChart(canvasId, reports, isEs){
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  const {axis, grid, target} = _chartTextColors();
+  const agg = _byDateAgg(reports);
+  const fillPcts = _fillPcts(agg.targets, agg.goods);
+  const chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: agg.labels,
+      datasets: [
+        { type:'bar', label: isEs?'Meta':'Target', data: agg.targets, backgroundColor: target, yAxisID:'y' },
+        { type:'bar', label: isEs?'Bueno':'Good', data: agg.goods, backgroundColor: '#10B981', yAxisID:'y' },
+        { type:'line', label: isEs?'% Cumplimiento':'Fill %', data: fillPcts, borderColor:'#FF1F8F', backgroundColor:'#FF1F8F', yAxisID:'y1', tension:0.25 }
+      ]
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{ labels:{ color: axis } } },
+      scales: {
+        y: { beginAtZero:true, ticks:{color:axis}, grid:{color:grid}, position:'left' },
+        y1: { beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, ticks:{color:axis, callback:v=>v+'%'} },
+        x: { ticks:{color:axis}, grid:{color:grid} }
+      }
+    }
+  });
+  previewCharts.push(chart);
+  return { totalGood: agg.goods.reduce((a,b)=>a+b,0), totalTarget: agg.targets.reduce((a,b)=>a+b,0) };
+}
+
+function _renderChartOverTime(reports, isEs){
+  const stat = document.getElementById('prevStatOverTime');
+  const res = _renderGoodTargetChart('prevChartOverTime', reports, isEs);
+  if (stat && res){
+    const pct = res.totalTarget>0 ? Math.round((res.totalGood/res.totalTarget)*1000)/10 : 0;
+    stat.textContent = isEs
+      ? `General: ${res.totalGood.toLocaleString()} / ${res.totalTarget.toLocaleString()} = ${pct}% cumplimiento`
+      : `Overall: ${res.totalGood.toLocaleString()} / ${res.totalTarget.toLocaleString()} = ${pct}% fill rate`;
+  }
+}
+
+function _renderStationCompareCharts(reports, isEs){
+  const stat = document.getElementById('prevStatStationCompare');
+  const longReports = reports.filter(r => r.Station === 'Long Gluer');
+  const shortReports = reports.filter(r => r.Station === 'Short Gluer');
+  const resL = _renderGoodTargetChart('prevChartLongGluer', longReports, isEs);
+  const resS = _renderGoodTargetChart('prevChartShortGluer', shortReports, isEs);
+  if (stat){
+    const pctL = resL && resL.totalTarget>0 ? Math.round((resL.totalGood/resL.totalTarget)*1000)/10 : 0;
+    const pctS = resS && resS.totalTarget>0 ? Math.round((resS.totalGood/resS.totalTarget)*1000)/10 : 0;
+    stat.textContent = isEs
+      ? `Pegadora Larga: ${pctL}% cumplimiento · Pegadora Corta: ${pctS}% cumplimiento`
+      : `Long Gluer: ${pctL}% fill rate · Short Gluer: ${pctS}% fill rate`;
+  }
+}
+
+function _renderByJobChart(reports, isEs){
+  const canvas = document.getElementById('prevChartByJob');
+  if (!canvas) return;
+  const {axis, grid, target} = _chartTextColors();
+  const labels = reports.map(r => String(r.PO||'—'));
+  const targets = reports.map(r => safeNum(r.Target));
+  const goods = reports.map(r => safeNum(r['Total Good']));
+  const chart = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label:isEs?'Meta':'Target', data:targets, backgroundColor:target },
+      { label:isEs?'Bueno':'Good', data:goods, backgroundColor:'#10B981' }
+    ]},
+    options: { responsive:true, plugins:{legend:{labels:{color:axis}}}, scales:{ y:{beginAtZero:true,ticks:{color:axis},grid:{color:grid}}, x:{ticks:{color:axis},grid:{color:grid}} } }
+  });
+  previewCharts.push(chart);
+}
+
+function _renderByStationChart(reports, isEs){
+  const canvas = document.getElementById('prevChartByStation');
+  if (!canvas) return;
+  const {axis, grid} = _chartTextColors();
+  const byStation = {};
+  reports.forEach(r => {
+    const st = r.Station || (isEs?'Desconocido':'Unknown');
+    if (!byStation[st]) byStation[st] = {target:0, good:0};
+    byStation[st].target += safeNum(r.Target);
+    byStation[st].good += safeNum(r['Total Good']);
+  });
+  const labels = Object.keys(byStation);
+  const targets = labels.map(s=>byStation[s].target);
+  const goods = labels.map(s=>byStation[s].good);
+  const fillPcts = _fillPcts(targets, goods);
+  const chart = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets: [
+      { type:'bar', label:isEs?'Meta':'Target', data:targets, backgroundColor:targets.map(()=>'#0A0A0A'), yAxisID:'y' },
+      { type:'bar', label:isEs?'Bueno':'Good', data:goods, backgroundColor:goods.map(()=>'#10B981'), yAxisID:'y' },
+      { type:'line', label:isEs?'% Cumplimiento':'Fill %', data:fillPcts, borderColor:'#FF1F8F', backgroundColor:'#FF1F8F', yAxisID:'y1', tension:0.25 }
+    ]},
+    options: { responsive:true, plugins:{legend:{labels:{color:axis}}}, scales:{
+      y:{beginAtZero:true,ticks:{color:axis},grid:{color:grid}, position:'left'},
+      y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false},ticks:{color:axis,callback:v=>v+'%'}},
+      x:{ticks:{color:axis},grid:{color:grid}}
+    }}
+  });
+  previewCharts.push(chart);
+}
+
+/* Pallets Progression — approximate, on purpose (see the on-page note):
+   there's no per-pallet timestamp left once a job finishes (individual
+   pallet taps are only kept while a job is still ACTIVE — see Pallets
+   sheet cleanup in apps_script_backend.gs). The Full Log DOES keep every
+   dated Good-count entry though, so cumulative Good over the course of the
+   job, divided by that job's own confirmed Packing Setup (pcs/pallet),
+   gives a reasonable pallets-equivalent curve — clearly labeled as an
+   approximation rather than presented as exact. */
+let palletColorMode = 'job';
+let selectedPalletJobKeys = new Set();
+const PASS_COLORS = { '1': '#0A0A0A', '2': '#FF1F8F', 'S': '#10B981' };
+
+function _reportKey(r){
+  return [r.PO, r.Pass||'', r.Timestamp].join('|');
+}
+
+function setPalletColorMode(mode, btnEl){
+  palletColorMode = mode;
+  btnEl.parentElement.querySelectorAll('.export-choice-btn').forEach(b => b.classList.remove('selected'));
+  btnEl.classList.add('selected');
+  _renderPalletChart(getFilteredReportsForExport(), document.body.classList.contains('es'));
+}
+
+function togglePalletJob(key, checked){
+  if (checked) selectedPalletJobKeys.add(key); else selectedPalletJobKeys.delete(key);
+  _renderPalletChart(getFilteredReportsForExport(), document.body.classList.contains('es'));
+}
+
+function _renderPalletJobPicker(reports, isEs){
+  const wrap = document.getElementById('palletJobPicker');
+  if (!wrap) return;
+  // Only jobs with a confirmed Packing Setup (piecesPerPalletUnit>0) can
+  // actually be turned into a pallets-equivalent curve at all.
+  const usable = reports.filter(r => getReportDerivedStats(r).piecesPerPalletUnit > 0);
+  const usableKeys = new Set(usable.map(_reportKey));
+  [...selectedPalletJobKeys].forEach(k => { if (!usableKeys.has(k)) selectedPalletJobKeys.delete(k); });
+  if (!usable.length){
+    wrap.innerHTML = `<div class="pallet-job-picker-empty">${isEs?'Ningún trabajo con Configuración de Empaque confirmada coincide con estos filtros.':'No jobs with a confirmed Packing Setup match these filters.'}</div>`;
+    return;
+  }
+  wrap.innerHTML = usable.map(r => {
+    const key = _reportKey(r);
+    const passText = r.Pass ? passLabel(String(r.Pass), isEs) : '';
+    const dateLabel = r.Timestamp ? new Date(r.Timestamp).toLocaleDateString() : '';
+    const label = `${escapeHtml(r.PO||'')}${passText?' — '+escapeHtml(passText):''} — ${escapeHtml(r.Station||'')} · ${dateLabel}`;
+    const checked = selectedPalletJobKeys.has(key) ? 'checked' : '';
+    return `<label><input type="checkbox" ${checked} onchange="togglePalletJob('${escapeAttr(key)}', this.checked)">${label}</label>`;
+  }).join('');
+}
+
+function _computePalletSeries(r){
+  const s = getReportDerivedStats(r);
+  if (s.piecesPerPalletUnit <= 0) return null;
+  // Full Log is built chronologically by sendReport() — its own line order
+  // already IS the timeline, no separate sort key needed.
+  const entries = parseFullLogText(r['Full Log']);
+  let cumulative = 0;
+  return entries.map(e => {
+    cumulative += Number(e.good) || 0;
+    return Math.round((cumulative / s.piecesPerPalletUnit) * 10) / 10;
+  });
+}
+
+function _renderPalletChart(reports, isEs){
+  _renderPalletJobPicker(reports, isEs);
+  const canvas = document.getElementById('prevChartPallets');
+  if (!canvas) return;
+  const {axis, grid} = _chartTextColors();
+  const selected = reports.filter(r => selectedPalletJobKeys.has(_reportKey(r)));
+  const datasets = [];
+  let maxLen = 0;
+  selected.forEach(r => {
+    const series = _computePalletSeries(r);
+    if (!series || !series.length) return;
+    maxLen = Math.max(maxLen, series.length);
+    const passKey = String(r.Pass||'S');
+    const color = palletColorMode === 'pass' ? (PASS_COLORS[passKey] || '#888888') : undefined;
+    const baseLabel = palletColorMode === 'pass' ? (r.Pass ? passLabel(passKey, isEs) : (isEs?'Sin Pasada':'No Pass')) : String(r.PO||'');
+    datasets.push({
+      label: baseLabel + (palletColorMode==='pass' ? ' ('+r.PO+')' : ''),
+      data: series,
+      borderColor: color, backgroundColor: color,
+      fill: false, tension: 0.2
+    });
+  });
+  if (window.__prevPalletChart){ window.__prevPalletChart.destroy(); window.__prevPalletChart = null; }
+  if (!datasets.length) return; // nothing selected yet — leave the canvas blank
+  const labels = Array.from({length: maxLen}, (_, i) => (isEs?'Evento ':'Event ') + (i+1));
+  window.__prevPalletChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive:true,
+      plugins:{ legend:{ labels:{ color: axis } } },
+      scales: { y: { beginAtZero:true, ticks:{color:axis}, grid:{color:grid} }, x: { ticks:{color:axis}, grid:{color:grid} } }
+    }
+  });
+}
+
+function renderExportPreview(){
+  if (!dashData) return;
+  const isEs = document.body.classList.contains('es');
+  const reports = getFilteredReportsForExport();
+  _destroyPreviewCharts();
+  _renderChartOverTime(reports, isEs);
+  _renderStationCompareCharts(reports, isEs);
+  _renderPalletChart(reports, isEs);
+  _renderByJobChart(reports, isEs);
+  _renderByStationChart(reports, isEs);
 }
 // Re-check the match count live as filters change, without waiting for an
 // export tap — lets a manager see "0 reports match" before wasting a click.
