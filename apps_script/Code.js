@@ -50,11 +50,12 @@ function doPostLocked(e) {
     if (data.action === 'log_entry') {
       var activeSheet = getOrCreateActiveEntriesSheet(ss);
       if (!entryIdExists(activeSheet, data.entryId, 12)) {
-        activeSheet.appendRow([
-          new Date(), data.po, data.product, data.station, data.target,
-          data.shift, data.date, data.time, data.good, data.reject, data.flags, data.entryId,
-          data.pass || ''
-        ]);
+        appendRowByHeaders(activeSheet, {
+          'Timestamp': new Date(), 'PO': data.po, 'Product': data.product, 'Station': data.station,
+          'Target': data.target, 'Shift': data.shift, 'Date': data.date, 'Time': data.time,
+          'Good': data.good, 'Reject': data.reject, 'Flags': data.flags, 'EntryId': data.entryId,
+          'Pass': data.pass || '', 'DeviceId': data.deviceId || ''
+        });
       }
       return success();
     }
@@ -65,11 +66,11 @@ function doPostLocked(e) {
     if (data.action === 'log_pallet') {
       var palletsSheet = getOrCreatePalletsSheet(ss);
       if (!entryIdExists(palletsSheet, data.entryId, 8)) {
-        palletsSheet.appendRow([
-          new Date(), data.po, data.product, data.station,
-          data.shift, data.date, data.time, data.entryId,
-          data.pass || ''
-        ]);
+        appendRowByHeaders(palletsSheet, {
+          'Timestamp': new Date(), 'PO': data.po, 'Product': data.product, 'Station': data.station,
+          'Shift': data.shift, 'Date': data.date, 'Time': data.time, 'EntryId': data.entryId,
+          'Pass': data.pass || '', 'DeviceId': data.deviceId || ''
+        });
       }
       return success();
     }
@@ -83,9 +84,10 @@ function doPostLocked(e) {
     if (data.action === 'add_note') {
       var notesSheet = getOrCreateNotesSheet(ss);
       if (!entryIdExists(notesSheet, data.noteId, 6)) {
-        notesSheet.appendRow([
-          new Date(), data.po, data.pass || '', data.scope, data.entryId || '', data.noteId, data.text
-        ]);
+        appendRowByHeaders(notesSheet, {
+          'Timestamp': new Date(), 'PO': data.po, 'Pass': data.pass || '', 'Scope': data.scope,
+          'EntryId': data.entryId || '', 'NoteId': data.noteId, 'Text': data.text, 'DeviceId': data.deviceId || ''
+        });
       }
       return success();
     }
@@ -175,11 +177,16 @@ function doPostLocked(e) {
       var logLines = String(reportRow.fullLog || '').split('\n').filter(function (l) { return l.trim(); });
       logLines.forEach(function (line, idx) {
         var parsed = parseLogLine(line);
-        activeSheetR.appendRow([
-          now, reportRow.po, reportRow.product, reopenStation, reportRow.target,
-          parsed.shift, parsed.date, parsed.time, parsed.good, parsed.reject, parsed.flags,
-          'reopen_' + now.getTime() + '_' + idx, reportRow.pass
-        ]);
+        // Tagged with the reopening device's own DeviceId (not the original
+        // logger's, long gone once a job finishes) — these rows now belong
+        // to whichever device reopened the job, same as any freshly-created
+        // job would be.
+        appendRowByHeaders(activeSheetR, {
+          'Timestamp': now, 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
+          'Target': reportRow.target, 'Shift': parsed.shift, 'Date': parsed.date, 'Time': parsed.time,
+          'Good': parsed.good, 'Reject': parsed.reject, 'Flags': parsed.flags,
+          'EntryId': 'reopen_' + now.getTime() + '_' + idx, 'Pass': reportRow.pass, 'DeviceId': data.deviceId || ''
+        });
       });
       var totalPallets = Number(reportRow.totalPallets) || 0;
       if (totalPallets > 0) {
@@ -188,10 +195,11 @@ function doPostLocked(e) {
         var todayDate = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
         var todayTime = Utilities.formatDate(now, tz, 'hh:mm a');
         for (var pIdx = 0; pIdx < totalPallets; pIdx++) {
-          palletsSheetR.appendRow([
-            now, reportRow.po, reportRow.product, reopenStation,
-            '1', todayDate, todayTime, 'reopen_pallet_' + now.getTime() + '_' + pIdx, reportRow.pass
-          ]);
+          appendRowByHeaders(palletsSheetR, {
+            'Timestamp': now, 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
+            'Shift': '1', 'Date': todayDate, 'Time': todayTime,
+            'EntryId': 'reopen_pallet_' + now.getTime() + '_' + pIdx, 'Pass': reportRow.pass, 'DeviceId': data.deviceId || ''
+          });
         }
       }
       reportsSheetR.deleteRow(reportRow.rowIndex);
@@ -226,15 +234,18 @@ function doPostLocked(e) {
       'Shifts': data.shifts || ''
     });
 
-    // Job is done — drop it out of the live "still active" list on every
-    // device. Pass is included: a PO's 1st Pass and 2nd Pass run are now
-    // fully separate jobs, so finishing one must not touch the other's
-    // still-in-progress rows under the same PO. Notes are already captured
-    // in this report's email body (see sendReport() in index.html) by the
-    // time this runs, so clearing them here doesn't lose anything.
-    removeActiveEntriesForPO(ss, data.po, data.pass);
-    removePalletsForPO(ss, data.po, data.pass);
-    removeNotesForPO(ss, data.po, data.pass);
+    // Job is done — drop THIS DEVICE's rows out of the live "still active"
+    // list. Pass is included: a PO's 1st Pass and 2nd Pass run are fully
+    // separate jobs, so finishing one must not touch the other's still-in-
+    // progress rows under the same PO. DeviceId is included too (2026-09-17):
+    // another device can legitimately be running its own separate job under
+    // this exact same PO+Pass now, and finishing this one must never delete
+    // that device's still-in-progress rows. Notes are already captured in
+    // this report's email body (see sendReport() in index.html) by the time
+    // this runs, so clearing them here doesn't lose anything.
+    removeActiveEntriesForPO(ss, data.po, data.pass, data.deviceId);
+    removePalletsForPO(ss, data.po, data.pass, data.deviceId);
+    removeNotesForPO(ss, data.po, data.pass, data.deviceId);
 
     // QA group can be added later: to: "jayro@moquinpress.com,qualitygroup@moquinpress.com"
     MailApp.sendEmail({
@@ -305,11 +316,25 @@ function entryIdExists(sheet, entryId, entryIdCol) {
   return ids.some(function (row) { return String(row[0]) === String(entryId); });
 }
 
+// DeviceId is appended LAST on all three sheets (never inserted earlier) so
+// its column index never has to change, same reasoning as Pass before it.
+// Added 2026-09-17 so two devices logging the SAME PO+Pass are never merged
+// into one job (Anthony: "treat it as a separate entry... no device should
+// ever auto-merge") — every write is tagged with the device that made it,
+// and index.html's own sync code only ever pulls rows back matching its own
+// DeviceId into a local job. Live Jobs (doGet, unfiltered) is unaffected —
+// it's meant to show every device's activity, tagged or not.
+var ACTIVE_ENTRIES_HEADERS = ['Timestamp', 'PO', 'Product', 'Station', 'Target', 'Shift', 'Date', 'Time', 'Good', 'Reject', 'Flags', 'EntryId', 'Pass', 'DeviceId'];
+var PALLETS_HEADERS = ['Timestamp', 'PO', 'Product', 'Station', 'Shift', 'Date', 'Time', 'EntryId', 'Pass', 'DeviceId'];
+var NOTES_HEADERS = ['Timestamp', 'PO', 'Pass', 'Scope', 'EntryId', 'NoteId', 'Text', 'DeviceId'];
+
 function getOrCreateActiveEntriesSheet(ss) {
   var sheet = ss.getSheetByName('ActiveEntries');
   if (!sheet) {
     sheet = ss.insertSheet('ActiveEntries');
-    sheet.appendRow(['Timestamp', 'PO', 'Product', 'Station', 'Target', 'Shift', 'Date', 'Time', 'Good', 'Reject', 'Flags', 'EntryId', 'Pass']);
+    sheet.appendRow(ACTIVE_ENTRIES_HEADERS);
+  } else {
+    ensureHeaders(sheet, ACTIVE_ENTRIES_HEADERS);
   }
   return sheet;
 }
@@ -318,19 +343,23 @@ function getOrCreatePalletsSheet(ss) {
   var sheet = ss.getSheetByName('Pallets');
   if (!sheet) {
     sheet = ss.insertSheet('Pallets');
-    sheet.appendRow(['Timestamp', 'PO', 'Product', 'Station', 'Shift', 'Date', 'Time', 'EntryId', 'Pass']);
+    sheet.appendRow(PALLETS_HEADERS);
+  } else {
+    ensureHeaders(sheet, PALLETS_HEADERS);
   }
   return sheet;
 }
 
-// Notes columns: Timestamp, PO, Pass, Scope, EntryId, NoteId, Text.
+// Notes columns: Timestamp, PO, Pass, Scope, EntryId, NoteId, Text, DeviceId.
 // Scope is 'job' or 'entry'; EntryId is blank for job-level notes, or the
 // ActiveEntries row's own EntryId for entry-level ones. NoteId is column 6.
 function getOrCreateNotesSheet(ss) {
   var sheet = ss.getSheetByName('Notes');
   if (!sheet) {
     sheet = ss.insertSheet('Notes');
-    sheet.appendRow(['Timestamp', 'PO', 'Pass', 'Scope', 'EntryId', 'NoteId', 'Text']);
+    sheet.appendRow(NOTES_HEADERS);
+  } else {
+    ensureHeaders(sheet, NOTES_HEADERS);
   }
   return sheet;
 }
@@ -364,44 +393,55 @@ function normalizePO(po) {
 // mid-loop. Pass is column 13 (0-based index 12) — see the layout comment
 // above entryIdExists. If pass is falsy (jobs created before Pass existed),
 // falls back to matching by PO alone, same as the original behavior.
-function removeActiveEntriesForPO(ss, po, pass) {
+// deviceId (optional) additionally requires column 14 (0-based index 13) to
+// match — added 2026-09-17 so that finishing ONE device's job never deletes
+// a different device's still-in-progress rows for the exact same PO+Pass,
+// now that two devices are explicitly allowed to run the same PO+Pass as
+// fully separate jobs (see the DeviceId comment on getOrCreateActiveEntriesSheet).
+// Omit deviceId (delete_job, an admin action from the aggregated Live Jobs
+// view) to keep the old blunt "wipe this PO+Pass for everyone" behavior.
+function removeActiveEntriesForPO(ss, po, pass, deviceId) {
   var sheet = ss.getSheetByName('ActiveEntries');
   if (!sheet || sheet.getLastRow() < 2) return;
   var target = normalizePO(po);
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i >= 1; i--) {
     var passMatches = !pass || String(data[i][12] || '') === String(pass);
-    if (normalizePO(data[i][1]) === target && passMatches) {
+    var deviceMatches = !deviceId || String(data[i][13] || '') === String(deviceId);
+    if (normalizePO(data[i][1]) === target && passMatches && deviceMatches) {
       sheet.deleteRow(i + 1);
     }
   }
 }
 
 // Same cleanup as removeActiveEntriesForPO, for the Pallets sheet. Pass is
-// column 9 (0-based index 8) there — see getOrCreatePalletsSheet's header.
-function removePalletsForPO(ss, po, pass) {
+// column 9 (0-based index 8), DeviceId column 10 (0-based index 9).
+function removePalletsForPO(ss, po, pass, deviceId) {
   var sheet = ss.getSheetByName('Pallets');
   if (!sheet || sheet.getLastRow() < 2) return;
   var target = normalizePO(po);
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i >= 1; i--) {
     var passMatches = !pass || String(data[i][8] || '') === String(pass);
-    if (normalizePO(data[i][1]) === target && passMatches) {
+    var deviceMatches = !deviceId || String(data[i][9] || '') === String(deviceId);
+    if (normalizePO(data[i][1]) === target && passMatches && deviceMatches) {
       sheet.deleteRow(i + 1);
     }
   }
 }
 
 // Same cleanup as removeActiveEntriesForPO, for the Notes sheet. PO is
-// column 2 (0-based index 1), Pass is column 3 (0-based index 2).
-function removeNotesForPO(ss, po, pass) {
+// column 2 (0-based index 1), Pass is column 3 (0-based index 2), DeviceId
+// column 8 (0-based index 7).
+function removeNotesForPO(ss, po, pass, deviceId) {
   var sheet = ss.getSheetByName('Notes');
   if (!sheet || sheet.getLastRow() < 2) return;
   var target = normalizePO(po);
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i >= 1; i--) {
     var passMatches = !pass || String(data[i][2] || '') === String(pass);
-    if (normalizePO(data[i][1]) === target && passMatches) {
+    var deviceMatches = !deviceId || String(data[i][7] || '') === String(deviceId);
+    if (normalizePO(data[i][1]) === target && passMatches && deviceMatches) {
       sheet.deleteRow(i + 1);
     }
   }
@@ -521,15 +561,24 @@ function sheetToObjects(sheet) {
 var REPORTS_HEADERS = ['Timestamp', 'PO', 'Product', 'Station', 'Target', 'Total Good', 'Total Reject', 'Total Pallets', 'Full Log', 'Pass',
   'OversPercent', 'EffectiveTarget', 'PiecesPerBox', 'BoxesPerPallet', 'PalletsNeeded', 'PctShortVsTarget', 'PctShortVsEffectiveTarget', 'Shifts'];
 function ensureReportsHeaders(sheet) {
+  ensureHeaders(sheet, REPORTS_HEADERS);
+}
+
+// Generic version of the above — appends whichever of `headers` a sheet is
+// still missing to the END of row 1, exactly once, never touching/reordering
+// any existing header. Used for Reports (History fields, 2026-09-16) and now
+// ActiveEntries/Pallets/Notes (DeviceId, 2026-09-17). Safe to call on every
+// request; a sheet that already has every header is untouched.
+function ensureHeaders(sheet, headers) {
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(REPORTS_HEADERS);
+    sheet.appendRow(headers);
     return;
   }
   var lastCol = sheet.getLastColumn();
   var existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
   var have = {};
   existing.forEach(function (h) { have[h] = true; });
-  var missing = REPORTS_HEADERS.filter(function (h) { return !have[h]; });
+  var missing = headers.filter(function (h) { return !have[h]; });
   if (missing.length) {
     sheet.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
   }

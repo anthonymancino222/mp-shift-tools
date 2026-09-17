@@ -1632,6 +1632,25 @@ const DRAFT_KEY = 'shiftHandoffDrafts_v1';
 const MANAGER_EMAIL = 'jayro@moquinpress.com';
 const QA_EMAIL = 'qualitygroup@moquinpress.com';
 
+// Persistent per-browser identity (2026-09-17, Anthony: "no device should
+// ever auto-merge... treat it as a separate entry"). Every entry/pallet/note
+// this device pushes is tagged with this id, and _mergeRemoteIntoJob()/
+// _discoverRemoteJobs() below only ever pull rows back that carry THIS same
+// id into this device's own local jobs[] — so two devices independently
+// working the identical PO+Pass stay two fully separate jobs, never merging
+// into one shared count. Live Jobs (renderDashLive) is intentionally
+// unaffected: it reads dashData.active/pallets/notes directly (every
+// device's raw rows, unfiltered), since that IS the one place meant to show
+// everyone's activity — "you should only see the other tablet's job through
+// Live Jobs." Generated once and kept in localStorage forever; clearing site
+// data on a device makes it look new (a fresh job on next use), same as
+// losing any other locally-stored state.
+let DEVICE_ID = localStorage.getItem('gluer_device_id_v1');
+if (!DEVICE_ID) {
+  DEVICE_ID = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  try { localStorage.setItem('gluer_device_id_v1', DEVICE_ID); } catch(e) {}
+}
+
 // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW (see setup instructions)
 const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.dev/';
 
@@ -2083,7 +2102,8 @@ function pushLiveNote(job, note, scope, entryId){
     body: JSON.stringify({
       action: 'add_note',
       po: job.po, station: job.machine, pass: job.pass || '',
-      scope, entryId: entryId || '', noteId: note.id, text: note.text
+      scope, entryId: entryId || '', noteId: note.id, text: note.text,
+      deviceId: DEVICE_ID
     })
   }).then(res => res.json()).then(res => {
     notePushesInFlight.delete(note.id);
@@ -3588,7 +3608,8 @@ function pushLivePallet(job, pallet){
     body: JSON.stringify({
       action: 'log_pallet',
       po: job.po, product: job.product || '', station: job.machine, pass: job.pass || '',
-      shift: pallet.shift, date: pallet.date, time: pallet.time, entryId: pallet.id
+      shift: pallet.shift, date: pallet.date, time: pallet.time, entryId: pallet.id,
+      deviceId: DEVICE_ID
     })
   }).then(res => res.json()).then(res => {
     palletPushesInFlight.delete(pallet.id);
@@ -3694,7 +3715,8 @@ function pushLiveEntry(job, entry){
       action: 'log_entry',
       po: job.po, product: job.product || '', station: job.machine, pass: job.pass || '', target: job.target || 0,
       shift: entry.shift, date: entry.date, time: entry.time,
-      good: entry.good, reject: entry.reject, flags: entry.flags, entryId: entry.id
+      good: entry.good, reject: entry.reject, flags: entry.flags, entryId: entry.id,
+      deviceId: DEVICE_ID
     })
   }).then(res => res.json()).then(res => {
     pushesInFlight.delete(entry.id);
@@ -3832,10 +3854,17 @@ function _mergeRemoteIntoJob(job, res){
   // this one. Jobs created before Pass existed have no job.pass, so they
   // fall back to matching by PO alone (unchanged prior behavior).
   const jobPass = job.pass || '';
+  // DeviceId match too (2026-09-17): a remote row from a DIFFERENT device
+  // logging this exact same PO+Pass is a deliberately separate job now, not
+  // something to merge in — see the DEVICE_ID comment up top. Only this
+  // device's own previously-pushed rows ever come back into its local job
+  // (useful for restoring state after a cache clear on the SAME device).
+  // Live Jobs stays unfiltered on purpose — that's the one place meant to
+  // show every device's activity.
   let added = 0;
   {
     const remote = (res.active || []).filter(e =>
-      normalizePO(e.PO) === jobPO && (!jobPass || String(e.Pass||'') === jobPass));
+      normalizePO(e.PO) === jobPO && (!jobPass || String(e.Pass||'') === jobPass) && String(e.DeviceId||'') === DEVICE_ID);
     const existingIds = new Set(job.entries.map(e => e.id));
     remote.forEach(e => {
         // Legacy rows written before the entryId/idempotency feature existed
@@ -3882,7 +3911,7 @@ function _mergeRemoteIntoJob(job, res){
   }
   {
     const remotePallets = (res.pallets || []).filter(p =>
-      normalizePO(p.PO) === jobPO && (!jobPass || String(p.Pass||'') === jobPass));
+      normalizePO(p.PO) === jobPO && (!jobPass || String(p.Pass||'') === jobPass) && String(p.DeviceId||'') === DEVICE_ID);
     // Includes already-voided local pallets so a locally-undone tap can
     // never get resurrected by the next pull (see undoPallet()).
     const existingPalletIds = new Set(job.pallets.map(p => p.id));
@@ -3906,7 +3935,7 @@ function _mergeRemoteIntoJob(job, res){
   }
   {
     const remoteNotes = (res.notes || []).filter(n =>
-      normalizePO(n.PO) === jobPO && (!jobPass || String(n.Pass||'') === jobPass));
+      normalizePO(n.PO) === jobPO && (!jobPass || String(n.Pass||'') === jobPass) && String(n.DeviceId||'') === DEVICE_ID);
     const existingJobNoteIds = new Set(job.notes.map(n => n.id));
     remoteNotes.filter(n => n.Scope === 'job').forEach(n => {
       const id = n.NoteId;
@@ -3940,22 +3969,27 @@ function _mergeRemoteIntoJob(job, res){
   return added;
 }
 
-// Finds any PO+Pass the server's ActiveEntries sheet still has open that
-// this device has never seen — e.g. a job started on someone else's phone —
-// and brings it into this device's own `jobs` dict (as a fresh, unconfirmed-
-// Packing-Setup job stub) so it shows up in the Active Job list without
-// anyone having to manually recreate it with a matching PO/Pass/Station.
+// Finds any PO+Pass THIS DEVICE has already pushed rows for (its own
+// DeviceId) that isn't in this device's local `jobs` dict yet — e.g.
+// recovering state after this exact browser's storage was cleared — and
+// brings it back as a fresh, unconfirmed-Packing-Setup job stub. Never
+// adopts a DIFFERENT device's job anymore (2026-09-17, Anthony: "I should
+// only be able to see the other tablet's job through Live Jobs... no device
+// should ever auto-merge") — that's the whole reason DeviceId exists; see
+// the DEVICE_ID comment up top. A job legitimately active on someone else's
+// phone simply never shows up here; it's still fully visible via Live Jobs
+// (renderDashLive reads dashData directly, unfiltered).
 // Product/Station/Target come straight off the ActiveEntries row itself
 // (see getOrCreateActiveEntriesSheet's column list in apps_script_backend.gs)
 // — the same row that already carries everything createJob() would've asked
 // for by hand. Deliberately only reads res.active (never res.reports) — a
 // job that's already been finished and reported has no business coming back
-// as "active" on every other device just because its old rows still exist
-// somewhere.
+// as "active" just because its old rows still exist somewhere.
 function _discoverRemoteJobs(res){
   let added = 0;
   const seen = {};
   (res.active || []).forEach(function(e){
+    if (String(e.DeviceId||'') !== DEVICE_ID) return;
     const po = normalizePO(e.PO);
     if (!po) return;
     const pass = String(e.Pass || '');
@@ -4171,6 +4205,7 @@ function sendReport(){
     product: job.product || '',
     station: job.machine,
     pass: job.pass || '',
+    deviceId: DEVICE_ID,
     target: job.target || 0,
     oversPercent: jobOversPercent,
     effectiveTarget: jobEffectiveTarget,
@@ -4813,7 +4848,7 @@ function confirmReopenJob(){
   btn.innerHTML = isEs ? '⏳ Reabriendo…' : '⏳ Reopening…';
   fetch(REPORT_ENDPOINT_URL, {
     method: 'POST',
-    body: JSON.stringify({ action: 'reopen_job', po: report.PO, pass: report.Pass || '', station, timestamp: report.Timestamp, pin })
+    body: JSON.stringify({ action: 'reopen_job', po: report.PO, pass: report.Pass || '', station, timestamp: report.Timestamp, pin, deviceId: DEVICE_ID })
   }).then(res => res.json()).then(res => {
     btn.disabled = false;
     btn.innerHTML = originalHTML;
