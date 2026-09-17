@@ -550,17 +550,6 @@
   .pallet-preset-del{background:none;border:none;color:var(--accent);font-size:1.1rem;font-weight:800;cursor:pointer;padding:6px 10px;}
   .entry-pallet-tag{display:inline-block;font-size:0.75rem;font-weight:700;color:var(--navy);background:var(--pink-soft);border-radius:6px;padding:2px 8px;margin-top:4px;}
 
-  /* Manual numeric count fields */
-  .counter-block{margin-bottom:16px;}
-  .counter-title{font-size:1.15rem;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
-  .counter-title.good{color:var(--good);}
-  .counter-title.reject{color:var(--accent);}
-  .count-input{
-    width:100%;padding:20px;font-size:2.4rem;font-weight:900;text-align:center;
-    border-radius:12px;border:2px solid var(--border);
-  }
-  .count-input.reject{background:var(--accent-soft-bg);color:var(--accent);border-color:var(--accent);}
-
   .btn-submit{
     width:100%;padding:20px;font-size:1.4rem;font-weight:900;border-radius:12px;border:none;
     background:var(--navy);color:#fff;margin-top:8px;
@@ -662,7 +651,6 @@
   .ec-original{font-size:0.95rem;font-weight:700;color:#9aa2b1;text-decoration:line-through;margin-bottom:2px;}
   .ec-value{font-size:1.6rem;font-weight:900;}
   .ec-value.good{color:var(--good);}
-  .ec-value.reject{color:var(--accent);}
   .entry-flags{margin-top:8px;font-size:0.9rem;color:var(--warn-soft-text);background:var(--warn-soft-bg);border-radius:6px;padding:6px 8px;}
   .entry-flags:empty{display:none;}
   .entry-edit-row{margin-top:8px;text-align:right;}
@@ -1016,7 +1004,7 @@
     <button type="button" class="landing-card landing-card-primary" style="--tile-accent:var(--navy);" onclick="enterLogScreen()">
       <div class="landing-icon">📦</div>
       <div class="landing-title"><span data-en>Log Production Counts</span><span data-es>Registrar Conteos de Producción</span></div>
-      <div class="landing-desc"><span data-en>Start or continue a job, track Good/Hold counts and pallets.</span><span data-es>Inicie o continúe un trabajo, registre conteos Bueno/Retenido y tarimas.</span></div>
+      <div class="landing-desc"><span data-en>Start or continue a job, track Good counts and pallets.</span><span data-es>Inicie o continúe un trabajo, registre conteos Buenos y tarimas.</span></div>
       <div class="landing-status" id="landingJobStatus"></div>
       <div class="landing-cta">👉 <span data-en>Tap here to start</span><span data-es>Toque aquí para empezar</span> <span class="arrow">→</span></div>
       <div class="landing-badge" id="landingSyncBadge" style="display:none;"></div>
@@ -2815,7 +2803,7 @@ const HELP_TEXTS = {
     en: {
       title: '📜 Shift Log History',
       body: 'Tap the "Shift Log History" title to open or close this list — it\'s collapsed by default to keep the screen simpler, and stays open or closed however you last left it.\n\n' +
-        'Every count you\'ve submitted for this job shows here once opened, grouped by day, with the running Good/Hold totals for each day. For a 1st Pass job, this instead shows each Machine Count reading and the day\'s LATEST reading (not a sum — see the Machine Count "?" for why).\n\n' +
+        'Every count you\'ve submitted for this job shows here once opened, grouped by day, with the running Good total for each day. For a 1st Pass job, this instead shows each Machine Count reading and the day\'s LATEST reading (not a sum — see the Machine Count "?" for why).\n\n' +
         'A count can be edited once (tap ✏️ Edit) if it was entered wrong — after that it\'s locked.\n\n' +
         '📧 "Finish, Send Report" closes this job out for good: it emails the final totals to your manager and removes it from Live Jobs. Only tap this once the job is truly done.'
     },
@@ -4110,21 +4098,20 @@ function sendReport(){
   scheduleSilentSync();
 
   const totalGood = computeTotalGood(job);
-  const totalReject = job.entries.filter(e=>!e.voided).reduce((s,e)=>s+e.reject,0);
   const totalPallets = job.pallets.filter(p=>!p.voided).length;
 
   const subject = `Shift Count Report — ${job.po} (${job.machine}${passText ? ', '+passText : ''})`;
   let fullLog = '';
   const sorted = [...job.entries].sort((a,b)=>a.loggedAt-b.loggedAt);
   // 1st Pass jobs never box product — each row is a cumulative Machine Count
-  // reading (replaces the running total), not an additive Good/Reject tally
-  // like every other Pass, so it's logged with its own distinct label to
-  // avoid reading as if these rows should be summed.
+  // reading (replaces the running total), not an additive Good tally like
+  // every other Pass, so it's logged with its own distinct label to avoid
+  // reading as if these rows should be summed.
   sorted.forEach(e=>{
     const shiftLabel = e.shift==='2' ? 'Shift 2' : 'Shift 1';
     fullLog += e.isMachineCount
       ? `${e.date} ${e.time} | ${shiftLabel} | Machine Count (cumulative): ${e.good}`
-      : `${e.date} ${e.time} | ${shiftLabel} | Good: ${e.good} | Reject: ${e.reject}`;
+      : `${e.date} ${e.time} | ${shiftLabel} | Good: ${e.good}`;
     if(e.flags) fullLog += ` | Flags: ${e.flags}`;
     fullLog += '\n';
   });
@@ -4176,7 +4163,7 @@ function sendReport(){
   const shortfallLine = `Shortfall vs Target (no overs): ${pctShortVsTarget}%\n`
     + (jobOversPercent > 0 ? `Shortfall vs Target incl. Overs: ${pctShortVsEffectiveTarget}%\n` : '');
 
-  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nShift(s): ${shiftsLabel}\nQuantity to Produce: ${job.target || 'N/A'}\n${oversLine}${packingLine}${palletsNeededLine}${shortfallLine}\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nCURRENT HOLD/REVIEW: ${totalReject.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
+  let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nShift(s): ${shiftsLabel}\nQuantity to Produce: ${job.target || 'N/A'}\n${oversLine}${packingLine}${palletsNeededLine}${shortfallLine}\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
 
   const payload = {
     action: 'finish_report',
@@ -4191,7 +4178,7 @@ function sendReport(){
     palletsNeeded,
     pctShortVsTarget, pctShortVsEffectiveTarget,
     shifts: shiftsInvolved.join(','),
-    totalGood, totalReject, totalPallets,
+    totalGood, totalPallets,
     subject, body,
     fullLog
   };
@@ -4264,7 +4251,6 @@ function saveEditEntry(jobId, entryId){
 
   const isEs = document.body.classList.contains('es');
   const newGood = parseInt(document.getElementById('editGood_'+entryId).value.replace(/,/g,'')) || 0;
-  const newReject = parseInt(document.getElementById('editReject_'+entryId).value.replace(/,/g,'')) || 0;
 
   const confirmMsg = isEs
     ? 'Esto solo se puede editar UNA vez. Después de guardar, este registro quedará bloqueado. ¿Continuar?'
@@ -4272,9 +4258,7 @@ function saveEditEntry(jobId, entryId){
   if(!confirm(confirmMsg)) return;
 
   entry.originalGood = entry.good;
-  entry.originalReject = entry.reject;
   entry.good = newGood;
-  entry.reject = newReject;
   entry.edited = true;
 
   saveAll();
@@ -4548,7 +4532,6 @@ function renderJob(){
   } else {
     const sorted = [...activeEntries].sort((a,b)=>b.loggedAt-a.loggedAt);
     const goodLbl = isEs ? 'CONTEO BUENO' : 'GOOD COUNT';
-    const rejLbl = isEs ? 'RETENIDO/REVISIÓN' : 'HOLD/REVIEW';
 
     // group by date, preserving most-recent-first order
     const groups = [];
@@ -4567,21 +4550,17 @@ function renderJob(){
       // over-count, so the day's total is just its latest reading instead
       // (g.entries is already newest-first, same ordering `sorted` used).
       const dayGood = job.pass === '1' ? g.entries[0].good : g.entries.reduce((s,e)=>s+e.good,0);
-      const dayReject = g.entries.reduce((s,e)=>s+e.reject,0);
       const entriesHtml = g.entries.map(e=>{
         const shiftClass = e.shift==='2' ? 'shift2' : '';
         const shiftLabel = e.shift==='2' ? (isEs?'Turno 2':'Shift 2') : (isEs?'Turno 1':'Shift 1');
 
         const goodOriginalHtml = e.edited ? `<div class="ec-original">${e.originalGood.toLocaleString()}</div>` : '';
-        const rejectOriginalHtml = e.edited ? `<div class="ec-original">${e.originalReject.toLocaleString()}</div>` : '';
 
         let editRowHtml = '';
         if(editingEntryId === e.id){
           editRowHtml = `<div class="edit-form">
             <label>${isEs?'Conteo Bueno':'Good Count'}</label>
             <input type="text" inputmode="numeric" id="editGood_${e.id}" value="${e.good.toLocaleString()}" oninput="formatThousands(this)">
-            <label>${isEs?'Retenido/Revisión':'Hold/Review Count'}</label>
-            <input type="text" inputmode="numeric" id="editReject_${e.id}" value="${e.reject.toLocaleString()}" oninput="formatThousands(this)">
             <div class="edit-form-btns">
               <button class="edit-cancel-btn" onclick="cancelEditEntry()">${isEs?'Cancelar':'Cancel'}</button>
               <button class="edit-save-btn" onclick="saveEditEntry('${currentJobId}','${e.id}')">${isEs?'Guardar (solo 1 vez)':'Save (one-time)'}</button>
@@ -4597,16 +4576,11 @@ function renderJob(){
         return `<div class="entry ${shiftClass}">
           <div class="entry-top"><span>${e.time}</span><span>${shiftLabel}</span></div>
           <div class="entry-counts">
-            <div${e.isMachineCount ? ' style="grid-column:1/-1;"' : ''}>
+            <div style="grid-column:1/-1;">
               <div class="ec-label">${entryGoodLbl}</div>
               ${goodOriginalHtml}
               <div class="ec-value good">${e.good.toLocaleString()}</div>
             </div>
-            ${e.isMachineCount ? '' : `<div>
-              <div class="ec-label">${rejLbl}</div>
-              ${rejectOriginalHtml}
-              <div class="ec-value reject">${e.reject.toLocaleString()}</div>
-            </div>`}
           </div>
           <div class="entry-flags">${e.flags||''}</div>
           ${e.fromPallet ? `<div class="entry-pallet-tag">📦 ${isEs?(e.partial?'Auto (Tarima Parcial)':'Auto (Tarima)'):(e.partial?'Auto (Partial Pallet)':'Auto (Pallet)')}</div>` : ''}
@@ -4618,7 +4592,7 @@ function renderJob(){
       }).join('');
       const daySubtotalHtml = job.pass === '1'
         ? `<span class="sg">${isEs?'Conteo de Máquina':'Machine Count'}: ${dayGood.toLocaleString()}</span>`
-        : `<span class="sg">${isEs?'Bueno':'Good'}: ${dayGood.toLocaleString()}</span> &nbsp;|&nbsp; <span class="sr">${isEs?'Retenido/Revisión':'Hold/Review'}: ${dayReject.toLocaleString()}</span>`;
+        : `<span class="sg">${isEs?'Bueno':'Good'}: ${dayGood.toLocaleString()}</span>`;
       return `<div class="day-group">
         <div class="day-header">
           <span class="day-date">📅 ${g.date}</span>
@@ -4803,8 +4777,8 @@ function openReopenJobModal(reportIndex){
   const passText = report.Pass ? passLabel(String(report.Pass), isEs) : '';
   const label = report.PO + (passText ? ' ('+passText+')' : '');
   document.getElementById('reopenJobDesc').textContent = isEs
-    ? `Esto regresa "${label}" a Trabajos Activos (con sus conteos Bueno/Retenido y el total de tarimas restaurados), lo pone en su lista de Trabajo Activo listo para reanudar, y lo QUITA de Historial.`
-    : `This puts "${label}" back in Live Jobs (with its Good/Hold counts and pallet total restored), into your Active Job list ready to resume, and REMOVES it from History.`;
+    ? `Esto regresa "${label}" a Trabajos Activos (con su conteo Bueno y el total de tarimas restaurados), lo pone en su lista de Trabajo Activo listo para reanudar, y lo QUITA de Historial.`
+    : `This puts "${label}" back in Live Jobs (with its Good count and pallet total restored), into your Active Job list ready to resume, and REMOVES it from History.`;
   document.getElementById('reopenJobPin').value = '';
   _updateReopenStationButtons();
   document.getElementById('reopenJobOverlay').classList.add('open');
@@ -4908,7 +4882,6 @@ function escapeAttr(s){ return String(s).replace(/'/g,"\\'"); }
 function renderLogEntryCards(entries){
   const isEs = document.body.classList.contains('es');
   const goodLbl = isEs ? 'CONTEO BUENO' : 'GOOD COUNT';
-  const rejLbl = isEs ? 'RETENIDO/REVISIÓN' : 'HOLD/REVIEW';
   if (!entries.length) return `<div class="dash-empty" style="padding:10px;">${isEs?'Sin registros individuales.':'No individual entries.'}</div>`;
   return entries.map(e => {
     const shiftClass = String(e.shift)==='2' ? 'shift2' : '';
@@ -4926,8 +4899,7 @@ function renderLogEntryCards(entries){
     return `<div class="entry ${shiftClass}">
       <div class="entry-top"><span>${dateTimeHtml}</span><span>${shiftLabel}</span>${deleteBtn}</div>
       <div class="entry-counts">
-        <div><div class="ec-label">${goodLbl}</div><div class="ec-value good">${Number(e.good||0).toLocaleString()}</div></div>
-        <div><div class="ec-label">${rejLbl}</div><div class="ec-value reject">${Number(e.reject||0).toLocaleString()}</div></div>
+        <div style="grid-column:1/-1;"><div class="ec-label">${goodLbl}</div><div class="ec-value good">${Number(e.good||0).toLocaleString()}</div></div>
       </div>
       ${e.flags ? `<div class="entry-flags">${escapeHtml(e.flags)}</div>` : ''}
     </div>`;
@@ -4950,15 +4922,20 @@ function parseFullLogText(text){
     const time = dateTime.slice(1).join(' ');
     const shiftMatch = (parts[1]||'').match(/(\d)/);
     const goodMatch = (parts[2]||'').match(/([\d,]+)/);
-    const rejectMatch = (parts[3]||'').match(/([\d,]+)/);
-    const flagsPart = parts.slice(4).join(' | ').replace(/^Flags:\s*/i, '');
+    // Reject/Flags are optional trailing fields found by their own label,
+    // not a fixed index — a line logged before Reject was removed from the
+    // app (2026-09-17, Anthony no longer wants it tracked) has one extra
+    // "| Reject: N" field ahead of Flags that a newer line won't, so a
+    // fixed-position read would silently swallow Flags on new lines.
+    const rejectPart = parts.find(p => /^Reject:/i.test(p));
+    const flagsPart = parts.find(p => /^Flags:/i.test(p));
     return {
       date: date,
       time: time,
       shift: shiftMatch ? shiftMatch[1] : '1',
       good: goodMatch ? parseInt(goodMatch[1].replace(/,/g,''),10) : 0,
-      reject: rejectMatch ? parseInt(rejectMatch[1].replace(/,/g,''),10) : 0,
-      flags: flagsPart
+      reject: rejectPart ? (parseInt((rejectPart.match(/([\d,]+)/)||[])[1]?.replace(/,/g,''),10) || 0) : 0,
+      flags: flagsPart ? flagsPart.replace(/^Flags:\s*/i, '') : ''
     };
   });
 }
@@ -5079,7 +5056,6 @@ function renderDashHistory(){
       <div class="dash-job-meta">${escapeHtml(r.Product||'')}${r.Product?' · ':''}<span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · <span data-en>Sent</span><span data-es>Enviado</span>: ${sentTs}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${safeNum(r['Total Good']).toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
-        <div><b style="color:var(--accent)">${safeNum(r['Total Reject']).toLocaleString()}</b>${isEs?'Retenido':'Hold'}</div>
         <div><b>${safeNum(r.Target).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
         <div><b style="color:var(--navy)">${safeNum(r['Total Pallets']).toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
@@ -5184,16 +5160,15 @@ function renderDashLive(){
     // the same PO are separate jobs now and must show as separate cards, not
     // merge their counts together.
     const groupKey = e.PO + '|' + (e.Pass || '');
-    if (!byPo[groupKey]) byPo[groupKey] = { po: e.PO, product: e.Product, station: e.Station, pass: e.Pass, target: e.Target, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
+    if (!byPo[groupKey]) byPo[groupKey] = { po: e.PO, product: e.Product, station: e.Station, pass: e.Pass, target: e.Target, good: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
     byPo[groupKey].good += Number(e.Good)||0;
-    byPo[groupKey].reject += Number(e.Reject)||0;
     byPo[groupKey].count++;
     const ts = e.Timestamp ? new Date(e.Timestamp) : null;
     if (ts && (!byPo[groupKey].lastTs || ts > byPo[groupKey].lastTs)) byPo[groupKey].lastTs = ts;
     // Same Sheets Date/Time-column garbling issue as syncActiveEntries —
     // derive a clean time string from the reliable Timestamp column instead.
     byPo[groupKey].entries.push({
-      ts, shift: e.Shift, good: e.Good, reject: e.Reject, flags: e.Flags,
+      ts, shift: e.Shift, good: e.Good, flags: e.Flags,
       date: ts ? ts.toLocaleDateString() : '',
       time: ts ? ts.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '',
       entryId: e.EntryId
@@ -5206,7 +5181,7 @@ function renderDashLive(){
       seenPalletIds.add(p.EntryId);
     }
     const groupKey = p.PO + '|' + (p.Pass || '');
-    if (!byPo[groupKey]) byPo[groupKey] = { po: p.PO, product: p.Product, station: p.Station, pass: p.Pass, target: 0, good: 0, reject: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
+    if (!byPo[groupKey]) byPo[groupKey] = { po: p.PO, product: p.Product, station: p.Station, pass: p.Pass, target: 0, good: 0, pallets: 0, count: 0, lastTs: null, entries: [] };
     byPo[groupKey].pallets++;
     const ts = p.Timestamp ? new Date(p.Timestamp) : null;
     if (ts && (!byPo[groupKey].lastTs || ts > byPo[groupKey].lastTs)) byPo[groupKey].lastTs = ts;
@@ -5229,7 +5204,6 @@ function renderDashLive(){
       <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'}<br><span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
-        <div><b style="color:var(--accent)">${j.reject.toLocaleString()}</b>${isEs?'Retenido':'Hold'}</div>
         <div><b>${Number(j.target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
         <div><b style="color:var(--navy)">${j.pallets.toLocaleString()}</b>${isEs?'Tarimas':'Pallets'}</div>
       </div>
@@ -5251,9 +5225,9 @@ function renderDashData(){
     el.innerHTML = `<div class="dash-empty">${isEs?'Aún no hay datos para graficar.':'No data to chart yet.'}</div>`;
     return;
   }
-  el.innerHTML = `<div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Retenido por trabajo':'Target vs Good vs Hold by job'}</h3><canvas id="dashChartByJob" height="260"></canvas></div>
+  el.innerHTML = `<div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno por trabajo':'Target vs Good by job'}</h3><canvas id="dashChartByJob" height="260"></canvas></div>
     <div class="dash-chart-wrap"><h3>${isEs?'Totales por estación':'Totals by station'}</h3><canvas id="dashChartByStation" height="220"></canvas></div>
-    <div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno vs Retenido a través del tiempo':'Target vs Good vs Hold over time'}</h3><canvas id="dashChartByDate" height="260"></canvas></div>`;
+    <div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno a través del tiempo':'Target vs Good over time'}</h3><canvas id="dashChartByDate" height="260"></canvas></div>`;
 
   // Chart.js bakes colors in at creation time, so the handful of colors that
   // wouldn't otherwise read well against a dark card (mainly Target, which
@@ -5276,7 +5250,6 @@ function renderDashData(){
   const labels = reports.map(r => String(r.PO||'—'));
   const targets = reports.map(r => safeNum(r.Target));
   const goods = reports.map(r => safeNum(r['Total Good']));
-  const rejects = reports.map(r => safeNum(r['Total Reject']));
   const pallets = reports.map(r => safeNum(r['Total Pallets']));
 
   dashCharts.push(new Chart(document.getElementById('dashChartByJob'), {
@@ -5286,7 +5259,6 @@ function renderDashData(){
       datasets: [
         { label: isEs?'Meta':'Target', data: targets, backgroundColor: targetColor },
         { label: isEs?'Bueno':'Good', data: goods, backgroundColor: '#2e7d4f' },
-        { label: isEs?'Retenido':'Hold', data: rejects, backgroundColor: '#c8393a' },
         { label: isEs?'Tarimas':'Pallets', data: pallets, backgroundColor: '#ff1f8f' }
       ]
     },
@@ -5296,10 +5268,9 @@ function renderDashData(){
   const byStation = {};
   reports.forEach(r => {
     const st = r.Station || (isEs?'Desconocido':'Unknown');
-    if (!byStation[st]) byStation[st] = { target: 0, good: 0, reject: 0 };
+    if (!byStation[st]) byStation[st] = { target: 0, good: 0 };
     byStation[st].target += safeNum(r.Target);
     byStation[st].good += safeNum(r['Total Good']);
-    byStation[st].reject += safeNum(r['Total Reject']);
   });
   const stLabels = Object.keys(byStation);
   dashCharts.push(new Chart(document.getElementById('dashChartByStation'), {
@@ -5308,24 +5279,22 @@ function renderDashData(){
       labels: stLabels,
       datasets: [
         { label: isEs?'Meta':'Target', data: stLabels.map(s=>byStation[s].target), backgroundColor: targetColor },
-        { label: isEs?'Bueno':'Good', data: stLabels.map(s=>byStation[s].good), backgroundColor: '#2e7d4f' },
-        { label: isEs?'Retenido':'Hold', data: stLabels.map(s=>byStation[s].reject), backgroundColor: '#c8393a' }
+        { label: isEs?'Bueno':'Good', data: stLabels.map(s=>byStation[s].good), backgroundColor: '#2e7d4f' }
       ]
     },
     options: chartOptions
   }));
 
-  // Same three quantities, but plotted chronologically by the date each
+  // Same two quantities, but plotted chronologically by the date each
   // report was sent — multiple jobs finished on the same day get summed
   // into one point rather than showing as separate overlapping entries.
   const byDate = {};
   reports.forEach(r => {
     if (!r.Timestamp) return;
     const dateKey = new Date(r.Timestamp).toISOString().slice(0,10);
-    if (!byDate[dateKey]) byDate[dateKey] = { target: 0, good: 0, reject: 0 };
+    if (!byDate[dateKey]) byDate[dateKey] = { target: 0, good: 0 };
     byDate[dateKey].target += safeNum(r.Target);
     byDate[dateKey].good += safeNum(r['Total Good']);
-    byDate[dateKey].reject += safeNum(r['Total Reject']);
   });
   const dateLabels = Object.keys(byDate).sort();
   dashCharts.push(new Chart(document.getElementById('dashChartByDate'), {
@@ -5334,8 +5303,7 @@ function renderDashData(){
       labels: dateLabels,
       datasets: [
         { label: isEs?'Meta':'Target', data: dateLabels.map(d=>byDate[d].target), borderColor: targetColor, backgroundColor: targetColor, fill: false, tension: 0.2 },
-        { label: isEs?'Bueno':'Good', data: dateLabels.map(d=>byDate[d].good), borderColor: '#2e7d4f', backgroundColor: '#2e7d4f', fill: false, tension: 0.2 },
-        { label: isEs?'Retenido':'Hold', data: dateLabels.map(d=>byDate[d].reject), borderColor: '#c8393a', backgroundColor: '#c8393a', fill: false, tension: 0.2 }
+        { label: isEs?'Bueno':'Good', data: dateLabels.map(d=>byDate[d].good), borderColor: '#2e7d4f', backgroundColor: '#2e7d4f', fill: false, tension: 0.2 }
       ]
     },
     options: chartOptions
@@ -5478,7 +5446,6 @@ function exportToExcel(){
         [isEs?'Tarimas Necesarias':'Pallets Needed']: s.palletsNeeded || '',
         [isEs?'Tarimas Producidas':'Pallets Produced']: safeNum(r['Total Pallets']),
         [isEs?'Bueno Total':'Total Good']: safeNum(r['Total Good']),
-        [isEs?'Retenido Total':'Total Reject']: safeNum(r['Total Reject']),
         [isEs?'% Corto vs Meta':'% Short vs Target']: s.pctShortVsTarget,
         [isEs?'% Corto vs Meta+Overs':'% Short vs Target+Overs']: s.pctShortVsEffectiveTarget
       };
@@ -5505,21 +5472,49 @@ function exportToExcel(){
    color outline shapes instead, the same visual language as any flat-icon
    dashboard (a status ring, a caution triangle, stacked layers, a target).
    Each is centered at (cx, cy) inside a `size`-inch square. */
+// Draws one straight segment as a thin rotated rounded-rect — pptxgenjs has
+// no freeform/polyline shape, so a bent glyph (a checkmark) is built from
+// two of these meeting at a point, same way the icon set below builds a
+// checkmark out of two straight strokes.
+function _addLineSeg(slide, x1, y1, x2, y2, color, weight){
+  const dx = x2-x1, dy = y2-y1;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  slide.addShape('roundRect', {
+    x: (x1+x2)/2 - len/2, y: (y1+y2)/2 - weight/2, w: len, h: weight, rectRadius: weight/2,
+    fill: { color }, line: { type: 'none' }, rotate: angle
+  });
+}
+
+/* Flat, single-color glyphs — literal enough to read at a glance (Anthony:
+   "I can't tell anything" about the first abstract-shape pass), still no
+   emoji/illustration. Each is proportioned inside an 80x80 unit box (design
+   verified visually first as SVG, then ported here) and scaled to `size`
+   inches, centered at (cx, cy). */
 function _addIcon(slide, type, cx, cy, size, color){
   const half = size / 2;
-  if (type === 'circle'){
-    slide.addShape('ellipse', { x: cx-half, y: cy-half, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.5 } });
-  } else if (type === 'triangle'){
-    slide.addShape('triangle', { x: cx-half, y: cy-half, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.5 } });
-    slide.addShape('ellipse', { x: cx-0.028, y: cy+half*0.32, w: 0.056, h: 0.056, fill: { color }, line: { type: 'none' } });
-  } else if (type === 'layers'){
-    const s = size * 0.62;
-    slide.addShape('roundRect', { x: cx-s/2-0.09, y: cy-s/2+0.09, w: s, h: s, rectRadius: 0.03, fill: { type: 'none' }, line: { color, width: 2.2 } });
-    slide.addShape('roundRect', { x: cx-s/2+0.09, y: cy-s/2-0.09, w: s, h: s, rectRadius: 0.03, fill: { color: 'FFFFFF' }, line: { color, width: 2.2 } });
+  const s = size / 80; // scale factor from the 80x80 design box
+  const ox = cx - half, oy = cy - half; // box origin (top-left)
+  if (type === 'check'){
+    slide.addShape('ellipse', { x: ox, y: oy, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.5 } });
+    const w = size * 0.075;
+    _addLineSeg(slide, ox+25*s, oy+41*s, ox+35*s, oy+51*s, color, w);
+    _addLineSeg(slide, ox+35*s, oy+51*s, ox+56*s, oy+28*s, color, w);
+  } else if (type === 'stack'){
+    const barW = 44*s, barH = 9*s, x = ox + 18*s;
+    [46, 33, 20].forEach(y0 => {
+      slide.addShape('roundRect', { x, y: oy + y0*s, w: barW, h: barH, rectRadius: 0.02, fill: { color }, line: { type: 'none' } });
+    });
+  } else if (type === 'clipboard'){
+    slide.addShape('roundRect', { x: ox+22*s, y: oy+16*s, w: 36*s, h: 48*s, rectRadius: 0.03, fill: { type: 'none' }, line: { color, width: 2.2 } });
+    slide.addShape('roundRect', { x: ox+31*s, y: oy+12*s, w: 18*s, h: 8*s, rectRadius: 0.015, fill: { color }, line: { type: 'none' } });
+    [[30,34,50],[30,44,50],[30,54,44]].forEach(([x1,y0,x2]) => {
+      slide.addShape('roundRect', { x: ox+x1*s, y: oy+y0*s-size*0.02, w: (x2-x1)*s, h: size*0.04, rectRadius: 0, fill: { color }, line: { type: 'none' } });
+    });
   } else if (type === 'target'){
-    slide.addShape('ellipse', { x: cx-half, y: cy-half, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.2 } });
-    slide.addShape('ellipse', { x: cx-half*0.55, y: cy-half*0.55, w: size*0.55, h: size*0.55, fill: { type: 'none' }, line: { color, width: 2.2 } });
-    slide.addShape('ellipse', { x: cx-size*0.06, y: cy-size*0.06, w: size*0.12, h: size*0.12, fill: { color }, line: { type: 'none' } });
+    slide.addShape('ellipse', { x: ox, y: oy, w: size, h: size, fill: { type: 'none' }, line: { color, width: 2.2 } });
+    slide.addShape('ellipse', { x: cx-size*0.225, y: cy-size*0.225, w: size*0.45, h: size*0.45, fill: { type: 'none' }, line: { color, width: 2.2 } });
+    slide.addShape('ellipse', { x: cx-size*0.0625, y: cy-size*0.0625, w: size*0.125, h: size*0.125, fill: { color }, line: { type: 'none' } });
   }
 }
 
@@ -5560,12 +5555,12 @@ function exportToPowerPoint(){
     // is exactly how a real export once showed "-131114.4%").
     const totals = reports.reduce((acc, r) => {
       acc.good += safeNum(r['Total Good']);
-      acc.reject += safeNum(r['Total Reject']);
       acc.pallets += safeNum(r['Total Pallets']);
       acc.target += safeNum(r.Target);
       return acc;
-    }, { good:0, reject:0, pallets:0, target:0 });
+    }, { good:0, pallets:0, target:0 });
     const fillRatePct = totals.target > 0 ? Math.round((totals.good / totals.target) * 1000) / 10 : 0;
+    const fillRateClamped = Math.max(0, Math.min(100, fillRatePct));
 
     const byStation = {};
     reports.forEach(r => {
@@ -5578,8 +5573,11 @@ function exportToPowerPoint(){
 
     const PINK = 'FF1F8F';
     const NAVY = '0A0A0A';
-    const GOOD = '2E7D4F';
-    const ACCENT = 'C8393A';
+    // A fresh, saturated emerald instead of the old dark forest green
+    // (Anthony: "give up on the dark green color, it's too christmas like
+    // and early internet") — export-only per his answer, the app's own
+    // --good CSS variable elsewhere is untouched.
+    const GOOD = '10B981';
     const AMBER = 'E8A020';
 
     const pptx = new PptxGenJS();
@@ -5610,21 +5608,24 @@ function exportToPowerPoint(){
 
     const cardW = 2.92, cardGap = 0.18, cardY = 1.05, cardH = 1.55;
     const cardX = i => 0.5 + i * (cardW + cardGap);
-    _addKpiCard(slide, cardX(0), cardY, cardW, cardH, 'circle', totals.good.toLocaleString(), isEs?'Bueno Total':'Total Good', GOOD);
-    _addKpiCard(slide, cardX(1), cardY, cardW, cardH, 'triangle', totals.reject.toLocaleString(), isEs?'Retenido Total':'Total Hold', ACCENT);
-    _addKpiCard(slide, cardX(2), cardY, cardW, cardH, 'layers', totals.pallets.toLocaleString(), isEs?'Tarimas Total':'Total Pallets', NAVY);
+    _addKpiCard(slide, cardX(0), cardY, cardW, cardH, 'check', totals.good.toLocaleString(), isEs?'Bueno Total':'Total Good', GOOD);
+    _addKpiCard(slide, cardX(1), cardY, cardW, cardH, 'stack', totals.pallets.toLocaleString(), isEs?'Tarimas Total':'Total Pallets', NAVY);
+    _addKpiCard(slide, cardX(2), cardY, cardW, cardH, 'clipboard', reports.length.toLocaleString(), isEs?'Trabajos Totales':'Total Jobs', AMBER);
     _addKpiCard(slide, cardX(3), cardY, cardW, cardH, 'target', fillRatePct + '%', isEs?'Tasa de Cumplimiento':'Overall Fill Rate', PINK);
 
-    // Left panel: Good vs Hold split (donut)
+    // Left panel: Overall Fill Rate as a single progress ring (Good removed
+    // from the old "Good vs Hold" donut once Hold tracking was dropped from
+    // the app entirely — Anthony: "this app is more for productivity").
     const panelY = 2.95, panelH = 4.15, panelW = 5.9;
-    _addPanelHeader(slide, 0.5, panelY, panelW, isEs?'Bueno vs Retenido':'Good vs Hold', GOOD);
+    _addPanelHeader(slide, 0.5, panelY, panelW, isEs?'Tasa de Cumplimiento':'Fill Rate', PINK);
     slide.addChart(pptx.ChartType.doughnut, [
-      { name: isEs?'Piezas':'Pieces', labels: [isEs?'Bueno':'Good', isEs?'Retenido':'Hold'], values: [totals.good, totals.reject] }
+      { name: isEs?'Cumplimiento':'Fill Rate', labels: [isEs?'Completado':'Filled', isEs?'Restante':'Remaining'], values: [fillRateClamped, 100-fillRateClamped] }
     ], {
-      x: 0.7, y: panelY + 0.55, w: panelW - 0.4, h: panelH - 0.75,
-      chartColors: [GOOD, ACCENT], showLegend: true, legendPos: 'b', showValue: false,
-      dataLabelColor: 'FFFFFF', showPercent: true, holeSize: 55
+      x: 0.7, y: panelY + 0.55, w: panelW - 0.4, h: panelH - 1.15,
+      chartColors: [PINK, 'EDEDED'], showLegend: false, showValue: false, showPercent: false, holeSize: 65
     });
+    slide.addText(fillRatePct + '%', { x: 0.7, y: panelY + 0.55, w: panelW - 0.4, h: panelH - 1.15, fontSize: 34, bold: true, color: NAVY, align: 'center', valign: 'middle' });
+    slide.addText(isEs?'Bueno vs Meta (todos los trabajos)':'Good vs Target (all jobs)', { x: 0.7, y: panelY + panelH - 0.68, w: panelW - 0.4, h: 0.4, fontSize: 11, color: '666666', align: 'center' });
 
     // Right panel: Target vs Good by Station (bar)
     const panel2X = 0.5 + panelW + 0.3;

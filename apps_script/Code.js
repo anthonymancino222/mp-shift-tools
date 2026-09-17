@@ -208,7 +208,11 @@ function doPostLocked(e) {
       'Station': data.station,
       'Target': data.target,
       'Total Good': data.totalGood,
-      'Total Reject': data.totalReject,
+      // Reject/Hold tracking was removed from the app 2026-09-17 (Anthony:
+      // this app is for productivity, not quality holds) — the frontend no
+      // longer sends totalReject at all. Column stays (old reports still
+      // have real values in it) but every new row just gets a blank cell.
+      'Total Reject': data.totalReject || '',
       'Total Pallets': data.totalPallets,
       'Full Log': data.fullLog,
       'Pass': data.pass || '',
@@ -444,8 +448,17 @@ function parseLogLine(line) {
   var time = dateTime.slice(1).join(' ');
   var shiftMatch = (parts[1] || '').match(/(\d)/);
   var goodMatch = (parts[2] || '').match(/([\d,]+)/);
-  var rejectMatch = (parts[3] || '').match(/([\d,]+)/);
-  var flagsPart = parts.slice(4).join(' | ').replace(/^Flags:\s*/i, '');
+  // Reject/Flags are optional trailing fields found by their own label, not
+  // a fixed index — a line logged before Reject tracking was removed from
+  // the app (2026-09-17) has one extra "| Reject: N" field ahead of Flags
+  // that a newer line won't, so a fixed-position read would silently
+  // swallow Flags when reopening a job finished after that date.
+  var rejectPart = null, flagsPart = '';
+  parts.forEach(function (p) {
+    if (/^Reject:/i.test(p)) rejectPart = p;
+    if (/^Flags:/i.test(p)) flagsPart = p.replace(/^Flags:\s*/i, '');
+  });
+  var rejectMatch = rejectPart ? rejectPart.match(/([\d,]+)/) : null;
   return {
     date: date,
     time: time,
