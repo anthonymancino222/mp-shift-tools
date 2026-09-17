@@ -400,6 +400,14 @@ function normalizePO(po) {
 // fully separate jobs (see the DeviceId comment on getOrCreateActiveEntriesSheet).
 // Omit deviceId (delete_job, an admin action from the aggregated Live Jobs
 // view) to keep the old blunt "wipe this PO+Pass for everyone" behavior.
+// A row with a BLANK DeviceId (any row logged before that column existed)
+// is always eligible for cleanup regardless of who's finishing — found
+// 2026-09-17, hours after DeviceId shipped: a real job logged before that
+// deploy had blank DeviceId on every row, so finishing it from any device
+// (a real, non-blank id) never matched, and the "already finished" job sat
+// in Live Jobs forever even though the Report itself sent and saved
+// correctly. Blank rows have no exclusive owner to protect in the first
+// place, unlike a row genuinely tagged by a DIFFERENT device.
 function removeActiveEntriesForPO(ss, po, pass, deviceId) {
   var sheet = ss.getSheetByName('ActiveEntries');
   if (!sheet || sheet.getLastRow() < 2) return;
@@ -407,7 +415,8 @@ function removeActiveEntriesForPO(ss, po, pass, deviceId) {
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i >= 1; i--) {
     var passMatches = !pass || String(data[i][12] || '') === String(pass);
-    var deviceMatches = !deviceId || String(data[i][13] || '') === String(deviceId);
+    var rowDeviceId = String(data[i][13] || '');
+    var deviceMatches = !deviceId || !rowDeviceId || rowDeviceId === String(deviceId);
     if (normalizePO(data[i][1]) === target && passMatches && deviceMatches) {
       sheet.deleteRow(i + 1);
     }
@@ -423,7 +432,8 @@ function removePalletsForPO(ss, po, pass, deviceId) {
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i >= 1; i--) {
     var passMatches = !pass || String(data[i][8] || '') === String(pass);
-    var deviceMatches = !deviceId || String(data[i][9] || '') === String(deviceId);
+    var rowDeviceId = String(data[i][9] || '');
+    var deviceMatches = !deviceId || !rowDeviceId || rowDeviceId === String(deviceId);
     if (normalizePO(data[i][1]) === target && passMatches && deviceMatches) {
       sheet.deleteRow(i + 1);
     }
@@ -440,7 +450,8 @@ function removeNotesForPO(ss, po, pass, deviceId) {
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i >= 1; i--) {
     var passMatches = !pass || String(data[i][2] || '') === String(pass);
-    var deviceMatches = !deviceId || String(data[i][7] || '') === String(deviceId);
+    var rowDeviceId = String(data[i][7] || '');
+    var deviceMatches = !deviceId || !rowDeviceId || rowDeviceId === String(deviceId);
     if (normalizePO(data[i][1]) === target && passMatches && deviceMatches) {
       sheet.deleteRow(i + 1);
     }
