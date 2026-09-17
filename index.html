@@ -2564,10 +2564,22 @@ function startOver(){
   if(!confirm(msg2)) return;
   // Local-only, no PIN — per Anthony, Start Over is a floor-level "I typed
   // this job wrong, let me redo it" action and should never be gated behind
-  // an admin PIN, just the two confirm() dialogs above. If this job ever
-  // pushed live entries to the server, those rows stay behind in Live
-  // Jobs — an admin can clear them from the Dashboard's own "Delete Job"
-  // button (PIN-gated there, on purpose) if that's ever actually needed.
+  // an admin PIN, just the two confirm() dialogs above. This never blocks
+  // on the network (fire-and-forget, no await) so it stays instant even
+  // offline — but if this job DID already push real pallets/entries to the
+  // server, this device's own rows would otherwise sit orphaned in Live
+  // Jobs forever (found 2026-09-17: the only other cleanup tool, the
+  // Dashboard's PIN-gated "Delete Job," wipes the ENTIRE PO+Pass — unsafe
+  // now that a different device can legitimately be running its own
+  // separate job under that exact same PO+Pass). Scoped strictly to
+  // DEVICE_ID, so a different device's real data for the same PO+Pass is
+  // never touched either way.
+  if (REPORT_ENDPOINT_URL && REPORT_ENDPOINT_URL !== 'PASTE_YOUR_APPS_SCRIPT_URL_HERE'){
+    fetchWithTimeout(REPORT_ENDPOINT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'clear_own_active', po: job.po, pass: job.pass || '', deviceId: DEVICE_ID })
+    }).catch(function(){});
+  }
   delete jobs[currentJobId];
   // Without this, a later job created with this exact same PO+Pass (same
   // id = po + '_p' + pass) would silently "restore" this old draft — wrong

@@ -131,6 +131,28 @@ function doPostLocked(e) {
       return success();
     }
 
+    // ---- Clear THIS DEVICE's own still-active rows for one PO+Pass ----
+    // No PIN: scoped strictly to the calling device's own DeviceId, same
+    // trust model finish_report already uses (a device can always clean up
+    // rows it pushed itself — never anyone else's). Added 2026-09-17 for
+    // Start Over: that action is local-only by design (no PIN, no server
+    // call at all, so it stays instant) — but if the job being cleared had
+    // already pushed real pallets/entries, those rows sat orphaned in Live
+    // Jobs forever with the only cleanup tool (delete_job) being an
+    // unscoped wipe of the ENTIRE PO+Pass — unsafe now that a different
+    // device can legitimately be running its own separate job under that
+    // exact same PO+Pass. deviceId is REQUIRED (unlike finish_report, where
+    // it's expected but tolerated blank) — without one, this would just be
+    // an unauthenticated wipe of a whole PO+Pass, which is exactly what the
+    // PIN-gated delete_job exists for instead.
+    if (data.action === 'clear_own_active') {
+      if (!data.deviceId) return success(); // nothing to scope to — safe no-op
+      removeActiveEntriesForPO(ss, data.po, data.pass, data.deviceId);
+      removePalletsForPO(ss, data.po, data.pass, data.deviceId);
+      removeNotesForPO(ss, data.po, data.pass, data.deviceId);
+      return success();
+    }
+
     // ---- Admin delete: one specific entry or pallet row, by its own
     // EntryId ---- Same PIN check as delete_job, just scoped to a single row
     // instead of an entire PO+Pass — for correcting one bad duplicate/mistake
