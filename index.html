@@ -4230,42 +4230,66 @@ function sendReport(){
   const btn = document.getElementById('reportBtn');
   const originalHTML = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = isEs ? '⏳ Enviando...' : '⏳ Sending...';
 
-  fetch(REPORT_ENDPOINT_URL, {
-    method: 'POST',
-    body: JSON.stringify(payload)
-  })
-  .then(res => res.json())
-  .then(res => {
-    btn.disabled = false;
-    btn.innerHTML = originalHTML;
-    if(res.result === 'success'){
-      alert(isEs ? '✅ Reporte enviado a Jayro y guardado en la hoja de cálculo.' : '✅ Report sent to Jayro and saved to the spreadsheet.');
-      // The backend has now wiped this PO out of ActiveEntries (see
-      // removeActiveEntriesForPO/removePalletsForPO) — the job is DONE.
-      // Clear it locally too, or it would sit in "Active Job" indistinguishable
-      // from a still-open job, and any further counts logged against it would
-      // pile on top of the already-reported totals instead of starting fresh
-      // (this was the cause of local totals silently drifting way above what
-      // the Dashboard's Live Jobs view showed).
-      delete jobs[currentJobId];
-      saveAll();
-      clearDraft(currentJobId);
-      currentJobId = null;
-      jobSectionsHidden = false;
-      refreshJobSelect();
-    } else {
-      alert((isEs ? 'Error al enviar: ' : 'Error sending: ') + (res.message || 'unknown error'));
-    }
-  })
-  .catch(err => {
-    btn.disabled = false;
-    btn.innerHTML = originalHTML;
-    alert(isEs
-      ? 'No se pudo conectar. Verifique la conexión a internet e intente de nuevo.'
-      : 'Could not connect. Check internet connection and try again.');
-  });
+  // Finish/Send Report used a plain fetch() with no timeout at all — every
+  // OTHER push in this app (entries, pallets, notes, the Dashboard's own
+  // reads) already switched to fetchWithTimeout() specifically because weak
+  // tablet WiFi can leave a request hanging indefinitely (see
+  // fetchWithTimeout's own comment) — this one call was missed. On top of
+  // that, unlike every other push, this one never retried on failure at
+  // all; a single dropped connection meant the job just sat there until
+  // someone noticed and tapped Finish again by hand. Anthony hit exactly
+  // this 2026-09-17: "I need a job that's been sent to go away almost
+  // immediately" — a bounded timeout plus a few automatic retries (still on
+  // THIS tap, not waiting for some later background sweep) means a single
+  // WiFi blip self-heals instead of silently stalling the whole screen.
+  const MAX_SEND_ATTEMPTS = 3;
+  function attemptSend(attempt){
+    btn.innerHTML = isEs
+      ? (attempt > 1 ? `⏳ Reintentando (${attempt}/${MAX_SEND_ATTEMPTS})…` : '⏳ Enviando...')
+      : (attempt > 1 ? `⏳ Retrying (${attempt}/${MAX_SEND_ATTEMPTS})…` : '⏳ Sending...');
+    return fetchWithTimeout(REPORT_ENDPOINT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(res => {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      if(res.result === 'success'){
+        alert(isEs ? '✅ Reporte enviado a Jayro y guardado en la hoja de cálculo.' : '✅ Report sent to Jayro and saved to the spreadsheet.');
+        // The backend has now wiped this PO out of ActiveEntries (see
+        // removeActiveEntriesForPO/removePalletsForPO) — the job is DONE.
+        // Clear it locally too, or it would sit in "Active Job" indistinguishable
+        // from a still-open job, and any further counts logged against it would
+        // pile on top of the already-reported totals instead of starting fresh
+        // (this was the cause of local totals silently drifting way above what
+        // the Dashboard's Live Jobs view showed).
+        delete jobs[currentJobId];
+        saveAll();
+        clearDraft(currentJobId);
+        currentJobId = null;
+        jobSectionsHidden = false;
+        refreshJobSelect();
+      } else {
+        // A real error response from the server (e.g. a validation failure)
+        // — retrying the exact same payload won't fix that, so surface it
+        // immediately instead of burning through retries pointlessly.
+        alert((isEs ? 'Error al enviar: ' : 'Error sending: ') + (res.message || 'unknown error'));
+      }
+    })
+    .catch(err => {
+      if (attempt < MAX_SEND_ATTEMPTS){
+        return new Promise(resolve => setTimeout(resolve, 2000)).then(() => attemptSend(attempt + 1));
+      }
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      alert(isEs
+        ? 'No se pudo conectar después de varios intentos. Verifique la conexión a internet e intente de nuevo.'
+        : 'Could not connect after several attempts. Check internet connection and try again.');
+    });
+  }
+  attemptSend(1);
 }
 
 function startEditEntry(entryId){
