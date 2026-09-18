@@ -1945,6 +1945,13 @@ function _resumeNewJobFormIfNeeded(){
   if (!flagged) return;
   _clearResumeNewJobIntent();
   setTimeout(function(){
+    // Without this, the modal opens on top of whatever screen init left
+    // showing (landing, since showLanding() always runs first) — so
+    // closing the modal after Create Job reveals landing behind it
+    // instead of the job that was just created, forcing an extra tap on
+    // "Log Production Counts" to actually see it. Matches the deep-link
+    // prefill flow, which already does this before its own modal open.
+    enterLogScreen();
     openActiveJobModal();
     const f = document.getElementById('newJobForm');
     if (!f) return;
