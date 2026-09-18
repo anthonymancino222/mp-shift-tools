@@ -1892,6 +1892,74 @@ function _simpleHash(str){
 }
 var APP_VERSION_HASH_KEY = 'gluer-app-version-hash';
 
+/* Guards against a Start Over'd job coming back from the dead. Without
+   this, deleting a job locally (startOver()) only removes it from THIS
+   device's `jobs{}` — the server-side rows for that PO+Pass may still be
+   mid-flight to being cleaned up (clear_own_active is fire-and-forget, see
+   startOver()'s own comment), or a forced app-update reload (see
+   _checkForAppUpdateAndReloadIfNeeded) can trigger _discoveryTick() again
+   before that cleanup lands. Either way, _discoverRemoteJobs() would
+   otherwise "helpfully" re-import the still-present server rows right back
+   into jobs{} since they're correctly tagged with this same device's own
+   DEVICE_ID. Persisted (not just an in-memory Set) because the race
+   specifically involves a page reload. Short cooldown, not permanent —
+   once the server-side cleanup has actually landed, a genuinely NEW job
+   under that same PO+Pass should be discoverable again like any other. */
+var RECENTLY_CLEARED_KEY = 'gluer_recently_cleared_v1';
+var RECENTLY_CLEARED_COOLDOWN_MS = 10 * 60 * 1000;
+
+function _markRecentlyCleared(id){
+  var map = {};
+  try { map = JSON.parse(localStorage.getItem(RECENTLY_CLEARED_KEY) || '{}'); } catch(e){}
+  map[id] = Date.now();
+  try { localStorage.setItem(RECENTLY_CLEARED_KEY, JSON.stringify(map)); } catch(e){}
+}
+function _isRecentlyCleared(id){
+  var map = {};
+  try { map = JSON.parse(localStorage.getItem(RECENTLY_CLEARED_KEY) || '{}'); } catch(e){}
+  var changed = false, now = Date.now();
+  Object.keys(map).forEach(function(k){
+    if (now - map[k] > RECENTLY_CLEARED_COOLDOWN_MS) { delete map[k]; changed = true; }
+  });
+  if (changed) { try { localStorage.setItem(RECENTLY_CLEARED_KEY, JSON.stringify(map)); } catch(e){} }
+  return !!map[id];
+}
+
+/* Lets "Start New Job" survive an app-update reload seamlessly instead of
+   dumping the user back on the landing screen with no explanation (see
+   _checkForAppUpdateAndReloadIfNeeded — it can fire mid-tap on Sync Now,
+   which is exactly when this form is being opened). Set right before the
+   sync gate that risks the reload; cleared as soon as that gate resolves
+   WITHOUT a reload (the common case), or consumed once on the next fresh
+   page load to reopen the form automatically. */
+var RESUME_NEW_JOB_KEY = 'gluer_resume_new_job_v1';
+function _markResumeNewJobIntent(){
+  try { localStorage.setItem(RESUME_NEW_JOB_KEY, '1'); } catch(e){}
+}
+function _clearResumeNewJobIntent(){
+  try { localStorage.removeItem(RESUME_NEW_JOB_KEY); } catch(e){}
+}
+function _resumeNewJobFormIfNeeded(){
+  var flagged = false;
+  try { flagged = localStorage.getItem(RESUME_NEW_JOB_KEY) === '1'; } catch(e){}
+  if (!flagged) return;
+  _clearResumeNewJobIntent();
+  setTimeout(function(){
+    openActiveJobModal();
+    const f = document.getElementById('newJobForm');
+    if (!f) return;
+    newJobStation = null;
+    document.getElementById('stLongBtn').classList.remove('selected');
+    document.getElementById('stShortBtn').classList.remove('selected');
+    selectPass('S');
+    selectOvers(0);
+    document.getElementById('njPODrop').style.display = 'none';
+    document.getElementById('njPOScheduleHint').style.display = 'none';
+    f.style.display = 'block';
+    f.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 300);
+}
+
 /* Checks whether the deployed index.html has actually changed since the
    last time this ran, and force-reloads (see forceUpdateApp) ONLY if it
    has — never unconditionally. Wired into the Sync Gate's "Sync Now"
@@ -2446,12 +2514,14 @@ function toggleNewJobForm(){
     }
   }
 
+  _markResumeNewJobIntent();
   requireSyncBeforeAction(() => {
     // Station always forces a fresh, explicit choice — never carries over
     // whatever was selected for the last job created in this form. Pass
     // defaults to Single Pass (see the comment by newJobPass above) instead
     // of also resetting to unselected — still a single tap away from 1st/2nd
     // Pass if that's what this job actually needs.
+    _clearResumeNewJobIntent();
     newJobStation = null;
     document.getElementById('stLongBtn').classList.remove('selected');
     document.getElementById('stShortBtn').classList.remove('selected');
@@ -2536,6 +2606,7 @@ function syncGateContinue(){
 function syncGateCancel(){
   document.getElementById('syncGateOverlay').classList.remove('open');
   syncGatePendingCallback = null;
+  _clearResumeNewJobIntent();
 }
 
 function createJob(){
@@ -2682,6 +2753,7 @@ function startOver(){
     }).catch(function(){});
   }
   delete jobs[currentJobId];
+  _markRecentlyCleared(currentJobId);
   // Without this, a later job created with this exact same PO+Pass (same
   // id = po + '_p' + pass) would silently "restore" this old draft — wrong
   // shift, stale timestamp — since restoreDraft() only looks up drafts[id]
@@ -4161,7 +4233,7 @@ function _discoverRemoteJobs(res){
     if (!po) return;
     const pass = String(e.Pass || '');
     const id = po + '_p' + pass;
-    if (jobs[id] || seen[id]) return;
+    if (jobs[id] || seen[id] || _isRecentlyCleared(id)) return;
     seen[id] = true;
     jobs[id] = {
       po: e.PO, product: e.Product || '', machine: e.Station || '', pass: pass,
@@ -6432,6 +6504,7 @@ renderGlobalSyncStatus();
 applyThemeButtonUI();
 showLanding();
 _applyPrefillFromURL();
+_resumeNewJobFormIfNeeded();
 _initScheduleAutoPull();
 
 // Automatic retry — weak tablet WiFi means a push routinely fails on the
