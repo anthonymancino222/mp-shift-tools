@@ -6402,7 +6402,13 @@ function filterJobScheduleForNewJob(){
   const q = jobEl.value.trim();
   _applyNjPOScheduleHint(q);
   const dropEl = document.getElementById('njPODrop');
-  if (!_scheduleData || !q){ dropEl.style.display = 'none'; njPODropOpen = false; return; }
+  // Empty q (tapping/focusing into an empty field) is deliberately NOT
+  // treated as "nothing to show" — per Anthony's request, tapping into
+  // Job/PO should surface the schedule's job list right away, not only
+  // once the user starts typing. jobNumber.indexOf('') === 0 is always
+  // true, so the loop below naturally lists every scheduled job (still
+  // capped/filtered by Station) when q is blank.
+  if (!_scheduleData){ dropEl.style.display = 'none'; njPODropOpen = false; return; }
 
   const sheets = STATION_TO_SCHEDULE_SHEETS[newJobStation]; // no Station picked yet = show every job
   let matches = [];
