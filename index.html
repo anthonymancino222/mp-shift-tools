@@ -6424,13 +6424,18 @@ function filterJobScheduleForNewJob(){
   renderNjPODrop(matches, totalMatches);
   njPODropOpen = true;
 
-  // Auto-dismiss even if blur never fires cleanly (matches the same pattern
-  // used by the QA app's typed job dropdown).
+  // This is a fallback only, for the rare case blur never fires cleanly
+  // (matches the same pattern used by the QA app's typed job dropdown) —
+  // normal dismissal is tapping away (blur) or picking a row. 4s was found
+  // to close on people mid-read, especially anyone who needs a moment
+  // longer to read the list (per Anthony, bad eyesight shouldn't mean the
+  // picker vanishes before they're done) — 30s gives real reading time
+  // while still self-healing if blur genuinely never fires.
   clearTimeout(njPODropAutoCloseTimer);
   njPODropAutoCloseTimer = setTimeout(function(){
     dropEl.style.display = 'none';
     njPODropOpen = false;
-  }, 4000);
+  }, 30000);
 }
 
 function renderNjPODrop(matches, totalMatches){
