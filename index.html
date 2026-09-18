@@ -6243,6 +6243,24 @@ const STATION_TO_SCHEDULE_SHEETS = {
   'Short Gluer': ['FolderGluer']
 };
 
+// Sheet names that mean "not a gluer job" — per Anthony, the QA Checklist
+// app's own STATION_TO_SCHEDULE_SHEETS maps BOTH Bindery Cutter and
+// Pressroom Cutter to the 'LabelCutter' tab (no distinction between the
+// two), and 'PMC' is grouped with LabelCutter there too — so excluding
+// those two sheet names covers Bindery Cutter, Pressroom Cutter, AND
+// label jobs in one shot. This app should only ever surface jobs that
+// actually run through the gluer (Long/Short) — but a job with NO sheets
+// info at all (not yet classified in the schedule export) is kept rather
+// than hidden, since hiding an unclassified job could hide a real gluer
+// job just because the schedule export hasn't tagged it yet.
+const NON_GLUER_SCHEDULE_SHEETS = ['LabelCutter', 'PMC'];
+function _isGluerRelevantScheduleEntry(entry){
+  const sheets = entry && entry.sheets;
+  if (!sheets || !sheets.length) return true; // unclassified — keep, just in case
+  if (sheets.indexOf('FolderGluer') !== -1) return true; // actually runs through the gluer
+  return false; // classified, but as some other department (DieCutter/LabelCutter/PMC/Kama/etc) — not this app's concern
+}
+
 // Same 5am/5pm auto-refresh cadence as the QA Checklist app, tracked via a
 // persisted timestamp (not a long setTimeout, which wouldn't survive the
 // tablet's tab being backgrounded/reloaded).
@@ -6321,6 +6339,7 @@ function renderJobPickerList(){
   const entries = [];
   for (const jobNumber in _scheduleData.jobs){
     const entry = _scheduleData.jobs[jobNumber];
+    if (!_isGluerRelevantScheduleEntry(entry)) continue;
     if (sheets && !(entry.sheets||[]).some(s => sheets.indexOf(s) !== -1)) continue;
     if (q){
       const hay = (jobNumber + ' ' + (entry.customer||'') + ' ' + entry.products.join(' ')).toLowerCase();
@@ -6410,11 +6429,12 @@ function filterJobScheduleForNewJob(){
   // capped/filtered by Station) when q is blank.
   if (!_scheduleData){ dropEl.style.display = 'none'; njPODropOpen = false; return; }
 
-  const sheets = STATION_TO_SCHEDULE_SHEETS[newJobStation]; // no Station picked yet = show every job
+  const sheets = STATION_TO_SCHEDULE_SHEETS[newJobStation]; // no Station picked yet = show every gluer job
   let matches = [];
   for (const jobNumber in _scheduleData.jobs){
     if (jobNumber.indexOf(q) !== 0) continue;
     const entry = _scheduleData.jobs[jobNumber];
+    if (!_isGluerRelevantScheduleEntry(entry)) continue;
     if (sheets && !(entry.sheets||[]).some(s => sheets.indexOf(s) !== -1)) continue;
     matches.push({ jobNumber, entry });
   }
