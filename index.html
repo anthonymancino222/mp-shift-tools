@@ -908,6 +908,69 @@
   .dash-chart-wrap h3{margin:0 0 10px;font-size:1rem;color:var(--navy);}
   .dash-empty{text-align:center;color:var(--text-tertiary);padding:30px 10px;}
 
+  /* ══ Data tab — executive dashboard redesign (2026-09-18) ══
+     Deliberately its OWN look (light page bg, white cards, flat status
+     colors) rather than the app's usual dark card styling — this is a
+     management/print-style infographic, not another logging screen.
+     Colors are fixed hex, not CSS vars, EXCEPT where the app already had
+     the exact right token (var(--warn) already IS #e8a020) — a management
+     report's "Good" should always read as emerald green and "Target" as
+     neutral gray regardless of the operator's light/dark preference, same
+     reasoning _renderGoodTargetChart() already uses for its own #10B981. */
+  .pdash{background:#F5F5F3;border-radius:12px;padding:0;margin:-4px 0 0;overflow:hidden;}
+  body.dark-mode .pdash{background:#151719;}
+  .pdash-header{background:#0A0A0A;color:#fff;padding:14px 16px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .pdash-header .pdash-brand{color:#FF1F8F;font-weight:800;font-size:0.95rem;letter-spacing:0.02em;}
+  .pdash-header .pdash-title{font-weight:800;font-size:1.15rem;}
+  .pdash-body{padding:12px;}
+  .pdash-matchcount{font-size:0.78rem;color:var(--text-secondary);text-align:center;margin:2px 0 10px;}
+  .pdash-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:12px;}
+  @media (max-width:1099px){ .pdash-kpi-row{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:520px){ .pdash-kpi-row{grid-template-columns:repeat(2,1fr);} }
+  .pdash-kpi-card{background:#fff;border-radius:14px;padding:12px 10px;box-shadow:0 2px 8px rgba(0,0,0,.08);text-align:left;}
+  body.dark-mode .pdash-kpi-card{background:#232629;box-shadow:0 2px 8px rgba(0,0,0,.35);}
+  .pdash-kpi-icon{font-size:1.1rem;line-height:1;margin-bottom:6px;}
+  .pdash-kpi-label{font-size:0.68rem;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:2px;}
+  .pdash-kpi-value{font-size:1.35rem;font-weight:800;line-height:1.15;}
+  .pdash-c-pink{color:#FF1F8F;} .pdash-c-good{color:#10B981;} .pdash-c-neutral{color:#4B5563;}
+  body.dark-mode .pdash-c-neutral{color:#D1D5DB;}
+  .pdash-c-warn{color:#E8A020;}
+  .pdash-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+  body.dark-mode .pdash-card{background:#232629;box-shadow:0 2px 8px rgba(0,0,0,.35);}
+  .pdash-card-title{font-size:0.92rem;font-weight:800;color:var(--text);margin:0 0 2px;}
+  .pdash-card-sub{font-size:0.72rem;color:var(--text-tertiary);margin:0 0 8px;}
+  .pdash-main-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  @media (max-width:900px){ .pdash-main-row{grid-template-columns:1fr;} }
+  .pdash-fillrate-flex{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .pdash-fillrate-ring{position:relative;width:150px;height:150px;flex-shrink:0;}
+  .pdash-fillrate-ring canvas{width:150px !important;height:150px !important;}
+  .pdash-fillrate-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;}
+  .pdash-fillrate-center .pct{font-size:1.55rem;font-weight:800;color:var(--text);}
+  .pdash-fillrate-center .lbl{font-size:0.68rem;color:var(--text-secondary);font-weight:700;text-transform:uppercase;}
+  .pdash-fillrate-stats{flex:1;min-width:180px;}
+  .pdash-fillrate-stat-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.88rem;}
+  .pdash-fillrate-stat-row:last-child{border-bottom:none;}
+  .pdash-fillrate-stat-row span:first-child{color:var(--text-secondary);}
+  .pdash-fillrate-stat-row span:last-child{font-weight:800;color:var(--text);}
+  .pdash-chartbox-major{position:relative;height:280px;}
+  .pdash-chartbox-secondary{position:relative;height:240px;}
+  .pdash-secondary-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;}
+  @media (max-width:1099px){ .pdash-secondary-row{grid-template-columns:1fr;} }
+  .pdash-donut-legend{margin-top:8px;font-size:0.8rem;}
+  .pdash-donut-legend-row{display:flex;justify-content:space-between;padding:3px 0;}
+  .pdash-donut-legend-row .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;}
+  .pdash-topjobs-box{position:relative;height:300px;margin-bottom:12px;}
+  .pdash-table-wrap{overflow-x:auto;margin-bottom:12px;}
+  .pdash-table{width:100%;border-collapse:collapse;font-size:0.8rem;white-space:nowrap;}
+  .pdash-table th{text-align:left;padding:8px 10px;background:#0A0A0A;color:#fff;position:sticky;top:0;}
+  .pdash-table td{padding:7px 10px;border-bottom:1px solid var(--border);}
+  .pdash-table tbody tr:nth-child(even){background:var(--row-bg);}
+  .pdash-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  @media (max-width:700px){ .pdash-summary-grid{grid-template-columns:1fr 1fr;} }
+  .pdash-summary-item{background:var(--row-bg);border-radius:10px;padding:10px;}
+  .pdash-summary-item .h{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.02em;margin-bottom:3px;}
+  .pdash-summary-item .v{font-size:0.95rem;font-weight:800;color:var(--text);}
+
   .export-filters{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
   .export-filter-row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
   .export-filter-row label{flex:1;min-width:130px;display:block;font-size:0.8rem;font-weight:700;color:var(--label-color);}
@@ -1607,7 +1670,151 @@
       <div id="dashHistoryList"></div>
     </div>
     <div id="dashTabLive" style="display:none;"></div>
-    <div id="dashTabData" style="display:none;"></div>
+    <div id="dashTabData" style="display:none;">
+      <div class="pdash">
+        <div class="pdash-header">
+          <span class="pdash-brand">GLUER SHIFT HAND-OFF</span>
+          <span class="pdash-title"><span data-en>Production Summary</span><span data-es>Resumen de Producción</span></span>
+        </div>
+        <div class="pdash-body">
+          <div class="export-filters" style="margin-bottom:10px;">
+            <div class="export-filter-row">
+              <label><span data-en>Date From</span><span data-es>Fecha Desde</span>
+                <input type="date" id="ddDateFrom" onchange="renderDashData()"></label>
+              <label><span data-en>Date To</span><span data-es>Fecha Hasta</span>
+                <input type="date" id="ddDateTo" onchange="renderDashData()"></label>
+            </div>
+            <div class="export-filter-row">
+              <div class="export-choice-field">
+                <span data-en>Station</span><span data-es>Estación</span>
+                <div class="export-choice-group" id="ddStationChoices">
+                  <button type="button" class="export-choice-btn selected" onclick="setDataFilter('station','',this)"><span data-en>All Stations</span><span data-es>Todas</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('station','Long Gluer',this)"><span data-en>Long Gluer</span><span data-es>Larga</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('station','Short Gluer',this)"><span data-en>Short Gluer</span><span data-es>Corta</span></button>
+                </div>
+              </div>
+              <div class="export-choice-field">
+                <span data-en>Pass</span><span data-es>Pasada</span>
+                <div class="export-choice-group" id="ddPassChoices">
+                  <button type="button" class="export-choice-btn selected" onclick="setDataFilter('pass','',this)"><span data-en>All Passes</span><span data-es>Todas</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('pass','1',this)"><span data-en>1st Pass</span><span data-es>1ra</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('pass','2',this)"><span data-en>2nd Pass</span><span data-es>2da</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('pass','S',this)"><span data-en>Single Pass</span><span data-es>Única</span></button>
+                </div>
+              </div>
+            </div>
+            <div class="export-filter-row">
+              <div class="export-choice-field">
+                <span data-en>Shift</span><span data-es>Turno</span>
+                <div class="export-choice-group" id="ddShiftChoices">
+                  <button type="button" class="export-choice-btn selected" onclick="setDataFilter('shift','',this)"><span data-en>All Shifts</span><span data-es>Todos</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('shift','1',this)"><span data-en>Shift 1</span><span data-es>Turno 1</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('shift','2',this)"><span data-en>Shift 2</span><span data-es>Turno 2</span></button>
+                </div>
+              </div>
+              <div class="export-choice-field">
+                <span data-en>Overs</span><span data-es>Overs</span>
+                <div class="export-choice-group" id="ddOversChoices">
+                  <button type="button" class="export-choice-btn selected" onclick="setDataFilter('overs','',this)"><span data-en>All Jobs</span><span data-es>Todos</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('overs','yes',this)"><span data-en>With Overs</span><span data-es>Con Overs</span></button>
+                  <button type="button" class="export-choice-btn" onclick="setDataFilter('overs','no',this)"><span data-en>No Overs</span><span data-es>Sin Overs</span></button>
+                </div>
+              </div>
+            </div>
+            <div class="export-filter-row">
+              <label style="flex:1;"><span data-en>Job/PO or Product #</span><span data-es>Trabajo/OC o # Producto</span>
+                <input type="text" id="ddSearchInput" oninput="renderDashData()" data-ph-en="Optional…" data-ph-es="Opcional…" placeholder="Optional…"></label>
+            </div>
+          </div>
+          <div class="pdash-matchcount" id="ddMatchCount"></div>
+
+          <div class="pdash-kpi-row">
+            <div class="pdash-kpi-card"><div class="pdash-kpi-icon pdash-c-pink">▤</div><div class="pdash-kpi-label"><span data-en>Completed Reports</span><span data-es>Reportes</span></div><div class="pdash-kpi-value pdash-c-pink" id="pdashKpiReports">0</div></div>
+            <div class="pdash-kpi-card"><div class="pdash-kpi-icon pdash-c-good">◧</div><div class="pdash-kpi-label"><span data-en>Total Good</span><span data-es>Total Bueno</span></div><div class="pdash-kpi-value pdash-c-good" id="pdashKpiGood">0</div></div>
+            <div class="pdash-kpi-card"><div class="pdash-kpi-icon pdash-c-neutral">▥</div><div class="pdash-kpi-label"><span data-en>Total Pallets</span><span data-es>Tarimas</span></div><div class="pdash-kpi-value pdash-c-neutral" id="pdashKpiPallets">0</div></div>
+            <div class="pdash-kpi-card"><div class="pdash-kpi-icon pdash-c-neutral">◎</div><div class="pdash-kpi-label"><span data-en>Target</span><span data-es>Meta</span></div><div class="pdash-kpi-value pdash-c-neutral" id="pdashKpiTarget">0</div></div>
+            <div class="pdash-kpi-card"><div class="pdash-kpi-icon pdash-c-pink">◉</div><div class="pdash-kpi-label"><span data-en>Effective Target</span><span data-es>Meta Efectiva</span></div><div class="pdash-kpi-value pdash-c-pink" id="pdashKpiEffTarget">0</div></div>
+            <div class="pdash-kpi-card"><div class="pdash-kpi-icon" id="pdashKpiFillRateIcon">◍</div><div class="pdash-kpi-label"><span data-en>Overall Fill Rate</span><span data-es>% Cumplimiento</span></div><div class="pdash-kpi-value" id="pdashKpiFillRate">0%</div></div>
+          </div>
+
+          <div class="pdash-main-row">
+            <div class="pdash-card">
+              <div class="pdash-card-title"><span data-en>Overall Fill Rate</span><span data-es>% Cumplimiento General</span></div>
+              <div class="pdash-fillrate-flex">
+                <div class="pdash-fillrate-ring">
+                  <canvas id="pdashFillRateChart"></canvas>
+                  <div class="pdash-fillrate-center"><div class="pct" id="pdashFillRatePct">0%</div><div class="lbl"><span data-en>Fill Rate</span><span data-es>Cumplimiento</span></div></div>
+                </div>
+                <div class="pdash-fillrate-stats">
+                  <div class="pdash-fillrate-stat-row"><span data-en>Total Good</span><span data-es>Total Bueno</span><span id="pdashFrGood">0</span></div>
+                  <div class="pdash-fillrate-stat-row"><span data-en>Target</span><span data-es>Meta</span><span id="pdashFrTarget">0</span></div>
+                  <div class="pdash-fillrate-stat-row"><span data-en>Difference vs Target</span><span data-es>Diferencia vs Meta</span><span id="pdashFrDiff">0</span></div>
+                  <div class="pdash-fillrate-stat-row"><span data-en>Effective Target</span><span data-es>Meta Efectiva</span><span id="pdashFrEffTarget">0</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="pdash-card">
+              <div class="pdash-card-title"><span data-en>Target vs Good by Station</span><span data-es>Meta vs Bueno por Estación</span></div>
+              <div class="pdash-chartbox-major"><canvas id="pdashStationChart"></canvas></div>
+            </div>
+          </div>
+
+          <div class="pdash-secondary-row">
+            <div class="pdash-card">
+              <div class="pdash-card-title"><span data-en>Good vs Target Over Time</span><span data-es>Bueno vs Meta en el Tiempo</span></div>
+              <div class="pdash-card-sub"><span data-en>Grouped by report sent date</span><span data-es>Agrupado por fecha de envío</span></div>
+              <div class="pdash-chartbox-secondary"><canvas id="pdashOverTimeChart"></canvas></div>
+            </div>
+            <div class="pdash-card">
+              <div class="pdash-card-title"><span data-en>Pass Mix</span><span data-es>Mezcla de Pasadas</span></div>
+              <div class="pdash-card-sub"><span data-en>Completed reports by pass</span><span data-es>Reportes completados por pasada</span></div>
+              <div class="pdash-fillrate-ring" style="margin:0 auto;">
+                <canvas id="pdashPassMixChart"></canvas>
+                <div class="pdash-fillrate-center"><div class="pct" id="pdashPassMixCenter">0</div><div class="lbl"><span data-en>Reports</span><span data-es>Reportes</span></div></div>
+              </div>
+              <div class="pdash-donut-legend" id="pdashPassMixLegend"></div>
+            </div>
+            <div class="pdash-card">
+              <div class="pdash-card-title"><span data-en>Shift Distribution</span><span data-es>Distribución de Turnos</span></div>
+              <div class="pdash-card-sub"><span data-en>Completed reports by shift involvement</span><span data-es>Reportes completados por turno</span></div>
+              <div class="pdash-fillrate-ring" style="margin:0 auto;">
+                <canvas id="pdashShiftChart"></canvas>
+                <div class="pdash-fillrate-center"><div class="pct" id="pdashShiftCenter">0</div><div class="lbl"><span data-en>Reports</span><span data-es>Reportes</span></div></div>
+              </div>
+              <div class="pdash-donut-legend" id="pdashShiftLegend"></div>
+            </div>
+          </div>
+
+          <div class="pdash-card" style="margin-bottom:12px;">
+            <div class="pdash-card-title"><span data-en>Top Jobs by Total Good</span><span data-es>Mejores Trabajos por Total Bueno</span></div>
+            <div class="pdash-card-sub"><span data-en>Production volume, not an efficiency ranking</span><span data-es>Volumen de producción, no un ranking de eficiencia</span></div>
+            <div class="pdash-topjobs-box"><canvas id="pdashTopJobsChart"></canvas></div>
+          </div>
+
+          <div class="pdash-card" style="margin-bottom:12px;">
+            <div class="pdash-card-title"><span data-en>Completed Report Details</span><span data-es>Detalles de Reportes Completados</span></div>
+            <div class="pdash-table-wrap">
+              <table class="pdash-table">
+                <thead><tr>
+                  <th>PO</th><th><span data-en>Product</span><span data-es>Producto</span></th><th><span data-en>Station</span><span data-es>Estación</span></th>
+                  <th><span data-en>Pass</span><span data-es>Pasada</span></th><th><span data-en>Shift(s)</span><span data-es>Turno(s)</span></th>
+                  <th><span data-en>Target</span><span data-es>Meta</span></th><th><span data-en>Overs %</span><span data-es>Overs %</span></th>
+                  <th><span data-en>Effective Target</span><span data-es>Meta Efectiva</span></th><th><span data-en>Pallets Needed</span><span data-es>Tarimas Necesarias</span></th>
+                  <th><span data-en>Pallets Produced</span><span data-es>Tarimas Producidas</span></th><th><span data-en>Total Good</span><span data-es>Total Bueno</span></th>
+                  <th><span data-en>% Short vs Target</span><span data-es>% Corto vs Meta</span></th><th><span data-en>% Short vs Eff. Target</span><span data-es>% Corto vs Meta Ef.</span></th>
+                </tr></thead>
+                <tbody id="pdashTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pdash-card">
+            <div class="pdash-card-title"><span data-en>Selected Data Summary</span><span data-es>Resumen de Datos Seleccionados</span></div>
+            <div class="pdash-summary-grid" id="pdashSummaryContent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="dashTabExport" style="display:none;">
       <div class="export-filters">
         <div class="export-filter-row">
@@ -4916,7 +5123,6 @@ function renderJob(){
 ══════════════════════════════════════════════════════════════════ */
 let dashData = null;
 let dashTab = 'history';
-let dashCharts = [];
 
 /* Keeps Live Jobs (and History/Data) current on its own while the Dashboard
    is open, instead of only ever showing the one snapshot fetched when it
@@ -5520,99 +5726,272 @@ function renderDashLive(){
   }).join('');
 }
 
+/* Single source of truth for every KPI/chart/table number on the Data tab
+   dashboard — takes an already-filtered reports array (see getFilteredReports)
+   and returns every aggregate the dashboard needs in one pass. Deliberately
+   built entirely from getReportDerivedStats()/safeNum() (the SAME per-row
+   calculations exportToExcel() uses) so the dashboard and the Excel/PowerPoint
+   exports can never disagree about a number for the same filtered set. */
+function calculateDashboardStats(reports){
+  const byStation = {};
+  const byPass = { '1':0, '2':0, 'S':0 };
+  const byShift = { s1:0, s2:0, both:0 };
+  const byDate = {};
+  let totalGood=0, totalPallets=0, totalTarget=0, totalEffectiveTarget=0;
+  let jobsMeetingTarget=0, jobsMeetingEffectiveTarget=0, oversJobs=0;
+  reports.forEach(r => {
+    const s = getReportDerivedStats(r);
+    const pallets = safeNum(r['Total Pallets']);
+    totalGood += s.totalGood;
+    totalPallets += pallets;
+    totalTarget += s.target;
+    totalEffectiveTarget += s.effectiveTarget;
+    if (s.target > 0 && s.totalGood >= s.target) jobsMeetingTarget++;
+    if (s.effectiveTarget > 0 && s.totalGood >= s.effectiveTarget) jobsMeetingEffectiveTarget++;
+    if (s.oversPercent > 0) oversJobs++;
+
+    const station = r.Station || 'Unknown';
+    if (!byStation[station]) byStation[station] = { target:0, good:0 };
+    byStation[station].target += s.target;
+    byStation[station].good += s.totalGood;
+
+    const passKey = (r.Pass === '1' || r.Pass === '2' || r.Pass === 'S') ? r.Pass : 'S';
+    byPass[passKey] = (byPass[passKey]||0) + 1;
+
+    if (s.shifts.length >= 2) byShift.both++;
+    else if (s.shifts[0] === '2') byShift.s2++;
+    else byShift.s1++;
+
+    if (r.Timestamp){
+      const d = new Date(r.Timestamp);
+      if (!isNaN(d.getTime())){
+        const key = d.toISOString().slice(0,10);
+        if (!byDate[key]) byDate[key] = { target:0, good:0 };
+        byDate[key].target += s.target;
+        byDate[key].good += s.totalGood;
+      }
+    }
+  });
+  // Overall Fill Rate is SUM(Good)/SUM(Target) — never an average of each
+  // job's own %, which would let a handful of tiny jobs at 200% mask a big
+  // job that badly missed. Anthony's own explicit spec for this redesign.
+  const overallFillRate = totalTarget > 0 ? Math.round((totalGood/totalTarget)*1000)/10 : 0;
+  return {
+    reportCount: reports.length, totalGood, totalPallets, totalTarget, totalEffectiveTarget,
+    overallFillRate, jobsMeetingTarget, jobsMeetingEffectiveTarget, oversJobs,
+    byStation, byPass, byShift, byDate
+  };
+}
+
+let pdashCharts = [];
+function _pdashDestroyCharts(){
+  pdashCharts.forEach(c => c.destroy());
+  pdashCharts = [];
+}
+
 function renderDashData(){
   const isEs = document.body.classList.contains('es');
-  const el = document.getElementById('dashTabData');
-  const reports = dashData.reports || [];
-  dashCharts.forEach(c => c.destroy());
-  dashCharts = [];
+  _pdashDestroyCharts();
+  const allReports = (dashData && dashData.reports) || [];
+  const reports = getFilteredReports(getDataFilters());
+  const fmt = n => Math.round(n||0).toLocaleString();
+
+  document.getElementById('ddMatchCount').textContent = isEs
+    ? `${reports.length} de ${allReports.length} reportes completados`
+    : `${reports.length} of ${allReports.length} completed reports`;
+
+  const stats = calculateDashboardStats(reports);
+
+  document.getElementById('pdashKpiReports').textContent = fmt(stats.reportCount);
+  document.getElementById('pdashKpiGood').textContent = fmt(stats.totalGood);
+  document.getElementById('pdashKpiPallets').textContent = fmt(stats.totalPallets);
+  document.getElementById('pdashKpiTarget').textContent = fmt(stats.totalTarget);
+  document.getElementById('pdashKpiEffTarget').textContent = fmt(stats.totalEffectiveTarget);
+  const fillEl = document.getElementById('pdashKpiFillRate');
+  fillEl.textContent = stats.overallFillRate + '%';
+  fillEl.className = 'pdash-kpi-value ' + (stats.overallFillRate >= 100 ? 'pdash-c-good' : 'pdash-c-warn');
+
+  document.getElementById('pdashFrGood').textContent = fmt(stats.totalGood);
+  document.getElementById('pdashFrTarget').textContent = fmt(stats.totalTarget);
+  const diff = stats.totalGood - stats.totalTarget;
+  const diffEl = document.getElementById('pdashFrDiff');
+  diffEl.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
+  diffEl.style.color = diff >= 0 ? '#10B981' : '#E8A020';
+  document.getElementById('pdashFrEffTarget').textContent = fmt(stats.totalEffectiveTarget);
+  document.getElementById('pdashFillRatePct').textContent = stats.overallFillRate + '%';
+
+  const tableBody = document.getElementById('pdashTableBody');
+  const summaryEl = document.getElementById('pdashSummaryContent');
+  const passMixLegend = document.getElementById('pdashPassMixLegend');
+  const shiftLegend = document.getElementById('pdashShiftLegend');
   if (!reports.length){
-    el.innerHTML = `<div class="dash-empty">${isEs?'Aún no hay datos para graficar.':'No data to chart yet.'}</div>`;
+    tableBody.innerHTML = `<tr><td colspan="13" style="text-align:center;color:var(--text-tertiary);padding:20px;">${isEs?'Sin reportes que coincidan con estos filtros':'No reports match these filters'}</td></tr>`;
+    summaryEl.innerHTML = '';
+    passMixLegend.innerHTML = '';
+    shiftLegend.innerHTML = '';
+    document.getElementById('pdashPassMixCenter').textContent = '0';
+    document.getElementById('pdashShiftCenter').textContent = '0';
     return;
   }
-  el.innerHTML = `<div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno por trabajo':'Target vs Good by job'}</h3><canvas id="dashChartByJob" height="260"></canvas></div>
-    <div class="dash-chart-wrap"><h3>${isEs?'Totales por estación':'Totals by station'}</h3><canvas id="dashChartByStation" height="220"></canvas></div>
-    <div class="dash-chart-wrap"><h3>${isEs?'Meta vs Bueno a través del tiempo':'Target vs Good over time'}</h3><canvas id="dashChartByDate" height="260"></canvas></div>`;
 
-  // Chart.js bakes colors in at creation time, so the handful of colors that
-  // wouldn't otherwise read well against a dark card (mainly Target, which
-  // defaulted to near-black) need picking here rather than via CSS —
-  // toggleTheme() calls this function again on switch to rebuild with the
-  // right set.
-  const isDark = document.body.classList.contains('dark-mode');
-  const targetColor = isDark ? '#e8e9eb' : '#0a0a0a';
-  const axisColor = isDark ? '#c7cad0' : '#444';
-  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-  const chartOptions = {
-    responsive: true,
-    plugins: { legend: { labels: { color: axisColor } } },
-    scales: {
-      y: { beginAtZero: true, ticks: { color: axisColor }, grid: { color: gridColor } },
-      x: { ticks: { color: axisColor }, grid: { color: gridColor } }
-    }
-  };
+  const {axis, grid} = _chartTextColors();
+  const NEUTRAL = '#9CA3AF';
+  const GOOD = '#10B981';
+  const PINK = '#FF1F8F';
+  const numTick = { callback: v => Number(v).toLocaleString() };
 
-  const labels = reports.map(r => String(r.PO||'—'));
-  const targets = reports.map(r => safeNum(r.Target));
-  const goods = reports.map(r => safeNum(r['Total Good']));
-  const pallets = reports.map(r => safeNum(r['Total Pallets']));
-
-  dashCharts.push(new Chart(document.getElementById('dashChartByJob'), {
-    type: 'bar',
+  // Overall Fill Rate ring — same colors/threshold as the KPI card above.
+  pdashCharts.push(new Chart(document.getElementById('pdashFillRateChart'), {
+    type: 'doughnut',
     data: {
-      labels,
-      datasets: [
-        { label: isEs?'Meta':'Target', data: targets, backgroundColor: targetColor },
-        { label: isEs?'Bueno':'Good', data: goods, backgroundColor: '#2e7d4f' },
-        { label: isEs?'Tarimas':'Pallets', data: pallets, backgroundColor: '#ff1f8f' }
-      ]
+      labels: [isEs?'Bueno':'Good', isEs?'Restante':'Remaining'],
+      datasets: [{
+        data: [Math.min(stats.totalGood, stats.totalTarget), Math.max(stats.totalTarget - stats.totalGood, 0)],
+        backgroundColor: [stats.overallFillRate >= 100 ? GOOD : PINK, NEUTRAL],
+        borderWidth: 0
+      }]
     },
-    options: chartOptions
+    options: { responsive:true, maintainAspectRatio:false, cutout:'75%', plugins:{ legend:{ display:false } } }
   }));
 
-  const byStation = {};
-  reports.forEach(r => {
-    const st = r.Station || (isEs?'Desconocido':'Unknown');
-    if (!byStation[st]) byStation[st] = { target: 0, good: 0 };
-    byStation[st].target += safeNum(r.Target);
-    byStation[st].good += safeNum(r['Total Good']);
-  });
-  const stLabels = Object.keys(byStation);
-  dashCharts.push(new Chart(document.getElementById('dashChartByStation'), {
+  // Target vs Good by Station
+  const stLabels = Object.keys(stats.byStation);
+  pdashCharts.push(new Chart(document.getElementById('pdashStationChart'), {
     type: 'bar',
     data: {
       labels: stLabels,
       datasets: [
-        { label: isEs?'Meta':'Target', data: stLabels.map(s=>byStation[s].target), backgroundColor: targetColor },
-        { label: isEs?'Bueno':'Good', data: stLabels.map(s=>byStation[s].good), backgroundColor: '#2e7d4f' }
+        { label: isEs?'Meta':'Target', data: stLabels.map(s=>stats.byStation[s].target), backgroundColor: NEUTRAL },
+        { label: isEs?'Bueno':'Good', data: stLabels.map(s=>stats.byStation[s].good), backgroundColor: GOOD }
       ]
     },
-    options: chartOptions
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color: axis } } },
+      scales: { y:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid} }, x:{ ticks:{color:axis}, grid:{display:false} } }
+    }
   }));
 
-  // Same two quantities, but plotted chronologically by the date each
-  // report was sent — multiple jobs finished on the same day get summed
-  // into one point rather than showing as separate overlapping entries.
-  const byDate = {};
-  reports.forEach(r => {
-    if (!r.Timestamp) return;
-    const dateKey = new Date(r.Timestamp).toISOString().slice(0,10);
-    if (!byDate[dateKey]) byDate[dateKey] = { target: 0, good: 0 };
-    byDate[dateKey].target += safeNum(r.Target);
-    byDate[dateKey].good += safeNum(r['Total Good']);
-  });
-  const dateLabels = Object.keys(byDate).sort();
-  dashCharts.push(new Chart(document.getElementById('dashChartByDate'), {
-    type: 'line',
+  // Good vs Target Over Time — grouped by report SENT date (Timestamp), same
+  // aggregation helper (_byDateAgg) the Export preview already uses. Ticks
+  // are thinned when there are many dates rather than deleting any point —
+  // every date still has a working tooltip.
+  const dateKeys = Object.keys(stats.byDate).sort();
+  // Short display form ("Sep 1") instead of the full ISO string — the ISO
+  // key is still what the aggregation/sort above uses, this only affects
+  // what's drawn under each bar, which is what was actually crowding this
+  // card's narrow 1/3-width slot.
+  const dateLabels = dateKeys.map(d => new Date(d+'T00:00:00').toLocaleDateString(isEs?'es':'en', {month:'short', day:'numeric'}));
+  const dateTargets = dateKeys.map(d=>stats.byDate[d].target);
+  const dateGoods = dateKeys.map(d=>stats.byDate[d].good);
+  // Only force our own thinning once there are genuinely many dates —
+  // otherwise Chart.js's own autoSkip already handles a handful of dates
+  // more gracefully (including a slight rotation on narrow/phone widths)
+  // than an unconditional every-Nth-label rule would.
+  const manyDates = dateLabels.length > 12;
+  const tickStep = Math.max(1, Math.ceil(dateLabels.length / 8));
+  const xTicks = manyDates
+    ? { color:axis, maxRotation:0, autoSkip:false, callback:function(val,idx){ return idx % tickStep === 0 ? this.getLabelForValue(val) : ''; } }
+    : { color:axis, maxRotation:45, minRotation:0, autoSkip:true };
+  pdashCharts.push(new Chart(document.getElementById('pdashOverTimeChart'), {
+    type: 'bar',
     data: {
       labels: dateLabels,
       datasets: [
-        { label: isEs?'Meta':'Target', data: dateLabels.map(d=>byDate[d].target), borderColor: targetColor, backgroundColor: targetColor, fill: false, tension: 0.2 },
-        { label: isEs?'Bueno':'Good', data: dateLabels.map(d=>byDate[d].good), borderColor: '#2e7d4f', backgroundColor: '#2e7d4f', fill: false, tension: 0.2 }
+        { label: isEs?'Meta':'Target', data: dateTargets, backgroundColor: NEUTRAL },
+        { label: isEs?'Bueno':'Good', data: dateGoods, backgroundColor: GOOD }
       ]
     },
-    options: chartOptions
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color: axis, boxWidth:10, font:{size:10} } } },
+      scales: {
+        y:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid} },
+        x:{ grid:{display:false}, ticks: xTicks }
+      }
+    }
   }));
+
+  // Pass Mix — count of completed REPORTS per pass, not production volume.
+  const passOrder = ['1','2','S'];
+  const passLabels = passOrder.map(p => passLabel(p, isEs));
+  const passCounts = passOrder.map(p => stats.byPass[p]||0);
+  const passColors = [PINK, '#4B5563', GOOD];
+  document.getElementById('pdashPassMixCenter').textContent = fmt(stats.reportCount);
+  pdashCharts.push(new Chart(document.getElementById('pdashPassMixChart'), {
+    type:'doughnut',
+    data: { labels: passLabels, datasets:[{ data: passCounts, backgroundColor: passColors, borderWidth:0 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'70%', plugins:{ legend:{ display:false } } }
+  }));
+  passMixLegend.innerHTML = passOrder.map((p,i) =>
+    `<div class="pdash-donut-legend-row"><span><span class="dot" style="background:${passColors[i]}"></span>${escapeHtml(passLabels[i])}</span><b>${passCounts[i]}</b></div>`
+  ).join('');
+
+  // Shift Distribution — which shift(s) appear on each completed report's
+  // own Shifts field (see getReportDerivedStats). NOT labor-hour tracking.
+  const shiftLabels = [isEs?'Solo Turno 1':'Shift 1 Only', isEs?'Solo Turno 2':'Shift 2 Only', isEs?'Ambos Turnos':'Both Shifts'];
+  const shiftCounts = [stats.byShift.s1, stats.byShift.s2, stats.byShift.both];
+  const shiftColors = [PINK, '#4B5563', GOOD];
+  document.getElementById('pdashShiftCenter').textContent = fmt(stats.reportCount);
+  pdashCharts.push(new Chart(document.getElementById('pdashShiftChart'), {
+    type:'doughnut',
+    data: { labels: shiftLabels, datasets:[{ data: shiftCounts, backgroundColor: shiftColors, borderWidth:0 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'70%', plugins:{ legend:{ display:false } } }
+  }));
+  shiftLegend.innerHTML = shiftLabels.map((l,i) =>
+    `<div class="pdash-donut-legend-row"><span><span class="dot" style="background:${shiftColors[i]}"></span>${escapeHtml(l)}</span><b>${shiftCounts[i]}</b></div>`
+  ).join('');
+
+  // Top Jobs by Total Good — production volume only, top 10, not a ranking
+  // of efficiency (a small job at 100% target still ranks below a huge one).
+  const topJobs = reports.map(r => ({ po:r.PO, good: safeNum(r['Total Good']) }))
+    .sort((a,b) => b.good - a.good).slice(0, 10);
+  pdashCharts.push(new Chart(document.getElementById('pdashTopJobsChart'), {
+    type:'bar',
+    data: {
+      labels: topJobs.map(j=>String(j.po||'—')),
+      datasets: [{ label: isEs?'Total Bueno':'Total Good', data: topJobs.map(j=>j.good), backgroundColor: PINK }]
+    },
+    options: {
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales: { x:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid} }, y:{ ticks:{color:axis}, grid:{display:false} } }
+    }
+  }));
+
+  // Detail table — identical per-row math to exportToExcel() (both call
+  // getReportDerivedStats()), so the numbers here and in the spreadsheet
+  // for the same report can never diverge.
+  tableBody.innerHTML = reports.map(r => {
+    const s = getReportDerivedStats(r);
+    const shiftsText = s.shifts.length ? s.shifts.map(x => (isEs?'Turno ':'Shift ')+x).join(', ') : '—';
+    return `<tr>
+      <td>${escapeHtml(r.PO||'')}</td><td>${escapeHtml(r.Product||'')}</td><td>${escapeHtml(r.Station||'')}</td>
+      <td>${escapeHtml(passLabel(String(r.Pass||''), isEs))}</td><td>${escapeHtml(shiftsText)}</td>
+      <td>${s.target.toLocaleString()}</td><td>${s.oversPercent}%</td>
+      <td>${s.effectiveTarget.toLocaleString()}</td><td>${s.palletsNeeded.toLocaleString()}</td>
+      <td>${safeNum(r['Total Pallets']).toLocaleString()}</td><td>${s.totalGood.toLocaleString()}</td>
+      <td>${s.pctShortVsTarget}%</td><td>${s.pctShortVsEffectiveTarget}%</td>
+    </tr>`;
+  }).join('');
+
+  // Selected Data Summary — objective calculations only, no interpretation
+  // (see Anthony's explicit instruction not to editorialize here).
+  const summaryItems = [];
+  stLabels.forEach(st => {
+    const g = stats.byStation[st].good;
+    const pct = stats.totalGood > 0 ? Math.round((g/stats.totalGood)*1000)/10 : 0;
+    summaryItems.push({ h: st, v: `${g.toLocaleString()} ${isEs?'Bueno':'Good'} · ${pct}% ${isEs?'de la producción seleccionada':'of selected production'}` });
+  });
+  passOrder.forEach(p => {
+    if (stats.byPass[p]) summaryItems.push({ h: passLabel(p, isEs), v: `${stats.byPass[p]} ${isEs?'reportes completados':'completed reports'}` });
+  });
+  summaryItems.push({ h: isEs?'Trabajos con Overs':'Overs Jobs', v: `${stats.oversJobs} ${isEs?'de':'of'} ${stats.reportCount} ${isEs?'reportes':'reports'}` });
+  summaryItems.push({ h: isEs?'Cumplen o Superan la Meta':'Jobs at/above Target', v: `${stats.jobsMeetingTarget} ${isEs?'de':'of'} ${stats.reportCount}` });
+  summaryItems.push({ h: isEs?'Cumplen o Superan la Meta Efectiva':'Jobs at/above Effective Target', v: `${stats.jobsMeetingEffectiveTarget} ${isEs?'de':'of'} ${stats.reportCount}` });
+  summaryEl.innerHTML = summaryItems.map(it =>
+    `<div class="pdash-summary-item"><div class="h">${escapeHtml(it.h)}</div><div class="v">${escapeHtml(it.v)}</div></div>`
+  ).join('');
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -5669,8 +6048,35 @@ function getExportFilters(){
    independent range. Shift/Overs read the derived stats (getReportDerivedStats)
    since those aren't raw sheet columns on every row (older reports predate
    them and fall back to being computed there). */
-function getFilteredReportsForExport(){
-  const f = getExportFilters();
+// Station/Pass/Shift/Overs state for the Data tab's own filter bar — kept
+// entirely separate from exportFilterState so switching filters on one tab
+// never silently changes what the other tab is showing.
+let dataFilterState = { station:'', pass:'', shift:'', overs:'' };
+function setDataFilter(key, value, btnEl){
+  dataFilterState[key] = value;
+  btnEl.parentElement.querySelectorAll('.export-choice-btn').forEach(b => b.classList.remove('selected'));
+  btnEl.classList.add('selected');
+  renderDashData();
+}
+
+function getDataFilters(){
+  return {
+    dateFrom: document.getElementById('ddDateFrom').value || '',
+    dateTo: document.getElementById('ddDateTo').value || '',
+    timeFrom: '', timeTo: '',
+    station: dataFilterState.station,
+    pass: dataFilterState.pass,
+    shift: dataFilterState.shift,
+    search: (document.getElementById('ddSearchInput').value || '').trim().toLowerCase(),
+    overs: dataFilterState.overs
+  };
+}
+
+/* Shared by the Export tab AND the Data tab dashboard (see setDataFilter/
+   renderDashData below) — both pass their own filters object through here
+   so the two views can never disagree about what "matches the filters"
+   means, even though each keeps its own independent filter state/UI. */
+function getFilteredReports(f){
   const all = (dashData && dashData.reports) || [];
   return all.filter(r => {
     if (!r.Timestamp) return false;
@@ -5700,6 +6106,10 @@ function getFilteredReportsForExport(){
     if (f.overs === 'no' && Number(r.OversPercent) > 0) return false;
     return true;
   });
+}
+
+function getFilteredReportsForExport(){
+  return getFilteredReports(getExportFilters());
 }
 
 function updateExportMatchCount(){
