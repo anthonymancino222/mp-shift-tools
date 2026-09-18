@@ -840,7 +840,7 @@
   }
   .dash-header h2{margin:0;font-size:1.2rem;}
   .dash-close{background:transparent;border:2px solid #fff;color:#fff;border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer;}
-  .dash-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;max-width:900px;margin:0 auto;}
+  .dash-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px;max-width:900px;margin:0 auto;}
   .dash-tab{padding:12px 8px;font-weight:800;border-radius:10px;border:3px solid var(--navy);background:var(--card);color:var(--navy);font-size:0.95rem;cursor:pointer;}
   /* 4 equal tabs get tight on a phone-width screen — 2x2 keeps each tab's
      label readable instead of squeezing all four into one row. */
@@ -915,8 +915,7 @@
      Colors are fixed hex, not CSS vars, EXCEPT where the app already had
      the exact right token (var(--warn) already IS #e8a020) — a management
      report's "Good" should always read as emerald green and "Target" as
-     neutral gray regardless of the operator's light/dark preference, same
-     reasoning _renderGoodTargetChart() already uses for its own #10B981. */
+     neutral gray regardless of the operator's light/dark preference. */
   .pdash{background:#F5F5F3;border-radius:12px;padding:0;margin:-4px 0 0;overflow:hidden;}
   body.dark-mode .pdash{background:#151719;}
   .pdash-header{background:#0A0A0A;color:#fff;padding:14px 16px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
@@ -1005,14 +1004,6 @@
   .export-btn-pptx:active{background:var(--navy-light);}
   .export-status{text-align:center;font-size:0.85rem;color:var(--text-secondary);min-height:1.2em;}
 
-  .preview-heading{font-size:0.95rem;font-weight:800;color:var(--navy);margin:18px 0 10px;padding-top:14px;border-top:2px dashed var(--border);}
-  .preview-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
-  .preview-section h3{margin:0 0 8px;font-size:0.95rem;color:var(--navy);}
-  .preview-stat{font-size:0.85rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px;}
-  .preview-note{font-size:0.75rem;color:var(--text-tertiary);margin-bottom:10px;font-style:italic;}
-  .preview-chart-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  @media (max-width:600px){ .preview-chart-pair{grid-template-columns:1fr;} }
-  .preview-chart-sublabel{font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-align:center;margin-bottom:4px;}
   .pallet-job-picker{max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:10px;background:var(--row-bg);}
   .pallet-job-picker label{display:flex;align-items:center;gap:8px;font-size:0.82rem;padding:5px 4px;cursor:pointer;}
   .pallet-job-picker input[type="checkbox"]{width:16px;height:16px;flex-shrink:0;}
@@ -1650,7 +1641,6 @@
     <button class="dash-tab active" id="dashTabHistoryBtn" onclick="setDashTab('history')"><span data-en>History</span><span data-es>Historial</span></button>
     <button class="dash-tab" id="dashTabLiveBtn" onclick="setDashTab('live')"><span data-en>Live Jobs</span><span data-es>Trabajos Activos</span></button>
     <button class="dash-tab" id="dashTabDataBtn" onclick="setDashTab('data')"><span data-en>Data</span><span data-es>Datos</span></button>
-    <button class="dash-tab" id="dashTabExportBtn" onclick="setDashTab('export')"><span data-en>Export</span><span data-es>Exportar</span></button>
   </div>
   <div class="dash-body">
     <div class="dash-tab-explainer" id="dashTabExplainer">
@@ -1792,6 +1782,20 @@
           </div>
 
           <div class="pdash-card" style="margin-bottom:12px;">
+            <div class="pdash-card-title"><span data-en>Pallets Progression</span><span data-es>Progresión de Tarimas</span></div>
+            <div class="pdash-card-sub"><span data-en>Approximate — derived from each job's logged Good counts over time divided by its Packing Setup (pcs/pallet). Jobs without a confirmed Packing Setup can't be shown here.</span><span data-es>Aproximado — derivado de los conteos Buenos registrados de cada trabajo a través del tiempo, dividido por su Configuración de Empaque (pzs/tarima). Los trabajos sin Configuración de Empaque confirmada no se pueden mostrar aquí.</span></div>
+            <div class="export-choice-field" style="margin-bottom:8px;">
+              <span data-en>Color lines by</span><span data-es>Colorear líneas por</span>
+              <div class="export-choice-group" id="palletColorModeChoices">
+                <button type="button" class="export-choice-btn selected" onclick="setPalletColorMode('job',this)"><span data-en>Job</span><span data-es>Trabajo</span></button>
+                <button type="button" class="export-choice-btn" onclick="setPalletColorMode('pass',this)"><span data-en>Pass (1st/2nd/Single)</span><span data-es>Pasada (1ra/2da/Única)</span></button>
+              </div>
+            </div>
+            <div id="palletJobPicker" class="pallet-job-picker"></div>
+            <canvas id="prevChartPallets" height="260"></canvas>
+          </div>
+
+          <div class="pdash-card" style="margin-bottom:12px;">
             <div class="pdash-card-title"><span data-en>Completed Report Details</span><span data-es>Detalles de Reportes Completados</span></div>
             <div class="pdash-table-wrap">
               <table class="pdash-table">
@@ -1812,111 +1816,12 @@
             <div class="pdash-card-title"><span data-en>Selected Data Summary</span><span data-es>Resumen de Datos Seleccionados</span></div>
             <div class="pdash-summary-grid" id="pdashSummaryContent"></div>
           </div>
+
+          <button class="export-btn export-btn-excel" style="margin-top:12px;" onclick="exportToExcel()">📊 <span data-en>Export to Excel</span><span data-es>Exportar a Excel</span></button>
+          <button class="export-btn export-btn-pptx" onclick="exportToPowerPoint()">📽️ <span data-en>Export to PowerPoint</span><span data-es>Exportar a PowerPoint</span></button>
+          <div id="pdashExportStatus" class="export-status"></div>
         </div>
       </div>
-    </div>
-    <div id="dashTabExport" style="display:none;">
-      <div class="export-filters">
-        <div class="export-filter-row">
-          <label><span data-en>Date From</span><span data-es>Fecha Desde</span>
-            <input type="date" id="exportDateFrom"></label>
-          <label><span data-en>Date To</span><span data-es>Fecha Hasta</span>
-            <input type="date" id="exportDateTo"></label>
-        </div>
-        <div class="export-filter-row">
-          <label><span data-en>Time From (optional)</span><span data-es>Hora Desde (opcional)</span>
-            <input type="time" id="exportTimeFrom"></label>
-          <label><span data-en>Time To (optional)</span><span data-es>Hora Hasta (opcional)</span>
-            <input type="time" id="exportTimeTo"></label>
-        </div>
-        <div class="export-filter-row">
-          <div class="export-choice-field">
-            <span data-en>Station</span><span data-es>Estación</span>
-            <div class="export-choice-group" id="exportStationChoices">
-              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('station','',this)"><span data-en>All Stations</span><span data-es>Todas las Estaciones</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('station','Long Gluer',this)"><span data-en>Long Gluer</span><span data-es>Pegadora Larga</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('station','Short Gluer',this)"><span data-en>Short Gluer</span><span data-es>Pegadora Corta</span></button>
-            </div>
-          </div>
-          <div class="export-choice-field">
-            <span data-en>Pass</span><span data-es>Pasada</span>
-            <div class="export-choice-group" id="exportPassChoices">
-              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('pass','',this)"><span data-en>All Passes</span><span data-es>Todas las Pasadas</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('pass','1',this)"><span data-en>1st Pass</span><span data-es>1ra Pasada</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('pass','2',this)"><span data-en>2nd Pass</span><span data-es>2da Pasada</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('pass','S',this)"><span data-en>Single Pass</span><span data-es>Pasada Única</span></button>
-            </div>
-          </div>
-        </div>
-        <div class="export-filter-row">
-          <div class="export-choice-field">
-            <span data-en>Shift</span><span data-es>Turno</span>
-            <div class="export-choice-group" id="exportShiftChoices">
-              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('shift','',this)"><span data-en>All Shifts</span><span data-es>Todos los Turnos</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('shift','1',this)"><span data-en>Shift 1</span><span data-es>Turno 1</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('shift','2',this)"><span data-en>Shift 2</span><span data-es>Turno 2</span></button>
-            </div>
-          </div>
-          <div class="export-choice-field">
-            <span data-en>Overs</span><span data-es>Overs</span>
-            <div class="export-choice-group" id="exportOversChoices">
-              <button type="button" class="export-choice-btn selected" onclick="setExportFilter('overs','',this)"><span data-en>All Jobs</span><span data-es>Todos los Trabajos</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('overs','yes',this)"><span data-en>With Overs</span><span data-es>Con Overs</span></button>
-              <button type="button" class="export-choice-btn" onclick="setExportFilter('overs','no',this)"><span data-en>No Overs</span><span data-es>Sin Overs</span></button>
-            </div>
-          </div>
-        </div>
-        <div class="export-filter-row">
-          <label style="flex:1;"><span data-en>Job/PO or Product #</span><span data-es>Trabajo/OC o # Producto</span>
-            <input type="text" id="exportSearchInput" data-ph-en="Optional…" data-ph-es="Opcional…" placeholder="Optional…"></label>
-        </div>
-      </div>
-      <div id="exportMatchCount" class="export-match-count"></div>
-
-      <div class="preview-heading"><span data-en>Live Preview — what will be exported</span><span data-es>Vista Previa en Vivo — lo que se exportará</span></div>
-
-      <div class="preview-section">
-        <h3><span data-en>Good vs Target Over Time</span><span data-es>Bueno vs Meta a Través del Tiempo</span></h3>
-        <div class="preview-stat" id="prevStatOverTime"></div>
-        <canvas id="prevChartOverTime" height="220"></canvas>
-      </div>
-
-      <div class="preview-section">
-        <h3><span data-en>Good vs Target: Long Gluer vs Short Gluer</span><span data-es>Bueno vs Meta: Pegadora Larga vs Corta</span></h3>
-        <div class="preview-stat" id="prevStatStationCompare"></div>
-        <div class="preview-chart-pair">
-          <div><div class="preview-chart-sublabel" data-en>Long Gluer</div><div class="preview-chart-sublabel" data-es hidden>Pegadora Larga</div><canvas id="prevChartLongGluer" height="220"></canvas></div>
-          <div><div class="preview-chart-sublabel" data-en>Short Gluer</div><div class="preview-chart-sublabel" data-es hidden>Pegadora Corta</div><canvas id="prevChartShortGluer" height="220"></canvas></div>
-        </div>
-      </div>
-
-      <div class="preview-section">
-        <h3><span data-en>Pallets Progression</span><span data-es>Progresión de Tarimas</span></h3>
-        <div class="preview-note"><span data-en>Approximate — derived from each job's logged Good counts over time divided by its Packing Setup (pcs/pallet). Jobs without a confirmed Packing Setup can't be shown here.</span><span data-es>Aproximado — derivado de los conteos Buenos registrados de cada trabajo a través del tiempo, dividido por su Configuración de Empaque (pzs/tarima). Los trabajos sin Configuración de Empaque confirmada no se pueden mostrar aquí.</span></div>
-        <div class="export-choice-field" style="margin-bottom:8px;">
-          <span data-en>Color lines by</span><span data-es>Colorear líneas por</span>
-          <div class="export-choice-group" id="palletColorModeChoices">
-            <button type="button" class="export-choice-btn selected" onclick="setPalletColorMode('job',this)"><span data-en>Job</span><span data-es>Trabajo</span></button>
-            <button type="button" class="export-choice-btn" onclick="setPalletColorMode('pass',this)"><span data-en>Pass (1st/2nd/Single)</span><span data-es>Pasada (1ra/2da/Única)</span></button>
-          </div>
-        </div>
-        <div id="palletJobPicker" class="pallet-job-picker"></div>
-        <canvas id="prevChartPallets" height="260"></canvas>
-      </div>
-
-      <div class="preview-section">
-        <h3><span data-en>Target vs Good by Job</span><span data-es>Meta vs Bueno por Trabajo</span></h3>
-        <canvas id="prevChartByJob" height="260"></canvas>
-      </div>
-
-      <div class="preview-section">
-        <h3><span data-en>Totals by Station</span><span data-es>Totales por Estación</span></h3>
-        <canvas id="prevChartByStation" height="220"></canvas>
-      </div>
-
-      <button class="export-btn export-btn-excel" onclick="exportToExcel()">📊 <span data-en>Export to Excel</span><span data-es>Exportar a Excel</span></button>
-      <button class="export-btn export-btn-pptx" onclick="exportToPowerPoint()">📽️ <span data-en>Export to PowerPoint</span><span data-es>Exportar a PowerPoint</span></button>
-      <div id="exportStatus" class="export-status"></div>
     </div>
   </div>
 </div>
@@ -2072,7 +1977,6 @@ function toggleTheme(){
   // whatever's currently drawn so the Data tab doesn't keep showing
   // black bars/lines against a now-dark card.
   if (dashData && dashTab === 'data') renderDashData();
-  if (dashData && dashTab === 'export') renderExportPreview();
 }
 
 /* Forces a fresh load of index.html instead of whatever the tablet's
@@ -2230,11 +2134,6 @@ function toggleLang(){
   // The History tab's year/month nav labels are JS-generated too (like the
   // above), so they'd stay stuck in the old language without this.
   if (dashData) renderDashboard();
-  // The Export tab's match-count line is also JS-generated (renderDashboard()
-  // doesn't cover it — its filter inputs are static markup, only this one
-  // line of text is written by JS) and would otherwise stay stuck in
-  // whatever language it was last rendered in.
-  if (dashTab === 'export') updateExportMatchCount();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -5166,13 +5065,10 @@ function setDashTab(tab){
   document.getElementById('dashTabHistoryBtn').classList.toggle('active', tab==='history');
   document.getElementById('dashTabLiveBtn').classList.toggle('active', tab==='live');
   document.getElementById('dashTabDataBtn').classList.toggle('active', tab==='data');
-  document.getElementById('dashTabExportBtn').classList.toggle('active', tab==='export');
   document.getElementById('dashTabHistory').style.display = tab==='history' ? 'block' : 'none';
   document.getElementById('dashTabLive').style.display = tab==='live' ? 'block' : 'none';
   document.getElementById('dashTabData').style.display = tab==='data' ? 'block' : 'none';
-  document.getElementById('dashTabExport').style.display = tab==='export' ? 'block' : 'none';
   if (dashData) renderDashboard();
-  if (tab === 'export') updateExportMatchCount();
   // Instant refresh the moment someone switches TO Live Jobs, instead of
   // making them wait for the next 25s tick just to see today's latest.
   if (tab === 'live' && dashData) refreshLiveJobsFast();
@@ -5831,6 +5727,7 @@ function renderDashData(){
     shiftLegend.innerHTML = '';
     document.getElementById('pdashPassMixCenter').textContent = '0';
     document.getElementById('pdashShiftCenter').textContent = '0';
+    _renderPalletChart([], isEs);
     return;
   }
 
@@ -5872,9 +5769,9 @@ function renderDashData(){
     }
   }));
 
-  // Good vs Target Over Time — grouped by report SENT date (Timestamp), same
-  // aggregation helper (_byDateAgg) the Export preview already uses. Ticks
-  // are thinned when there are many dates rather than deleting any point —
+  // Good vs Target Over Time — grouped by report SENT date (Timestamp),
+  // from calculateDashboardStats()'s own byDate aggregation. Ticks are
+  // thinned when there are many dates rather than deleting any point —
   // every date still has a working tooltip.
   const dateKeys = Object.keys(stats.byDate).sort();
   // Short display form ("Sep 1") instead of the full ISO string — the ISO
@@ -5959,6 +5856,10 @@ function renderDashData(){
     }
   }));
 
+  // Pallets Progression — reuses the exact same job-picker/series logic the
+  // old Export tab preview had, just fed this tab's own filtered reports.
+  _renderPalletChart(reports, isEs);
+
   // Detail table — identical per-row math to exportToExcel() (both call
   // getReportDerivedStats()), so the numbers here and in the spreadsheet
   // for the same report can never diverge.
@@ -6015,42 +5916,9 @@ function _loadScriptOnce(src){
   });
 }
 
-// Station/Pass/Shift/Overs state for the Export tab's button-group filters
-// (see setExportFilter() below) — not read from a <select> since this app
-// deliberately doesn't use native <select> anywhere (see the CSS comment
-// on .export-choice-field).
-let exportFilterState = { station:'', pass:'', shift:'', overs:'' };
-function setExportFilter(key, value, btnEl){
-  exportFilterState[key] = value;
-  btnEl.parentElement.querySelectorAll('.export-choice-btn').forEach(b => b.classList.remove('selected'));
-  btnEl.classList.add('selected');
-  updateExportMatchCount();
-}
-
-function getExportFilters(){
-  return {
-    dateFrom: document.getElementById('exportDateFrom').value || '',
-    dateTo: document.getElementById('exportDateTo').value || '',
-    timeFrom: document.getElementById('exportTimeFrom').value || '',
-    timeTo: document.getElementById('exportTimeTo').value || '',
-    station: exportFilterState.station,
-    pass: exportFilterState.pass,
-    shift: exportFilterState.shift,
-    search: (document.getElementById('exportSearchInput').value || '').trim().toLowerCase(),
-    overs: exportFilterState.overs
-  };
-}
-
-/* Applies every Export tab filter to dashData.reports. Date/time filters
-   read the report's own Timestamp (when it was sent) — Time From/To are
-   OPTIONAL (Anthony explicitly didn't want them mandatory) and, when set,
-   filter by that Timestamp's time-of-day rather than adding a second
-   independent range. Shift/Overs read the derived stats (getReportDerivedStats)
-   since those aren't raw sheet columns on every row (older reports predate
-   them and fall back to being computed there). */
-// Station/Pass/Shift/Overs state for the Data tab's own filter bar — kept
-// entirely separate from exportFilterState so switching filters on one tab
-// never silently changes what the other tab is showing.
+// Station/Pass/Shift/Overs state for the Data tab's own filter bar — not
+// read from a <select> since this app deliberately doesn't use native
+// <select> anywhere (see the CSS comment on .export-choice-field).
 let dataFilterState = { station:'', pass:'', shift:'', overs:'' };
 function setDataFilter(key, value, btnEl){
   dataFilterState[key] = value;
@@ -6072,10 +5940,10 @@ function getDataFilters(){
   };
 }
 
-/* Shared by the Export tab AND the Data tab dashboard (see setDataFilter/
-   renderDashData below) — both pass their own filters object through here
-   so the two views can never disagree about what "matches the filters"
-   means, even though each keeps its own independent filter state/UI. */
+/* The single filter predicate behind the Data tab dashboard, its Excel/
+   PowerPoint export buttons, and the Pallets Progression chart — all three
+   call this with the SAME getDataFilters() result, so none of them can
+   ever disagree about what "matches the filters" means. */
 function getFilteredReports(f){
   const all = (dashData && dashData.reports) || [];
   return all.filter(r => {
@@ -6108,40 +5976,9 @@ function getFilteredReports(f){
   });
 }
 
-function getFilteredReportsForExport(){
-  return getFilteredReports(getExportFilters());
-}
-
-function updateExportMatchCount(){
-  const isEs = document.body.classList.contains('es');
-  const el = document.getElementById('exportMatchCount');
-  if (!el) return;
-  const total = (dashData && dashData.reports) ? dashData.reports.length : 0;
-  const matched = getFilteredReportsForExport().length;
-  el.textContent = isEs
-    ? `${matched} de ${total} reportes coinciden con los filtros`
-    : `${matched} of ${total} reports match these filters`;
-  renderExportPreview();
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   EXPORT LIVE PREVIEW (Anthony, 2026-09-17) — every chart here reads the
-   SAME getFilteredReportsForExport() the actual Excel/PowerPoint exports
-   use, so what's shown on screen is exactly what gets exported. Rebuilt
-   on every filter change via updateExportMatchCount() above. Chart.js is
-   already loaded globally for the Data tab (see the <script> tag near the
-   top of <head>) — no lazy-load needed here, unlike XLSX/pptxgenjs.
-══════════════════════════════════════════════════════════════════ */
-let previewCharts = [];
-function _destroyPreviewCharts(){
-  previewCharts.forEach(c => c.destroy());
-  previewCharts = [];
-  if (window.__prevPalletChart){ window.__prevPalletChart.destroy(); window.__prevPalletChart = null; }
-}
-
-// Chart.js bakes colors in at creation time (same reasoning as
-// renderDashData's own copy of this) — dark mode needs its own axis/grid
-// colors, not just whatever the page's CSS variables currently say.
+// Chart.js bakes colors in at creation time — dark mode needs its own
+// axis/grid colors, not just whatever the page's CSS variables currently
+// say. Used by renderDashData() and by _renderPalletChart() below.
 function _chartTextColors(){
   const isDark = document.body.classList.contains('dark-mode');
   return {
@@ -6149,132 +5986,6 @@ function _chartTextColors(){
     grid: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
     target: isDark ? '#e8e9eb' : '#0a0a0a'
   };
-}
-
-function _byDateAgg(reports){
-  const byDate = {};
-  reports.forEach(r => {
-    if (!r.Timestamp) return;
-    const dateKey = new Date(r.Timestamp).toISOString().slice(0,10);
-    if (!byDate[dateKey]) byDate[dateKey] = { target:0, good:0 };
-    byDate[dateKey].target += safeNum(r.Target);
-    byDate[dateKey].good += safeNum(r['Total Good']);
-  });
-  const labels = Object.keys(byDate).sort();
-  return { labels, targets: labels.map(d=>byDate[d].target), goods: labels.map(d=>byDate[d].good) };
-}
-
-function _fillPcts(targets, goods){
-  return targets.map((t,i) => t>0 ? Math.round((goods[i]/t)*1000)/10 : 0);
-}
-
-// Shared by "Good vs Target Over Time" and each half of the station
-// comparison — a bar (Target, Good) + line (Fill %, secondary axis) combo,
-// grouped by the date each report was sent. Returns the underlying totals
-// so the caller can build its own summary stat line.
-function _renderGoodTargetChart(canvasId, reports, isEs){
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return null;
-  const {axis, grid, target} = _chartTextColors();
-  const agg = _byDateAgg(reports);
-  const fillPcts = _fillPcts(agg.targets, agg.goods);
-  const chart = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: agg.labels,
-      datasets: [
-        { type:'bar', label: isEs?'Meta':'Target', data: agg.targets, backgroundColor: target, yAxisID:'y' },
-        { type:'bar', label: isEs?'Bueno':'Good', data: agg.goods, backgroundColor: '#10B981', yAxisID:'y' },
-        { type:'line', label: isEs?'% Cumplimiento':'Fill %', data: fillPcts, borderColor:'#FF1F8F', backgroundColor:'#FF1F8F', yAxisID:'y1', tension:0.25 }
-      ]
-    },
-    options: {
-      responsive:true,
-      plugins:{ legend:{ labels:{ color: axis } } },
-      scales: {
-        y: { beginAtZero:true, ticks:{color:axis}, grid:{color:grid}, position:'left' },
-        y1: { beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, ticks:{color:axis, callback:v=>v+'%'} },
-        x: { ticks:{color:axis}, grid:{color:grid} }
-      }
-    }
-  });
-  previewCharts.push(chart);
-  return { totalGood: agg.goods.reduce((a,b)=>a+b,0), totalTarget: agg.targets.reduce((a,b)=>a+b,0) };
-}
-
-function _renderChartOverTime(reports, isEs){
-  const stat = document.getElementById('prevStatOverTime');
-  const res = _renderGoodTargetChart('prevChartOverTime', reports, isEs);
-  if (stat && res){
-    const pct = res.totalTarget>0 ? Math.round((res.totalGood/res.totalTarget)*1000)/10 : 0;
-    stat.textContent = isEs
-      ? `General: ${res.totalGood.toLocaleString()} / ${res.totalTarget.toLocaleString()} = ${pct}% cumplimiento`
-      : `Overall: ${res.totalGood.toLocaleString()} / ${res.totalTarget.toLocaleString()} = ${pct}% fill rate`;
-  }
-}
-
-function _renderStationCompareCharts(reports, isEs){
-  const stat = document.getElementById('prevStatStationCompare');
-  const longReports = reports.filter(r => r.Station === 'Long Gluer');
-  const shortReports = reports.filter(r => r.Station === 'Short Gluer');
-  const resL = _renderGoodTargetChart('prevChartLongGluer', longReports, isEs);
-  const resS = _renderGoodTargetChart('prevChartShortGluer', shortReports, isEs);
-  if (stat){
-    const pctL = resL && resL.totalTarget>0 ? Math.round((resL.totalGood/resL.totalTarget)*1000)/10 : 0;
-    const pctS = resS && resS.totalTarget>0 ? Math.round((resS.totalGood/resS.totalTarget)*1000)/10 : 0;
-    stat.textContent = isEs
-      ? `Pegadora Larga: ${pctL}% cumplimiento · Pegadora Corta: ${pctS}% cumplimiento`
-      : `Long Gluer: ${pctL}% fill rate · Short Gluer: ${pctS}% fill rate`;
-  }
-}
-
-function _renderByJobChart(reports, isEs){
-  const canvas = document.getElementById('prevChartByJob');
-  if (!canvas) return;
-  const {axis, grid, target} = _chartTextColors();
-  const labels = reports.map(r => String(r.PO||'—'));
-  const targets = reports.map(r => safeNum(r.Target));
-  const goods = reports.map(r => safeNum(r['Total Good']));
-  const chart = new Chart(canvas, {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label:isEs?'Meta':'Target', data:targets, backgroundColor:target },
-      { label:isEs?'Bueno':'Good', data:goods, backgroundColor:'#10B981' }
-    ]},
-    options: { responsive:true, plugins:{legend:{labels:{color:axis}}}, scales:{ y:{beginAtZero:true,ticks:{color:axis},grid:{color:grid}}, x:{ticks:{color:axis},grid:{color:grid}} } }
-  });
-  previewCharts.push(chart);
-}
-
-function _renderByStationChart(reports, isEs){
-  const canvas = document.getElementById('prevChartByStation');
-  if (!canvas) return;
-  const {axis, grid} = _chartTextColors();
-  const byStation = {};
-  reports.forEach(r => {
-    const st = r.Station || (isEs?'Desconocido':'Unknown');
-    if (!byStation[st]) byStation[st] = {target:0, good:0};
-    byStation[st].target += safeNum(r.Target);
-    byStation[st].good += safeNum(r['Total Good']);
-  });
-  const labels = Object.keys(byStation);
-  const targets = labels.map(s=>byStation[s].target);
-  const goods = labels.map(s=>byStation[s].good);
-  const fillPcts = _fillPcts(targets, goods);
-  const chart = new Chart(canvas, {
-    type: 'bar',
-    data: { labels, datasets: [
-      { type:'bar', label:isEs?'Meta':'Target', data:targets, backgroundColor:targets.map(()=>'#0A0A0A'), yAxisID:'y' },
-      { type:'bar', label:isEs?'Bueno':'Good', data:goods, backgroundColor:goods.map(()=>'#10B981'), yAxisID:'y' },
-      { type:'line', label:isEs?'% Cumplimiento':'Fill %', data:fillPcts, borderColor:'#FF1F8F', backgroundColor:'#FF1F8F', yAxisID:'y1', tension:0.25 }
-    ]},
-    options: { responsive:true, plugins:{legend:{labels:{color:axis}}}, scales:{
-      y:{beginAtZero:true,ticks:{color:axis},grid:{color:grid}, position:'left'},
-      y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false},ticks:{color:axis,callback:v=>v+'%'}},
-      x:{ticks:{color:axis},grid:{color:grid}}
-    }}
-  });
-  previewCharts.push(chart);
 }
 
 /* Pallets Progression — approximate, on purpose (see the on-page note):
@@ -6297,12 +6008,12 @@ function setPalletColorMode(mode, btnEl){
   palletColorMode = mode;
   btnEl.parentElement.querySelectorAll('.export-choice-btn').forEach(b => b.classList.remove('selected'));
   btnEl.classList.add('selected');
-  _renderPalletChart(getFilteredReportsForExport(), document.body.classList.contains('es'));
+  _renderPalletChart(getFilteredReports(getDataFilters()), document.body.classList.contains('es'));
 }
 
 function togglePalletJob(key, checked){
   if (checked) selectedPalletJobKeys.add(key); else selectedPalletJobKeys.delete(key);
-  _renderPalletChart(getFilteredReportsForExport(), document.body.classList.contains('es'));
+  _renderPalletChart(getFilteredReports(getDataFilters()), document.body.classList.contains('es'));
 }
 
 function _renderPalletJobPicker(reports, isEs){
@@ -6376,33 +6087,10 @@ function _renderPalletChart(reports, isEs){
   });
 }
 
-function renderExportPreview(){
-  if (!dashData) return;
-  const isEs = document.body.classList.contains('es');
-  const reports = getFilteredReportsForExport();
-  _destroyPreviewCharts();
-  _renderChartOverTime(reports, isEs);
-  _renderStationCompareCharts(reports, isEs);
-  _renderPalletChart(reports, isEs);
-  _renderByJobChart(reports, isEs);
-  _renderByStationChart(reports, isEs);
-}
-// Re-check the match count live as filters change, without waiting for an
-// export tap — lets a manager see "0 reports match" before wasting a click.
-// These inputs already exist in the DOM by the time this script runs (they
-// sit earlier in the HTML, above this <script> tag), so no need to wait
-// for any load event. Station/Pass/Shift/Overs aren't listed here — their
-// buttons already call updateExportMatchCount() directly via
-// setExportFilter().
-['exportDateFrom','exportDateTo','exportTimeFrom','exportTimeTo','exportSearchInput'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('input', updateExportMatchCount);
-});
-
 function exportToExcel(){
   const isEs = document.body.classList.contains('es');
-  const status = document.getElementById('exportStatus');
-  const reports = getFilteredReportsForExport();
+  const status = document.getElementById('pdashExportStatus');
+  const reports = getFilteredReports(getDataFilters());
   if (!reports.length){
     status.textContent = isEs ? 'No hay reportes que coincidan con estos filtros.' : 'No reports match these filters.';
     return;
@@ -6516,8 +6204,8 @@ function _addPanelHeader(slide, x, y, w, title, color){
 
 function exportToPowerPoint(){
   const isEs = document.body.classList.contains('es');
-  const status = document.getElementById('exportStatus');
-  const reports = getFilteredReportsForExport();
+  const status = document.getElementById('pdashExportStatus');
+  const reports = getFilteredReports(getDataFilters());
   if (!reports.length){
     status.textContent = isEs ? 'No hay reportes que coincidan con estos filtros.' : 'No reports match these filters.';
     return;
@@ -6571,7 +6259,7 @@ function exportToPowerPoint(){
     slide.addText(isEs ? 'Reporte de Producción — Pegadora' : 'Gluer Shift Production Report', {
       x: 0.6, y: 2.6, w: 12, h: 1.2, fontSize: 36, bold: true, color: 'FFFFFF'
     });
-    const f = getExportFilters();
+    const f = getDataFilters();
     const rangeLabel = (f.dateFrom || f.dateTo)
       ? `${f.dateFrom || (isEs?'Inicio':'Start')} → ${f.dateTo || (isEs?'Hoy':'Today')}`
       : (isEs ? 'Todo el historial' : 'All history');
