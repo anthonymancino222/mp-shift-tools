@@ -1313,6 +1313,29 @@
 
       <label><span data-en>Quantity to Produce</span><span data-es>Cantidad a Producir</span></label>
       <input id="njTarget" type="text" inputmode="numeric" placeholder="Enter QTY to Produce" data-ph-en="Enter QTY to Produce" data-ph-es="Ingrese la Cantidad a Producir" oninput="formatThousands(this)">
+
+      <!-- Packing Setup, right here too (Anthony, 2026-09-18: packers weren't
+           realizing it existed at all, tucked away on the job screen until
+           someone went looking for "Pallets Ready for Shipping"). Deliberately
+           OPTIONAL here (his call) — leaving it blank creates the job exactly
+           like before, unconfirmed, still editable/settable on the job screen
+           itself at any time. Hidden for 1st Pass, which never boxes product
+           at all (see palletCard's own is1stPass toggle in renderJob()). -->
+      <div id="njPackingSetupWrap">
+        <label><span data-en>Packing Setup (optional here)</span><span data-es>Configuración de Empaque (opcional aquí)</span></label>
+        <div class="row2">
+          <div>
+            <label style="font-size:0.85rem;font-weight:700;"><span data-en>Pieces per Box</span><span data-es>Piezas por Caja</span></label>
+            <input id="njPiecesPerBox" type="text" inputmode="numeric" placeholder="0" oninput="formatThousands(this)">
+          </div>
+          <div>
+            <label style="font-size:0.85rem;font-weight:700;"><span data-en>Boxes per Pallet</span><span data-es>Cajas por Tarima</span></label>
+            <input id="njBoxesPerPallet" type="text" inputmode="numeric" placeholder="0" oninput="formatThousands(this)">
+          </div>
+        </div>
+        <div class="pass-hint"><span data-en>Optional — leave blank to set this up later on the job screen instead. Can always be edited afterward either way.</span><span data-es>Opcional — déjelo en blanco para configurarlo después en la pantalla del trabajo. Siempre se puede editar después de cualquier forma.</span></div>
+      </div>
+
       <button class="btn-submit" onclick="createJob()"><span data-en>Create Job</span><span data-es>Crear Trabajo</span></button>
     </div>
     <button class="modal-cancel-btn" onclick="closeActiveJobModal()"><span data-en>Close</span><span data-es>Cerrar</span></button>
@@ -2000,6 +2023,10 @@ function selectPass(pass){
   // pass got tapped — clear the dashed highlight and hint either way.
   ['pass1Btn','pass2Btn','passSBtn'].forEach(function(id){ document.getElementById(id).classList.remove('suggested'); });
   document.getElementById('passSuggestHint').style.display = 'none';
+  // Packing Setup never applies to 1st Pass (Machine Count instead) — same
+  // rule renderJob()'s palletCard/is1stPass toggle already uses.
+  const packingWrap = document.getElementById('njPackingSetupWrap');
+  if (packingWrap) packingWrap.style.display = (pass === '1') ? 'none' : 'block';
 }
 
 function selectOvers(percent){
@@ -2539,6 +2566,14 @@ function createJob(){
     alert(isEs ? 'Ingrese la cantidad a producir.' : 'Enter the quantity to produce.');
     return;
   }
+  // Packing Setup here is entirely optional (Anthony's explicit call,
+  // 2026-09-18) — only actually apply it when BOTH fields were filled in
+  // with real numbers; a half-filled or blank pair just leaves the job
+  // unconfirmed exactly like before, still settable later on the job
+  // screen itself. Never applies to 1st Pass (Machine Count instead).
+  const piecesPerBoxNum = parseInt(document.getElementById('njPiecesPerBox').value.replace(/,/g,''), 10) || 0;
+  const boxesPerPalletNum = parseInt(document.getElementById('njBoxesPerPallet').value.replace(/,/g,''), 10) || 0;
+  const packingSetupProvided = newJobPass !== '1' && piecesPerBoxNum > 0 && boxesPerPalletNum > 0;
   // Keyed by normalized PO + Pass (not PO alone, and not a random id) so the
   // same job is recognized across devices once synced, regardless of leading
   // zeros — see syncActiveEntries() and normalizePO() above. Pass IS part of
@@ -2571,9 +2606,15 @@ function createJob(){
     existing.product = product || existing.product;
     existing.target = target ? parseInt(target, 10) : existing.target;
     existing.oversPercent = newJobOvers || 0;
+    if (packingSetupProvided){
+      existing.palletConfig = { piecesPerBox: piecesPerBoxNum, boxesPerPallet: boxesPerPalletNum, confirmed: true };
+    }
     saveAll();
   } else {
-    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, oversPercent: newJobOvers || 0, createdAt: Date.now(), entries: [], pallets: [], notes: [], palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false } };
+    jobs[id] = { po, product, machine: newJobStation, pass: newJobPass, target: target?parseInt(target):0, oversPercent: newJobOvers || 0, createdAt: Date.now(), entries: [], pallets: [], notes: [],
+      palletConfig: packingSetupProvided
+        ? { piecesPerBox: piecesPerBoxNum, boxesPerPallet: boxesPerPalletNum, confirmed: true }
+        : { piecesPerBox: null, boxesPerPallet: null, confirmed: false } };
     saveAll();
   }
   currentJobId = id;
@@ -2584,6 +2625,8 @@ function createJob(){
   document.getElementById('njPO').value='';
   document.getElementById('njProduct').value='';
   document.getElementById('njTarget').value='';
+  document.getElementById('njPiecesPerBox').value='';
+  document.getElementById('njBoxesPerPallet').value='';
   document.getElementById('newJobForm').style.display='none';
   refreshJobSelect();
   closeActiveJobModal();
