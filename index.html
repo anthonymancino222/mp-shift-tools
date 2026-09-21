@@ -5252,9 +5252,18 @@ function confirmReopenJob(){
   const originalHTML = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = isEs ? '⏳ Reabriendo…' : '⏳ Reopening…';
+  // String(report.PO) matters here specifically — report.PO comes straight
+  // from the backend's raw JSON (dashData.reports), and a purely numeric
+  // PO (e.g. "47726") can come back as a JS number rather than a string.
+  // The Worker's own validation requires typeof po === 'string', so an
+  // all-numeric PO was silently failing with "Missing required fields"
+  // even though the value was clearly present. Every other action in this
+  // file builds its `po` from a local job object (always already a
+  // string, from an <input> or normalizePO()), so this is the one place
+  // that needed the explicit coercion.
   fetch(REPORT_ENDPOINT_URL, {
     method: 'POST',
-    body: JSON.stringify({ action: 'reopen_job', po: report.PO, pass: report.Pass || '', station, timestamp: report.Timestamp, pin, deviceId: DEVICE_ID })
+    body: JSON.stringify({ action: 'reopen_job', po: String(report.PO), pass: String(report.Pass || ''), station, timestamp: report.Timestamp, pin, deviceId: DEVICE_ID })
   }).then(res => res.json()).then(res => {
     btn.disabled = false;
     btn.innerHTML = originalHTML;
