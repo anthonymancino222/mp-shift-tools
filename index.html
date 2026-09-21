@@ -5906,9 +5906,13 @@ function renderDashData(){
   // old Export tab preview had, just fed this tab's own filtered reports.
   _renderPalletChart(reports, isEs);
 
-  // Detail table — identical per-row math to exportToExcel() (both call
-  // getReportDerivedStats()), so the numbers here and in the spreadsheet
-  // for the same report can never diverge.
+  // Detail table — identical per-row MATH to exportToExcel() (both call
+  // getReportDerivedStats(), same underlying numbers), but the last two
+  // columns display via _formatShortfallStat() (see its own comment) so a
+  // job that finished over target doesn't read as a negative/error on
+  // screen — the exported Excel file keeps the plain signed number, which
+  // is the normal convention once it's a spreadsheet someone will sort/
+  // filter/pivot on, not a display someone is just glancing at.
   tableBody.innerHTML = reports.map(r => {
     const s = getReportDerivedStats(r);
     const shiftsText = s.shifts.length ? s.shifts.map(x => (isEs?'Turno ':'Shift ')+x).join(', ') : '—';
@@ -5918,7 +5922,7 @@ function renderDashData(){
       <td>${s.target.toLocaleString()}</td><td>${s.oversPercent}%</td>
       <td>${s.effectiveTarget.toLocaleString()}</td><td>${s.palletsNeeded.toLocaleString()}</td>
       <td>${safeNum(r['Total Pallets']).toLocaleString()}</td><td>${s.totalGood.toLocaleString()}</td>
-      <td>${s.pctShortVsTarget}%</td><td>${s.pctShortVsEffectiveTarget}%</td>
+      <td>${_formatShortfallStat(s.pctShortVsTarget, isEs)}</td><td>${_formatShortfallStat(s.pctShortVsEffectiveTarget, isEs)}</td>
     </tr>`;
   }).join('');
 
