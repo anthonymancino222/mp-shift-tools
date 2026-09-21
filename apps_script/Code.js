@@ -69,7 +69,15 @@ function doPostLocked(e) {
         appendRowByHeaders(palletsSheet, {
           'Timestamp': new Date(), 'PO': data.po, 'Product': data.product, 'Station': data.station,
           'Shift': data.shift, 'Date': data.date, 'Time': data.time, 'EntryId': data.entryId,
-          'Pass': data.pass || '', 'DeviceId': data.deviceId || ''
+          'Pass': data.pass || '', 'DeviceId': data.deviceId || '',
+          // The Good-count entry THIS pallet auto-created client-side (see
+          // createAutoEntryFromPallet in index.html) — stored so a later
+          // pull on ANY device (a second tablet, this same device after a
+          // cache clear, or a reopened job) can reconstruct the same
+          // pallet<->entry link a live, never-synced job already has,
+          // letting Undo Last Pallet correctly reverse the Good Count it
+          // added instead of only decrementing the pallet tally.
+          'LinkedEntryId': data.linkedEntryId || ''
         });
       }
       return success();
@@ -195,35 +203,45 @@ function doPostLocked(e) {
       // the client somehow didn't send one.
       var reopenStation = data.station || reportRow.station;
       var activeSheetR = getOrCreateActiveEntriesSheet(ss);
+      var palletsSheetR = getOrCreatePalletsSheet(ss);
       var now = new Date();
       var logLines = String(reportRow.fullLog || '').split('\n').filter(function (l) { return l.trim(); });
       logLines.forEach(function (line, idx) {
         var parsed = parseLogLine(line);
+        var entryId = 'reopen_' + now.getTime() + '_' + idx;
+        // +idx ms keeps every reconstructed row's Timestamp in the SAME
+        // relative order the original log lines were in — matters because
+        // the client's "Undo Last Pallet" picks whichever pallet has the
+        // latest Timestamp; giving every row the exact same `now` would
+        // make that a coin flip instead of actually the last one.
+        var rowTs = new Date(now.getTime() + idx);
         // Tagged with the reopening device's own DeviceId (not the original
         // logger's, long gone once a job finishes) — these rows now belong
         // to whichever device reopened the job, same as any freshly-created
         // job would be.
         appendRowByHeaders(activeSheetR, {
-          'Timestamp': now, 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
+          'Timestamp': rowTs, 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
           'Target': reportRow.target, 'Shift': parsed.shift, 'Date': parsed.date, 'Time': parsed.time,
           'Good': parsed.good, 'Reject': parsed.reject, 'Flags': parsed.flags,
-          'EntryId': 'reopen_' + now.getTime() + '_' + idx, 'Pass': reportRow.pass, 'DeviceId': data.deviceId || ''
+          'EntryId': entryId, 'Pass': reportRow.pass, 'DeviceId': data.deviceId || ''
         });
-      });
-      var totalPallets = Number(reportRow.totalPallets) || 0;
-      if (totalPallets > 0) {
-        var palletsSheetR = getOrCreatePalletsSheet(ss);
-        var tz = Session.getScriptTimeZone();
-        var todayDate = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
-        var todayTime = Utilities.formatDate(now, tz, 'hh:mm a');
-        for (var pIdx = 0; pIdx < totalPallets; pIdx++) {
+        // A pallet row is only ever recreated for a log line that was
+        // ITSELF a pallet-completion entry (the "| Pallet: full/partial"
+        // marker sendReport() now writes — see parseLogLine). Tagging it
+        // with LinkedEntryId (this same line's entryId, just above) is what
+        // lets the client's undoPallet() correctly reverse the Good Count
+        // that specific pallet added, exactly like a live job — the old
+        // code instead created `totalPallets` blank, disconnected rows with
+        // no way to tie back to a specific entry at all.
+        if (parsed.fromPallet) {
           appendRowByHeaders(palletsSheetR, {
-            'Timestamp': now, 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
-            'Shift': '1', 'Date': todayDate, 'Time': todayTime,
-            'EntryId': 'reopen_pallet_' + now.getTime() + '_' + pIdx, 'Pass': reportRow.pass, 'DeviceId': data.deviceId || ''
+            'Timestamp': rowTs, 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
+            'Shift': parsed.shift, 'Date': parsed.date, 'Time': parsed.time,
+            'EntryId': 'reopen_pallet_' + now.getTime() + '_' + idx, 'Pass': reportRow.pass, 'DeviceId': data.deviceId || '',
+            'LinkedEntryId': entryId
           });
         }
-      }
+      });
       reportsSheetR.deleteRow(reportRow.rowIndex);
       return success();
     }
@@ -347,7 +365,11 @@ function entryIdExists(sheet, entryId, entryIdCol) {
 // DeviceId into a local job. Live Jobs (doGet, unfiltered) is unaffected —
 // it's meant to show every device's activity, tagged or not.
 var ACTIVE_ENTRIES_HEADERS = ['Timestamp', 'PO', 'Product', 'Station', 'Target', 'Shift', 'Date', 'Time', 'Good', 'Reject', 'Flags', 'EntryId', 'Pass', 'DeviceId'];
-var PALLETS_HEADERS = ['Timestamp', 'PO', 'Product', 'Station', 'Shift', 'Date', 'Time', 'EntryId', 'Pass', 'DeviceId'];
+// LinkedEntryId (2026-09-21) is appended LAST, same reasoning as DeviceId
+// before it — an existing sheet gets it auto-added at the end by
+// ensureHeaders(), so entryIdExists()'s hardcoded EntryId column index (8)
+// never has to change.
+var PALLETS_HEADERS = ['Timestamp', 'PO', 'Product', 'Station', 'Shift', 'Date', 'Time', 'EntryId', 'Pass', 'DeviceId', 'LinkedEntryId'];
 var NOTES_HEADERS = ['Timestamp', 'PO', 'Pass', 'Scope', 'EntryId', 'NoteId', 'Text', 'DeviceId'];
 
 function getOrCreateActiveEntriesSheet(ss) {
@@ -526,10 +548,17 @@ function parseLogLine(line) {
   // the app (2026-09-17) has one extra "| Reject: N" field ahead of Flags
   // that a newer line won't, so a fixed-position read would silently
   // swallow Flags when reopening a job finished after that date.
-  var rejectPart = null, flagsPart = '';
+  // "| Pallet: full" / "| Pallet: partial" (added 2026-09-21) marks a line
+  // that was originally an auto-entry created by +1 Pallet Complete/Add
+  // Partial Pallet, not a manually-typed Good count — reopen_job uses this
+  // to know which lines need a matching Pallets row recreated, tied back
+  // via LinkedEntryId. Absent on any line logged before this existed, or on
+  // a genuinely manual entry — both correctly parse as fromPallet: false.
+  var rejectPart = null, flagsPart = '', palletPart = null;
   parts.forEach(function (p) {
     if (/^Reject:/i.test(p)) rejectPart = p;
     if (/^Flags:/i.test(p)) flagsPart = p.replace(/^Flags:\s*/i, '');
+    if (/^Pallet:/i.test(p)) palletPart = p;
   });
   var rejectMatch = rejectPart ? rejectPart.match(/([\d,]+)/) : null;
   return {
@@ -538,7 +567,9 @@ function parseLogLine(line) {
     shift: shiftMatch ? shiftMatch[1] : '1',
     good: goodMatch ? parseInt(goodMatch[1].replace(/,/g, ''), 10) : 0,
     reject: rejectMatch ? parseInt(rejectMatch[1].replace(/,/g, ''), 10) : 0,
-    flags: flagsPart
+    flags: flagsPart,
+    fromPallet: !!palletPart,
+    partial: !!(palletPart && /partial/i.test(palletPart))
   };
 }
 

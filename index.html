@@ -3982,6 +3982,12 @@ function pushLivePallet(job, pallet){
       action: 'log_pallet',
       po: job.po, product: job.product || '', station: job.machine, pass: job.pass || '',
       shift: pallet.shift, date: pallet.date, time: pallet.time, entryId: pallet.id,
+      // The Good-count entry this pallet auto-created (if any) — stored
+      // server-side so a later pull on ANY device (second tablet, this
+      // device after a cache clear, or a reopened job) can rebuild the same
+      // pallet<->entry link a never-synced live job already has, letting
+      // Undo Last Pallet correctly reverse the Good Count it added.
+      linkedEntryId: pallet.linkedEntryId || '',
       deviceId: DEVICE_ID
     })
   }).then(res => res.json()).then(res => {
@@ -4300,7 +4306,14 @@ function _mergeRemoteIntoJob(job, res){
         time: dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         loggedAt: loggedAt,
         synced: true,
-        voided: false
+        voided: false,
+        // Without this, a pallet pulled down from the server (a second
+        // device, this device after a cache clear, or Reopen Job) had no
+        // way to know which entry it added — undoPallet() would decrement
+        // the pallet tally but leave Good Count untouched. Blank/legacy
+        // rows pushed before this column existed just fall back to null,
+        // same (unfixable, no data to recover) behavior as before.
+        linkedEntryId: p.LinkedEntryId || null
       });
       existingPalletIds.add(id);
       added++;
@@ -4509,7 +4522,16 @@ function sendReport(){
 
   const subject = `Shift Count Report — ${job.po} (${job.machine}${passText ? ', '+passText : ''})`;
   let fullLog = '';
-  const sorted = [...job.entries].sort((a,b)=>a.loggedAt-b.loggedAt);
+  // Filters out voided entries — found 2026-09-21: this used to include
+  // EVERY entry regardless of .voided, so any pallet/count that was ever
+  // undone before finishing still landed in the Full Log as if it counted.
+  // That's harmless for the report's own totals (computeTotalGood already
+  // filters voided entries correctly), but it silently poisons anything
+  // reconstructed FROM the log later — Reopen Job was rebuilding every
+  // undone entry right back to life, so a job that read well under target
+  // in History could come back at 228,600 on a 150,000-target job. Filter
+  // here so the log and the totals it's a record of can never disagree.
+  const sorted = job.entries.filter(e=>!e.voided).sort((a,b)=>a.loggedAt-b.loggedAt);
   // 1st Pass jobs never box product — each row is a cumulative Machine Count
   // reading (replaces the running total), not an additive Good tally like
   // every other Pass, so it's logged with its own distinct label to avoid
@@ -4519,6 +4541,14 @@ function sendReport(){
     fullLog += e.isMachineCount
       ? `${e.date} ${e.time} | ${shiftLabel} | Machine Count (cumulative): ${e.good}`
       : `${e.date} ${e.time} | ${shiftLabel} | Good: ${e.good}`;
+    // Marks a line as having come from +1 Pallet Complete/Add Partial
+    // Pallet (not a manually-typed count) — Reopen Job's backend reads
+    // this to know which lines need a Pallets row recreated, correctly
+    // linked back to that same entry (see reopen_job in
+    // apps_script_backend.gs). Without it, a reopened job's pallets have
+    // no way to know which Good-count entry they added, so undoing one
+    // only ever decremented the pallet tally, never the Good Count.
+    if(e.fromPallet) fullLog += ` | Pallet: ${e.partial ? 'partial' : 'full'}`;
     if(e.flags) fullLog += ` | Flags: ${e.flags}`;
     fullLog += '\n';
   });
@@ -4567,8 +4597,15 @@ function sendReport(){
   const palletsNeededLine = palletsNeeded > 0
     ? `Pallets Needed (vs ${jobOversPercent>0?'target incl. overs':'target'}): ${palletsNeeded.toLocaleString()} — Produced: ${totalPallets.toLocaleString()}\n`
     : '';
-  const shortfallLine = `Shortfall vs Target (no overs): ${pctShortVsTarget}%\n`
-    + (jobOversPercent > 0 ? `Shortfall vs Target incl. Overs: ${pctShortVsEffectiveTarget}%\n` : '');
+  // Same reasoning as _formatShortfallStat (see there) — a negative "%
+  // short" here means the job finished OVER target, which read as an
+  // alarm in this plain-text report (the one that actually goes out to
+  // managers) exactly like it did on the History card before that fix.
+  // This report is always English by design (every other label in `body`
+  // below is hardcoded English, no isEs branch anywhere in this function).
+  const _shortfallText = pct => pct > 0 ? `${pct}% short` : pct < 0 ? `+${Math.abs(pct)}% over target` : 'On target (0%)';
+  const shortfallLine = `Shortfall vs Target (no overs): ${_shortfallText(pctShortVsTarget)}\n`
+    + (jobOversPercent > 0 ? `Shortfall vs Target incl. Overs: ${_shortfallText(pctShortVsEffectiveTarget)}\n` : '');
 
   let body = `Job/PO: ${job.po}\nProduct Number: ${job.product || 'N/A'}\nStation: ${job.machine}\nPass: ${passText || 'N/A'}\nShift(s): ${shiftsLabel}\nQuantity to Produce: ${job.target || 'N/A'}\n${oversLine}${packingLine}${palletsNeededLine}${shortfallLine}\nCURRENT GOOD COUNT: ${totalGood.toLocaleString()}\nPALLETS READY FOR SHIPPING: ${totalPallets.toLocaleString()}\n\n--- Shift Log ---\n${fullLog}${notesText}`;
 
@@ -5297,11 +5334,21 @@ function _bringReopenedJobLocal(report, station){
   const po = normalizePO(report.PO);
   const id = po + '_p' + pass;
   if (!jobs[id]){
+    // Packing Setup and Overs restored from the finished report's own saved
+    // values (Anthony, 2026-09-21: reopening should bring the job back
+    // exactly as it was, not reset to blank) — both were already being
+    // captured on every "Finish, Send Report" (see sendReport()'s payload),
+    // just never read back on Reopen Job until now.
+    const piecesPerBox = Number(report.PiecesPerBox) || 0;
+    const boxesPerPallet = Number(report.BoxesPerPallet) || 0;
     jobs[id] = {
       po, product: report.Product || '', machine: station, pass,
-      target: Number(report.Target) || 0, createdAt: Date.now(),
+      target: Number(report.Target) || 0, oversPercent: Number(report.OversPercent) || 0,
+      createdAt: Date.now(),
       entries: [], pallets: [], notes: [],
-      palletConfig: { piecesPerBox: null, boxesPerPallet: null, confirmed: false }
+      palletConfig: (piecesPerBox > 0 && boxesPerPallet > 0)
+        ? { piecesPerBox, boxesPerPallet, confirmed: true }
+        : { piecesPerBox: null, boxesPerPallet: null, confirmed: false }
     };
     saveAll();
   }
@@ -5379,13 +5426,19 @@ function parseFullLogText(text){
     // fixed-position read would silently swallow Flags on new lines.
     const rejectPart = parts.find(p => /^Reject:/i.test(p));
     const flagsPart = parts.find(p => /^Flags:/i.test(p));
+    // "| Pallet: full"/"| Pallet: partial" (2026-09-21) — same marker
+    // sendReport() now writes for a pallet-auto-created entry; absent on
+    // any older line or a genuinely manual entry, both correctly false.
+    const palletPart = parts.find(p => /^Pallet:/i.test(p));
     return {
       date: date,
       time: time,
       shift: shiftMatch ? shiftMatch[1] : '1',
       good: goodMatch ? parseInt(goodMatch[1].replace(/,/g,''),10) : 0,
       reject: rejectPart ? (parseInt((rejectPart.match(/([\d,]+)/)||[])[1]?.replace(/,/g,''),10) || 0) : 0,
-      flags: flagsPart ? flagsPart.replace(/^Flags:\s*/i, '') : ''
+      flags: flagsPart ? flagsPart.replace(/^Flags:\s*/i, '') : '',
+      fromPallet: !!palletPart,
+      partial: !!(palletPart && /partial/i.test(palletPart))
     };
   });
 }
