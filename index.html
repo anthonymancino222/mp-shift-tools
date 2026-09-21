@@ -913,6 +913,9 @@
   .dash-history-detail-row:last-child{border-bottom:none;}
   .dash-history-detail-row span{color:var(--text-secondary);}
   .dash-history-detail-row b{text-align:right;color:var(--navy);}
+  .dash-history-detail-row b.shortfall-good{color:var(--good);}
+  .dash-history-detail-row b.shortfall-warn{color:var(--accent);}
+  .dash-history-detail-row b.shortfall-neutral{color:var(--text-secondary);}
   .dash-chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;}
   .dash-chart-wrap h3{margin:0 0 10px;font-size:1rem;color:var(--navy);}
   .dash-empty{text-align:center;color:var(--text-tertiary);padding:30px 10px;}
@@ -5556,6 +5559,18 @@ function getReportDerivedStats(r){
   return { target, totalGood, oversPercent, effectiveTarget, piecesPerBox, boxesPerPallet, piecesPerPalletUnit: computed.piecesPerPalletUnit, palletsNeeded, pctShortVsTarget, pctShortVsEffectiveTarget, shifts, hasHistoryFields };
 }
 
+/* pctShortVsTarget/pctShortVsEffectiveTarget are ((target-good)/target)*100
+   — mathematically correct, but a NEGATIVE "% Short" (production finished
+   OVER target) reads as an alarm/error at a glance, not as the good news
+   it actually is. Flips the sign and relabels as "over" instead of
+   negative-short, and colors it green — a genuine shortfall (positive
+   pct) stays in the warning color, on-target (exactly 0) stays neutral. */
+function _formatShortfallStat(pct, isEs){
+  if (pct > 0) return `<b class="shortfall-warn">${pct}% ${isEs?'corto':'short'}</b>`;
+  if (pct < 0) return `<b class="shortfall-good">+${Math.abs(pct)}% ${isEs?'sobre meta':'over target'}</b>`;
+  return `<b class="shortfall-neutral">${isEs?'En meta (0%)':'On target (0%)'}</b>`;
+}
+
 function renderHistoryExtraDetails(r, isEs){
   const s = getReportDerivedStats(r);
   const rows = [];
@@ -5566,12 +5581,12 @@ function renderHistoryExtraDetails(r, isEs){
     rows.push([isEs?'Config. de Empaque':'Packing Setup', `${s.piecesPerBox.toLocaleString()} ${isEs?'pzs/caja':'pcs/box'} × ${s.boxesPerPallet.toLocaleString()} ${isEs?'cajas/tarima':'boxes/pallet'}`]);
     rows.push([isEs?'Tarimas Necesarias vs Producidas':'Pallets Needed vs Produced', `${s.palletsNeeded.toLocaleString()} ${isEs?'vs':'vs'} ${safeNum(r['Total Pallets']).toLocaleString()}`]);
   }
-  rows.push([isEs?'% Corto vs Meta (sin overs)':'% Short vs Target (no overs)', s.pctShortVsTarget + '%']);
+  rows.push([isEs?'vs. Meta (sin overs)':'vs. Target (no overs)', null, _formatShortfallStat(s.pctShortVsTarget, isEs)]);
   if (s.oversPercent > 0){
-    rows.push([isEs?'% Corto vs Meta (con overs)':'% Short vs Target (incl. overs)', s.pctShortVsEffectiveTarget + '%']);
+    rows.push([isEs?'vs. Meta (con overs)':'vs. Target (incl. overs)', null, _formatShortfallStat(s.pctShortVsEffectiveTarget, isEs)]);
   }
-  return `<div class="dash-history-details">${rows.map(([label,val]) =>
-    `<div class="dash-history-detail-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(String(val))}</b></div>`
+  return `<div class="dash-history-details">${rows.map(([label,val,rawHtml]) =>
+    `<div class="dash-history-detail-row"><span>${escapeHtml(label)}</span>${rawHtml || `<b>${escapeHtml(String(val))}</b>`}</div>`
   ).join('')}</div>`;
 }
 
