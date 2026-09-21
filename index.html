@@ -6383,7 +6383,12 @@ function _renderPalletChart(reports, isEs){
     options: {
       responsive:true,
       plugins:{ legend:{ labels:{ color: axis } } },
-      scales: { y: { beginAtZero:true, ticks:{color:axis}, grid:{color:grid} }, x: { ticks:{color:axis}, grid:{color:grid} } }
+      scales: {
+        y: { beginAtZero:true, ticks:{color:axis}, grid:{color:grid},
+             title:{ display:true, text: isEs?'Tarimas (equivalente)':'Pallets (equivalent)', color: axis } },
+        x: { ticks:{color:axis}, grid:{color:grid},
+             title:{ display:true, text: isEs?'Entrada de Registro #':'Logged Entry #', color: axis } }
+      }
     }
   });
 }
