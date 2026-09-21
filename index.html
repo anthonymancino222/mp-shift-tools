@@ -6461,7 +6461,18 @@ function _renderPalletChart(reports, isEs){
   });
   if (window.__prevPalletChart){ window.__prevPalletChart.destroy(); window.__prevPalletChart = null; }
   if (!datasets.length) return; // nothing selected yet — leave the canvas blank
-  const labels = Array.from({length: maxLen}, (_, i) => (isEs?'Evento ':'Event ') + (i+1));
+  // Anthony: "where is the time represented here?" — a hover-only tooltip
+  // doesn't count as "represented" on a touchscreen tablet with no mouse.
+  // With exactly ONE job checked, its real logged date/time can safely
+  // BE the x-axis (unambiguous — there's only one timeline to show), so
+  // it's shown directly instead of a bare sequence. With more than one job
+  // checked, each has its OWN real dates/times at "Event 1," so a single
+  // shared x-axis still has to stay a plain sequence — those still get
+  // their real time via the tooltip (see afterLabel below).
+  const singleTimeline = datasets.length === 1 ? datasets[0].pointMeta : null;
+  const labels = singleTimeline
+    ? singleTimeline.map(p => _shortDateTimeLabel(p.date, p.time))
+    : Array.from({length: maxLen}, (_, i) => (isEs?'Evento ':'Event ') + (i+1));
   window.__prevPalletChart = new Chart(canvas, {
     type: 'line',
     data: { labels, datasets },
@@ -6496,11 +6507,21 @@ function _renderPalletChart(reports, isEs){
       scales: {
         y: { beginAtZero:true, ticks:{color:axis}, grid:{color:grid},
              title:{ display:true, text: isEs?'Tarimas (equivalente)':'Pallets (equivalent)', color: axis } },
-        x: { ticks:{color:axis}, grid:{color:grid},
-             title:{ display:true, text: isEs?'Entrada de Registro #':'Logged Entry #', color: axis } }
+        x: { ticks:{color:axis, maxRotation: singleTimeline ? 45 : 0, minRotation: singleTimeline ? 45 : 0}, grid:{color:grid},
+             title:{ display:true, text: singleTimeline ? (isEs?'Fecha y Hora':'Date & Time') : (isEs?'Entrada de Registro #':'Logged Entry #'), color: axis } }
       }
     }
   });
+}
+
+// "9/18 8:00 AM" — compact enough to use as an x-axis tick label (see
+// _renderPalletChart's singleTimeline case) while still being an actual
+// date/time, not just a bare sequence number.
+function _shortDateTimeLabel(dateStr, timeStr){
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  const md = isNaN(d.getTime()) ? dateStr : (d.getMonth()+1) + '/' + d.getDate();
+  return timeStr ? md + ' ' + timeStr : md;
 }
 
 function exportToExcel(){
