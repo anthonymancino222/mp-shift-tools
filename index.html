@@ -6314,6 +6314,16 @@ function _addPanelHeader(slide, x, y, w, title, color){
   slide.addText(title, { x, y, w, h: 0.42, fontSize: 13, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
 }
 
+/* Mirrors the Data tab dashboard slide-for-panel (Anthony, 2026-09-21:
+   "should be the same as the data presentations shown in the data tab,
+   just minus the filter settings details" — this used to be its own
+   hand-built 2-panel layout with different KPIs/colors, which is exactly
+   why it looked like it came from a different app). Reuses
+   calculateDashboardStats() — the SAME function renderDashData() calls —
+   so a number here can never drift from what's on screen; only the
+   filter bar itself has no PowerPoint equivalent (nothing to filter on a
+   static export, so its numbers just reflect whatever was selected when
+   the button was tapped). */
 function exportToPowerPoint(){
   const isEs = document.body.classList.contains('es');
   const status = document.getElementById('pdashExportStatus');
@@ -6324,41 +6334,19 @@ function exportToPowerPoint(){
   }
   status.textContent = isEs ? '⏳ Generando PowerPoint…' : '⏳ Generating PowerPoint…';
   _loadScriptOnce(PPTXGENJS_CDN_URL).then(() => {
-    // Summary/KPI-only deck (Anthony's choice) — a dashboard-style slide of
-    // big numbers and charts, meant to be read by someone who'd never open
-    // the underlying spreadsheet. Every total here is a SUM across reports,
-    // never an average of per-job percentages — a single old/corrupted
-    // Reports row (a real one exists: garbled Target/Total Pallets cells
-    // from a past sheet-schema mismatch, see safeNum()'s comment) can only
-    // ever contribute a bounded amount to a sum, whereas averaging ratios
-    // lets one bad row's absurd percentage dominate the whole result (this
-    // is exactly how a real export once showed "-131114.4%").
-    const totals = reports.reduce((acc, r) => {
-      acc.good += safeNum(r['Total Good']);
-      acc.pallets += safeNum(r['Total Pallets']);
-      acc.target += safeNum(r.Target);
-      return acc;
-    }, { good:0, pallets:0, target:0 });
-    const fillRatePct = totals.target > 0 ? Math.round((totals.good / totals.target) * 1000) / 10 : 0;
-    const fillRateClamped = Math.max(0, Math.min(100, fillRatePct));
-
-    const byStation = {};
-    reports.forEach(r => {
-      const st = r.Station || (isEs?'Desconocido':'Unknown');
-      if (!byStation[st]) byStation[st] = { good:0, target:0, jobs:0 };
-      byStation[st].good += safeNum(r['Total Good']);
-      byStation[st].target += safeNum(r.Target);
-      byStation[st].jobs++;
-    });
+    const stats = calculateDashboardStats(reports);
+    const fillRateClamped = Math.max(0, Math.min(100, stats.overallFillRate));
 
     const PINK = 'FF1F8F';
     const NAVY = '0A0A0A';
-    // A fresh, saturated emerald instead of the old dark forest green
-    // (Anthony: "give up on the dark green color, it's too christmas like
-    // and early internet") — export-only per his answer, the app's own
-    // --good CSS variable elsewhere is untouched.
+    // Same fresh emerald as the Data tab's own #10B981 (Anthony: "give up
+    // on the dark green color, it's too christmas like and early
+    // internet") — export-only, the app's own --good CSS variable
+    // elsewhere is untouched.
     const GOOD = '10B981';
     const AMBER = 'E8A020';
+    const NEUTRAL = '9CA3AF';
+    const fillRateColor = stats.overallFillRate >= 100 ? GOOD : AMBER;
 
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name: 'MP', width: 13.33, height: 7.5 });
@@ -6379,48 +6367,94 @@ function exportToPowerPoint(){
       x: 0.6, y: 4.15, w: 12, h: 0.6, fontSize: 18, color: PINK
     });
 
-    // Dashboard slide — KPI card row + two chart panels, all on one slide
-    // (the "everything visible at a glance" look Anthony pointed to in the
-    // reference screenshots, rather than one plain number per slide).
+    // Slide 2 — the 6 KPI cards (same set/order/colors as the Data tab's
+    // own KPI row) + Fill Rate ring + Target vs Good by Station.
     slide = pptx.addSlide();
     slide.background = { color: 'F5F5F3' };
-    slide.addText(isEs ? 'Panel de Producción' : 'Production Dashboard', { x: 0.5, y: 0.25, w: 12, h: 0.6, fontSize: 24, bold: true, color: NAVY });
+    slide.addText(isEs ? 'Resumen de Producción' : 'Production Summary', { x: 0.5, y: 0.22, w: 12, h: 0.55, fontSize: 22, bold: true, color: NAVY });
 
-    const cardW = 2.92, cardGap = 0.18, cardY = 1.05, cardH = 1.55;
+    const cardGap = 0.14, cardY = 0.9, cardH = 1.45;
+    const cardW = (12.33 - 5*cardGap) / 6;
     const cardX = i => 0.5 + i * (cardW + cardGap);
-    _addKpiCard(slide, cardX(0), cardY, cardW, cardH, 'check', totals.good.toLocaleString(), isEs?'Bueno Total':'Total Good', GOOD);
-    _addKpiCard(slide, cardX(1), cardY, cardW, cardH, 'stack', totals.pallets.toLocaleString(), isEs?'Tarimas Total':'Total Pallets', NAVY);
-    _addKpiCard(slide, cardX(2), cardY, cardW, cardH, 'clipboard', reports.length.toLocaleString(), isEs?'Trabajos Totales':'Total Jobs', AMBER);
-    _addKpiCard(slide, cardX(3), cardY, cardW, cardH, 'target', fillRatePct + '%', isEs?'Tasa de Cumplimiento':'Overall Fill Rate', PINK);
+    _addKpiCard(slide, cardX(0), cardY, cardW, cardH, 'clipboard', stats.reportCount.toLocaleString(), isEs?'Reportes':'Completed Reports', PINK);
+    _addKpiCard(slide, cardX(1), cardY, cardW, cardH, 'check', stats.totalGood.toLocaleString(), isEs?'Total Bueno':'Total Good', GOOD);
+    _addKpiCard(slide, cardX(2), cardY, cardW, cardH, 'stack', stats.totalPallets.toLocaleString(), isEs?'Tarimas':'Total Pallets', NEUTRAL);
+    _addKpiCard(slide, cardX(3), cardY, cardW, cardH, 'target', stats.totalTarget.toLocaleString(), isEs?'Meta':'Target', NEUTRAL);
+    _addKpiCard(slide, cardX(4), cardY, cardW, cardH, 'target', stats.totalEffectiveTarget.toLocaleString(), isEs?'Meta Efectiva':'Effective Target', PINK);
+    _addKpiCard(slide, cardX(5), cardY, cardW, cardH, 'target', stats.overallFillRate + '%', isEs?'% Cumplimiento':'Overall Fill Rate', fillRateColor);
 
-    // Left panel: Overall Fill Rate as a single progress ring (Good removed
-    // from the old "Good vs Hold" donut once Hold tracking was dropped from
-    // the app entirely — Anthony: "this app is more for productivity").
-    const panelY = 2.95, panelH = 4.15, panelW = 5.9;
-    _addPanelHeader(slide, 0.5, panelY, panelW, isEs?'Tasa de Cumplimiento':'Fill Rate', PINK);
+    const panelY = 2.75, panelH = 4.3, panelW = 5.9;
+    _addPanelHeader(slide, 0.5, panelY, panelW, isEs?'Tasa de Cumplimiento General':'Overall Fill Rate', PINK);
     slide.addChart(pptx.ChartType.doughnut, [
-      { name: isEs?'Cumplimiento':'Fill Rate', labels: [isEs?'Completado':'Filled', isEs?'Restante':'Remaining'], values: [fillRateClamped, 100-fillRateClamped] }
+      { name: isEs?'Cumplimiento':'Fill Rate', labels: [isEs?'Bueno':'Good', isEs?'Restante':'Remaining'], values: [fillRateClamped, 100-fillRateClamped] }
     ], {
       x: 0.7, y: panelY + 0.55, w: panelW - 0.4, h: panelH - 1.15,
-      chartColors: [PINK, 'EDEDED'], showLegend: false, showValue: false, showPercent: false, holeSize: 65
+      chartColors: [fillRateColor, NEUTRAL], showLegend: false, showValue: false, showPercent: false, holeSize: 65
     });
-    slide.addText(fillRatePct + '%', { x: 0.7, y: panelY + 0.55, w: panelW - 0.4, h: panelH - 1.15, fontSize: 34, bold: true, color: NAVY, align: 'center', valign: 'middle' });
+    slide.addText(stats.overallFillRate + '%', { x: 0.7, y: panelY + 0.55, w: panelW - 0.4, h: panelH - 1.15, fontSize: 34, bold: true, color: NAVY, align: 'center', valign: 'middle' });
     slide.addText(isEs?'Bueno vs Meta (todos los trabajos)':'Good vs Target (all jobs)', { x: 0.7, y: panelY + panelH - 0.68, w: panelW - 0.4, h: 0.4, fontSize: 11, color: '666666', align: 'center' });
 
-    // Right panel: Target vs Good by Station (bar)
     const panel2X = 0.5 + panelW + 0.3;
     const panel2W = 12.33 - panel2X - 0.5;
-    if (Object.keys(byStation).length){
+    const stationLabels = Object.keys(stats.byStation);
+    if (stationLabels.length){
       _addPanelHeader(slide, panel2X, panelY, panel2W, isEs?'Meta vs Bueno por Estación':'Target vs Good by Station', NAVY);
-      const stationLabels = Object.keys(byStation);
       slide.addChart(pptx.ChartType.bar, [
-        { name: isEs?'Meta':'Target', labels: stationLabels, values: stationLabels.map(s => byStation[s].target) },
-        { name: isEs?'Bueno':'Good', labels: stationLabels, values: stationLabels.map(s => byStation[s].good) }
-      ], { x: panel2X + 0.2, y: panelY + 0.55, w: panel2W - 0.4, h: panelH - 0.75, barGrouping: 'clustered', chartColors: [NAVY, GOOD], showLegend: true, legendPos: 'b' });
+        { name: isEs?'Meta':'Target', labels: stationLabels, values: stationLabels.map(s => stats.byStation[s].target) },
+        { name: isEs?'Bueno':'Good', labels: stationLabels, values: stationLabels.map(s => stats.byStation[s].good) }
+      ], { x: panel2X + 0.2, y: panelY + 0.55, w: panel2W - 0.4, h: panelH - 0.75, barGrouping: 'clustered', chartColors: [NEUTRAL, GOOD], showLegend: true, legendPos: 'b' });
     } else {
       _addPanelHeader(slide, panel2X, panelY, panel2W, isEs?'Por Estación':'By Station', AMBER);
       slide.addText(isEs?'Sin datos de estación.':'No station data.', { x: panel2X, y: panelY + 1.5, w: panel2W, h: 0.6, align: 'center', color: '888888', fontSize: 14 });
     }
+
+    // Slide 3 — the three secondary panels (Good vs Target Over Time /
+    // Pass Mix / Shift Distribution), same as the Data tab's secondary row.
+    slide = pptx.addSlide();
+    slide.background = { color: 'F5F5F3' };
+    slide.addText(isEs ? 'Resumen de Producción' : 'Production Summary', { x: 0.5, y: 0.22, w: 12, h: 0.55, fontSize: 22, bold: true, color: NAVY });
+
+    const secY = 1.0, secH = 5.9, secGap = 0.25;
+    const secW = (12.33 - 2*secGap) / 3;
+    const secX = i => 0.5 + i * (secW + secGap);
+
+    const dateKeys = Object.keys(stats.byDate).sort();
+    _addPanelHeader(slide, secX(0), secY, secW, isEs?'Bueno vs Meta en el Tiempo':'Good vs Target Over Time', NAVY);
+    if (dateKeys.length){
+      const dateLabels = dateKeys.map(d => new Date(d+'T00:00:00').toLocaleDateString(isEs?'es':'en', {month:'short', day:'numeric'}));
+      slide.addChart(pptx.ChartType.bar, [
+        { name: isEs?'Meta':'Target', labels: dateLabels, values: dateKeys.map(d => stats.byDate[d].target) },
+        { name: isEs?'Bueno':'Good', labels: dateLabels, values: dateKeys.map(d => stats.byDate[d].good) }
+      ], { x: secX(0)+0.15, y: secY+0.55, w: secW-0.3, h: secH-0.85, barGrouping: 'clustered', chartColors: [NEUTRAL, GOOD], showLegend: true, legendPos: 'b', dataLabelFontSize: 8, catAxisLabelFontSize: 8 });
+    } else {
+      slide.addText(isEs?'Sin datos.':'No data.', { x: secX(0), y: secY+2.5, w: secW, h: 0.6, align:'center', color:'888888', fontSize:14 });
+    }
+
+    const passOrder = ['1','2','S'];
+    const passLabels = passOrder.map(p => passLabel(p, isEs));
+    const passCounts = passOrder.map(p => stats.byPass[p]||0);
+    _addPanelHeader(slide, secX(1), secY, secW, isEs?'Mezcla de Pasadas':'Pass Mix', PINK);
+    slide.addChart(pptx.ChartType.doughnut, [
+      { name: isEs?'Reportes':'Reports', labels: passLabels, values: passCounts }
+    ], { x: secX(1)+0.15, y: secY+0.55, w: secW-0.3, h: secH-1.5, chartColors: [PINK, NAVY, GOOD], showLegend: true, legendPos: 'b', showValue: true, holeSize: 65 });
+
+    const shiftLabels = [isEs?'Solo Turno 1':'Shift 1 Only', isEs?'Solo Turno 2':'Shift 2 Only', isEs?'Ambos Turnos':'Both Shifts'];
+    const shiftCounts = [stats.byShift.s1, stats.byShift.s2, stats.byShift.both];
+    _addPanelHeader(slide, secX(2), secY, secW, isEs?'Distribución de Turnos':'Shift Distribution', GOOD);
+    slide.addChart(pptx.ChartType.doughnut, [
+      { name: isEs?'Reportes':'Reports', labels: shiftLabels, values: shiftCounts }
+    ], { x: secX(2)+0.15, y: secY+0.55, w: secW-0.3, h: secH-1.5, chartColors: [PINK, NAVY, GOOD], showLegend: true, legendPos: 'b', showValue: true, holeSize: 65 });
+
+    // Slide 4 — Top Jobs by Total Good (full-width horizontal bar), same
+    // top-10-by-volume view as the Data tab's own chart.
+    slide = pptx.addSlide();
+    slide.background = { color: 'F5F5F3' };
+    slide.addText(isEs ? 'Mejores Trabajos por Total Bueno' : 'Top Jobs by Total Good', { x: 0.5, y: 0.3, w: 12, h: 0.55, fontSize: 22, bold: true, color: NAVY });
+    const topJobs = reports.map(r => ({ po: r.PO, good: safeNum(r['Total Good']) }))
+      .sort((a,b) => b.good - a.good).slice(0, 10).reverse(); // reverse so #1 draws at the TOP of the horizontal bar
+    slide.addChart(pptx.ChartType.bar, [
+      { name: isEs?'Total Bueno':'Total Good', labels: topJobs.map(j=>String(j.po||'—')), values: topJobs.map(j=>j.good) }
+    ], { x: 0.5, y: 1.1, w: 12.33, h: 5.8, barDir: 'bar', chartColors: [PINK], showLegend: false });
 
     const filename = 'Gluer_Shift_Report_' + new Date().toISOString().slice(0,10) + '.pptx';
     pptx.writeFile({ fileName: filename }).then(() => {
