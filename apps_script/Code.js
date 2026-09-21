@@ -206,6 +206,7 @@ function doPostLocked(e) {
       var palletsSheetR = getOrCreatePalletsSheet(ss);
       var now = new Date();
       var logLines = String(reportRow.fullLog || '').split('\n').filter(function (l) { return l.trim(); });
+      var taggedPalletCount = 0;
       logLines.forEach(function (line, idx) {
         var parsed = parseLogLine(line);
         var entryId = 'reopen_' + now.getTime() + '_' + idx;
@@ -234,6 +235,7 @@ function doPostLocked(e) {
         // code instead created `totalPallets` blank, disconnected rows with
         // no way to tie back to a specific entry at all.
         if (parsed.fromPallet) {
+          taggedPalletCount++;
           appendRowByHeaders(palletsSheetR, {
             'Timestamp': rowTs, 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
             'Shift': parsed.shift, 'Date': parsed.date, 'Time': parsed.time,
@@ -242,6 +244,30 @@ function doPostLocked(e) {
           });
         }
       });
+      // Fallback for a report finished BEFORE the "| Pallet:" marker
+      // existed — its log has no tagged lines at all, so the loop above
+      // recreates zero pallet rows even though the job really did have
+      // some. Recreating the old disconnected-blank-row count here is
+      // strictly better than silently losing the pallet tally outright;
+      // Undo Last Pallet still won't correctly reverse Good Count for
+      // THESE specific rows (there's no way to retroactively know which
+      // entry each one belonged to), but the count itself is right, and
+      // every pallet logged from this point forward links up normally.
+      if (taggedPalletCount === 0) {
+        var totalPallets = Number(reportRow.totalPallets) || 0;
+        if (totalPallets > 0) {
+          var tz = Session.getScriptTimeZone();
+          var todayDate = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+          var todayTime = Utilities.formatDate(now, tz, 'hh:mm a');
+          for (var pIdx = 0; pIdx < totalPallets; pIdx++) {
+            appendRowByHeaders(palletsSheetR, {
+              'Timestamp': new Date(now.getTime() + logLines.length + pIdx), 'PO': reportRow.po, 'Product': reportRow.product, 'Station': reopenStation,
+              'Shift': '1', 'Date': todayDate, 'Time': todayTime,
+              'EntryId': 'reopen_pallet_' + now.getTime() + '_legacy' + pIdx, 'Pass': reportRow.pass, 'DeviceId': data.deviceId || ''
+            });
+          }
+        }
+      }
       reportsSheetR.deleteRow(reportRow.rowIndex);
       return success();
     }
