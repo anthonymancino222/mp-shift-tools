@@ -6062,7 +6062,12 @@ function renderDashData(){
     options: {
       responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ labels:{ color: axis } } },
-      scales: { y:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid} }, x:{ ticks:{color:axis}, grid:{display:false} } }
+      scales: {
+        y:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid},
+            title:{ display:true, text: isEs?'Piezas':'Pieces', color: axis } },
+        x:{ ticks:{color:axis}, grid:{display:false},
+            title:{ display:true, text: isEs?'Estación':'Station', color: axis } }
+      }
     }
   }));
 
@@ -6100,8 +6105,10 @@ function renderDashData(){
       responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ labels:{ color: axis, boxWidth:10, font:{size:10} } } },
       scales: {
-        y:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid} },
-        x:{ grid:{display:false}, ticks: xTicks }
+        y:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid},
+            title:{ display:true, text: isEs?'Piezas':'Pieces', color: axis } },
+        x:{ grid:{display:false}, ticks: xTicks,
+            title:{ display:true, text: isEs?'Fecha de Envío':'Sent Date', color: axis } }
       }
     }
   }));
@@ -6149,7 +6156,12 @@ function renderDashData(){
     options: {
       indexAxis:'y', responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ display:false } },
-      scales: { x:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid} }, y:{ ticks:{color:axis}, grid:{display:false} } }
+      scales: {
+        x:{ beginAtZero:true, ticks:Object.assign({color:axis}, numTick), grid:{color:grid},
+            title:{ display:true, text: isEs?'Total Bueno (piezas)':'Total Good (pieces)', color: axis } },
+        y:{ ticks:{color:axis}, grid:{display:false},
+            title:{ display:true, text: isEs?'Trabajo / Número de OC':'Job / PO Number', color: axis } }
+      }
     }
   }));
 
@@ -6333,12 +6345,61 @@ function _renderPalletJobPicker(reports, isEs){
     const key = _reportKey(r);
     const passText = r.Pass ? passLabel(String(r.Pass), isEs) : '';
     const dateLabel = r.Timestamp ? new Date(r.Timestamp).toLocaleDateString() : '';
-    const label = `${escapeHtml(r.PO||'')}${passText?' — '+escapeHtml(passText):''} — ${escapeHtml(r.Station||'')} · ${dateLabel}`;
+    // Avg pace per job (Anthony, on behalf of the Gluer floor manager: "how
+    // fast or slow a pallet is completed") — right on the picker so jobs
+    // can be compared at a glance without checking each one into the chart.
+    const avgMs = _avgPalletPaceMs(r);
+    const paceText = avgMs != null ? ` · ${isEs?'prom':'avg'} ${_formatDuration(avgMs, isEs)}${isEs?'/tarima':'/pallet'}` : '';
+    const label = `${escapeHtml(r.PO||'')}${passText?' — '+escapeHtml(passText):''} — ${escapeHtml(r.Station||'')} · ${dateLabel}${escapeHtml(paceText)}`;
     const checked = selectedPalletJobKeys.has(key) ? 'checked' : '';
     return `<label><input type="checkbox" ${checked} onchange="togglePalletJob('${escapeAttr(key)}', this.checked)">${label}</label>`;
   }).join('');
 }
 
+// Reconstructs a real timestamp from the Full Log's own date ("YYYY-MM-DD")
+// + time ("8:00 AM"/"08:00 AM"/24h "14:00" depending on the browser's
+// locale that logged it) strings — deliberately NOT relying on new
+// Date(fullString), which parses inconsistently across browsers/locales
+// for this exact format. Used to answer "how fast/slow is a pallet
+// completed" (Anthony, 2026-09-22, on behalf of the Gluer floor manager)
+// by measuring real elapsed time between consecutive logged pallets —
+// works retroactively on already-collected reports, unlike adding a new
+// hidden marker to the log line, which would only help going forward.
+// Minute precision only (the log never recorded seconds) — returns null
+// if date/time can't be parsed at all, never a wrong/misleading value.
+function _parseLogDateTime(dateStr, timeStr){
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  const m = String(timeStr||'').trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?$/);
+  if (!m) return d.getTime(); // no usable time part — date-only precision
+  let hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  const ap = m[3] ? m[3].toLowerCase() : null;
+  if (ap === 'pm' && hh < 12) hh += 12;
+  if (ap === 'am' && hh === 12) hh = 0;
+  d.setHours(hh, mm, 0, 0);
+  return d.getTime();
+}
+
+// Turns a millisecond gap into a short "Xh Ym"/"Xm" string — never shows
+// 0m for a real gap under a minute (reads as "instant," which is either
+// truly instant or two pallets logged back-to-back in the same minute).
+function _formatDuration(ms, isEs){
+  const totalMin = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h > 0) return `${h}${isEs?'h':'h'} ${m}${isEs?'m':'m'}`;
+  return `${m}${isEs?'m':'m'}`;
+}
+
+// Returns {value, date, time} per point, not a plain number — the date/
+// time travels with each point so the chart's tooltip can show exactly
+// WHEN a count was logged (Anthony, 2026-09-22), even though the x-axis
+// itself still has to stay a plain sequence ("Event 1, 2, 3…") rather than
+// real dates: different jobs started on different days and logged
+// different numbers of entries, so lining them up by actual calendar date
+// would misalign the comparison instead of showing each job's own timeline
+// from its own start.
 function _computePalletSeries(r){
   const s = getReportDerivedStats(r);
   if (s.piecesPerPalletUnit <= 0) return null;
@@ -6348,8 +6409,28 @@ function _computePalletSeries(r){
   let cumulative = 0;
   return entries.map(e => {
     cumulative += Number(e.good) || 0;
-    return Math.round((cumulative / s.piecesPerPalletUnit) * 10) / 10;
+    return { value: Math.round((cumulative / s.piecesPerPalletUnit) * 10) / 10, date: e.date, time: e.time, ts: _parseLogDateTime(e.date, e.time) };
   });
+}
+
+// Average real elapsed time between consecutive PALLET-tagged points in a
+// job's series — the direct "how fast/slow is a pallet completed" number
+// the Gluer floor manager asked for. Deliberately only averages gaps
+// between entries actually marked fromPallet (not every Good-count entry,
+// e.g. a manual correction) — and per Anthony, this can currently be
+// gamed by a packer logging every pallet in a batch at the end of a shift
+// (all near-zero gaps, misleadingly "fast"); that's a floor-process issue
+// he plans to address with packers once the app's data is more solid, not
+// something this function can detect or correct for on its own. Returns
+// null when fewer than 2 pallet-tagged, ts-parseable points exist.
+function _avgPalletPaceMs(r){
+  const entries = parseFullLogText(r['Full Log']);
+  const stamps = entries.filter(e => e.fromPallet).map(e => _parseLogDateTime(e.date, e.time)).filter(ts => ts != null);
+  if (stamps.length < 2) return null;
+  stamps.sort((a,b) => a-b);
+  let totalGap = 0;
+  for (let i = 1; i < stamps.length; i++) totalGap += (stamps[i] - stamps[i-1]);
+  return totalGap / (stamps.length - 1);
 }
 
 function _renderPalletChart(reports, isEs){
@@ -6369,7 +6450,11 @@ function _renderPalletChart(reports, isEs){
     const baseLabel = palletColorMode === 'pass' ? (r.Pass ? passLabel(passKey, isEs) : (isEs?'Sin Pasada':'No Pass')) : String(r.PO||'');
     datasets.push({
       label: baseLabel + (palletColorMode==='pass' ? ' ('+r.PO+')' : ''),
-      data: series,
+      data: series.map(p => p.value),
+      // Not a Chart.js option — just carried along on the dataset so the
+      // tooltip callback below can look up this exact point's real date/
+      // time by dataIndex, without changing what's actually plotted.
+      pointMeta: series.map(p => ({ date: p.date, time: p.time, ts: p.ts })),
       borderColor: color, backgroundColor: color,
       fill: false, tension: 0.2
     });
@@ -6382,7 +6467,32 @@ function _renderPalletChart(reports, isEs){
     data: { labels, datasets },
     options: {
       responsive:true,
-      plugins:{ legend:{ labels:{ color: axis } } },
+      plugins:{
+        legend:{ labels:{ color: axis } },
+        tooltip:{
+          callbacks:{
+            // Appends the real logged date/time under the usual "series:
+            // value" line — this is the ONLY place real time shows up,
+            // since the x-axis itself has to stay a plain sequence (see
+            // _computePalletSeries's own comment on why).
+            afterLabel: function(ctx){
+              const points = ctx.dataset.pointMeta;
+              const meta = points && points[ctx.dataIndex];
+              if (!meta || !meta.date) return '';
+              const lines = [(isEs ? 'Registrado: ' : 'Logged: ') + meta.date + (meta.time ? ' ' + meta.time : '')];
+              // "How fast/slow is a pallet completed" (Anthony, on behalf
+              // of the Gluer floor manager) — the real elapsed time since
+              // the PREVIOUS point in this same job's own series, shown
+              // right where someone's already looking at that point.
+              const prev = ctx.dataIndex > 0 ? points[ctx.dataIndex - 1] : null;
+              if (prev && prev.ts != null && meta.ts != null && meta.ts >= prev.ts){
+                lines.push((isEs ? 'Desde el anterior: ' : 'Since previous: ') + _formatDuration(meta.ts - prev.ts, isEs));
+              }
+              return lines;
+            }
+          }
+        }
+      },
       scales: {
         y: { beginAtZero:true, ticks:{color:axis}, grid:{color:grid},
              title:{ display:true, text: isEs?'Tarimas (equivalente)':'Pallets (equivalent)', color: axis } },
