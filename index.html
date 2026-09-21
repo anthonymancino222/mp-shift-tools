@@ -26,6 +26,7 @@
 <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"></noscript>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     /* Moquin brand palette (matches moquin_qa_checklists.html) — --navy /
@@ -1040,6 +1041,24 @@
   } catch(e) {}
 </script>
 
+<!-- LOGIN GATE (Anthony, 2026-09-21) — only a verified @moquinpress.com
+     Google account may use this app at all; the Dashboard is further
+     restricted to 5 named accounts (see DASHBOARD_ALLOWED_EMAILS/
+     _applyDashboardVisibility below). Sits OUTSIDE #appRoot so it can be
+     shown/hidden independently of the rest of the page. -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:500;background:#0A0A0A;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
+  <div style="max-width:380px;width:100%;text-align:center;">
+    <div style="font-size:1.5rem;font-weight:800;color:#fff;margin-bottom:8px;">Gluer Shift Hand-Off</div>
+    <div style="font-size:0.92rem;color:#aaa;margin-bottom:28px;line-height:1.4;">
+      <span data-en>Sign in with your Moquin Press Google account to continue.</span>
+      <span data-es>Inicie sesión con su cuenta de Google de Moquin Press para continuar.</span>
+    </div>
+    <div id="googleSignInBtn" style="display:flex;justify-content:center;margin-bottom:18px;"></div>
+    <div id="loginError" style="color:#FF6B6B;font-size:0.85rem;min-height:1.2em;line-height:1.4;"></div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
 <div class="sticky-top-bar">
   <header>
     <h1><span data-en>Gluer Shift Hand-Off</span><span data-es>Traspaso de Turno de Pegadora</span></h1>
@@ -1051,7 +1070,9 @@
     <button class="lang-toggle" onclick="toggleLang()">🌐 <span id="langLabel">Español</span></button>
     <button class="lang-toggle" id="themeToggleBtn" onclick="toggleTheme()">🌙 <span id="themeLabel"><span data-en>Dark</span><span data-es>Oscuro</span></span></button>
     <button class="dash-btn" id="forceUpdateBtn" onclick="forceUpdateApp()">🔄 <span data-en>Update App</span><span data-es>Actualizar App</span></button>
+    <button class="dash-btn" onclick="signOutOfApp()">🚪 <span data-en>Sign Out</span><span data-es>Cerrar Sesión</span></button>
   </div>
+  <div style="text-align:center;font-size:0.78rem;color:var(--text-tertiary);margin:-4px 0 6px;" id="signedInAs"></div>
 
   <!-- GLOBAL SYNC BAR — visible whenever a job section is open, independent
        of which job that is, so a weak-WiFi backlog of unsynced entries is
@@ -1102,7 +1123,7 @@
       <div class="landing-cta">👉 <span data-en>Tap here to start</span><span data-es>Toque aquí para empezar</span> <span class="arrow">→</span></div>
       <div class="landing-badge" id="landingSyncBadge" style="display:none;"></div>
     </button>
-    <button type="button" class="landing-card landing-card-secondary" style="--tile-accent:var(--info);" onclick="openDashboard()">
+    <button type="button" class="landing-card landing-card-secondary" id="dashLandingTile" style="--tile-accent:var(--info);" onclick="openDashboard()">
       <div class="landing-icon">📊</div>
       <div class="landing-title"><span data-en>Dashboard</span><span data-es>Panel</span></div>
     </button>
@@ -1882,6 +1903,165 @@ const REPORT_ENDPOINT_URL = 'https://sweet-frost-888e.anthony-mancino2.workers.d
 const SCHEDULE_BACKEND_URL = 'https://qa-checklist-backend.anthony-mancino2.workers.dev';
 const SCHEDULE_API_KEY = 'MoquinQA2026SecureKeyAlpha7';
 
+/* ══════════════════════════════════════════════════════════════════
+   LOGIN GATE (Anthony, 2026-09-21) — only a verified @moquinpress.com
+   Google account may use this app at all; the Dashboard is further
+   restricted to 5 named accounts (see DASHBOARD_ALLOWED_EMAILS below).
+   Google Identity Services (the <script> tag in <head>) handles the
+   actual sign-in UI/flow; this app has no backend of its own to verify a
+   token's signature against, so _verifyGoogleIdToken() delegates that to
+   Google's own tokeninfo endpoint instead — the standard approach for a
+   client-only integration like this one (a raw client-side JWT decode
+   proves nothing; anyone could hand-craft a payload claiming any email).
+══════════════════════════════════════════════════════════════════ */
+// A real OAuth 2.0 Client ID from Google Cloud Console (APIs & Services >
+// Credentials > Create Credentials > OAuth client ID > Web application),
+// with this site's exact origin (e.g. https://anthonymancino222.github.io)
+// added under "Authorized JavaScript origins." No redirect URI needed —
+// Google Identity Services' button flow never navigates away from the
+// page. The app is NOT usable until this placeholder is replaced.
+const GOOGLE_CLIENT_ID = '830270295408-kki2i8f18ft612tnan0oqltl3iv0gdlp.apps.googleusercontent.com';
+const ALLOWED_EMAIL_DOMAIN = 'moquinpress.com';
+// Only these accounts may open the Dashboard (History/Live Jobs/Data) —
+// everyone else with a valid @moquinpress.com account can still log
+// production counts, just not see it. Lowercase — compared case-
+// insensitively in isDashboardAllowedFor().
+const DASHBOARD_ALLOWED_EMAILS = [
+  'anthony.mancino@moquinpress.com', 'mathias@moquinpress.com', 'jayro@moquinpress.com',
+  'norma@moquinpress.com', 'mariah.gomez@moquinpress.com'
+];
+const AUTH_SESSION_KEY = 'gluer_auth_session_v1';
+// A signed-in session survives this long WITHOUT the app being touched at
+// all — not 30 days from the moment they signed in, but 30 days since the
+// LAST time they actually used it (see _touchAuthSession(), called once on
+// restore and then every 5 minutes/on every tab-foreground while it stays
+// open — Anthony: "only require sign in again if the app haven't been
+// touched for 1 month").
+const AUTH_SESSION_MAX_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
+
+let currentUser = null; // { email, name, picture } once signed in, else null
+
+function _loadAuthSession(){
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session || !session.email || !session.lastActiveAt) return null;
+    if (Date.now() - session.lastActiveAt > AUTH_SESSION_MAX_IDLE_MS) return null;
+    return session;
+  } catch(e){ return null; }
+}
+function _saveAuthSession(session){
+  try { localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session)); } catch(e){}
+}
+function _touchAuthSession(){
+  if (!currentUser) return;
+  _saveAuthSession({ email: currentUser.email, name: currentUser.name || '', picture: currentUser.picture || '', lastActiveAt: Date.now() });
+}
+function _clearAuthSession(){
+  try { localStorage.removeItem(AUTH_SESSION_KEY); } catch(e){}
+}
+
+function isDashboardAllowedFor(email){
+  return DASHBOARD_ALLOWED_EMAILS.indexOf(String(email||'').toLowerCase()) !== -1;
+}
+
+// Hides the Dashboard entry points entirely for anyone not on the allowed
+// list, rather than showing them and blocking on tap — a hidden button
+// reads as "this isn't for me," a blocked one reads as broken.
+function _applyDashboardVisibility(){
+  const allowed = !!(currentUser && isDashboardAllowedFor(currentUser.email));
+  const topBtn = document.getElementById('dashBtnTop');
+  const tile = document.getElementById('dashLandingTile');
+  if (topBtn) topBtn.style.display = allowed ? '' : 'none';
+  if (tile) tile.style.display = allowed ? '' : 'none';
+}
+
+function _verifyGoogleIdToken(idToken){
+  return fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken))
+    .then(res => { if (!res.ok) throw new Error('verify failed'); return res.json(); })
+    .then(payload => {
+      // aud must match OUR client id specifically — without this check, a
+      // genuine Google-issued token for some OTHER site's OAuth client
+      // would still pass every other check here.
+      if (payload.aud !== GOOGLE_CLIENT_ID) throw new Error('token not for this app');
+      if (payload.email_verified !== 'true' && payload.email_verified !== true) throw new Error('email not verified');
+      return payload;
+    });
+}
+
+function _onGoogleSignIn(response){
+  const isEs = document.body.classList.contains('es');
+  const errEl = document.getElementById('loginError');
+  if (errEl) errEl.textContent = '';
+  _verifyGoogleIdToken(response.credential).then(payload => {
+    const email = String(payload.email || '').toLowerCase();
+    if (!email.endsWith('@' + ALLOWED_EMAIL_DOMAIN)){
+      if (errEl) errEl.textContent = isEs
+        ? `Solo cuentas @${ALLOWED_EMAIL_DOMAIN} pueden usar esta app. Inició sesión como ${email}.`
+        : `Only @${ALLOWED_EMAIL_DOMAIN} accounts can use this app. You signed in as ${email}.`;
+      try { google.accounts.id.disableAutoSelect(); } catch(e){}
+      return;
+    }
+    currentUser = { email, name: payload.name || '', picture: payload.picture || '' };
+    _touchAuthSession();
+    _enterApp();
+  }).catch(function(){
+    if (errEl) errEl.textContent = isEs ? 'No se pudo verificar el inicio de sesión — intente de nuevo.' : 'Could not verify sign-in — please try again.';
+  });
+}
+
+// Fully local — no server-side session to invalidate, since none exists.
+// A full reload after clearing is the simplest way back to a clean,
+// definitely-signed-out state (matches forceUpdateApp()'s own reasoning
+// for why a real navigation beats trying to reset in-memory state by hand).
+function signOutOfApp(){
+  _clearAuthSession();
+  try { google.accounts.id.disableAutoSelect(); } catch(e){}
+  location.reload();
+}
+
+function _showLoginScreen(){
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('appRoot').style.display = 'none';
+  if (window.google && google.accounts && google.accounts.id){
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: _onGoogleSignIn });
+    google.accounts.id.renderButton(document.getElementById('googleSignInBtn'), { theme: 'filled_blue', size: 'large', width: 280 });
+  } else {
+    // Google Identity Services' script (in <head>) hasn't finished loading
+    // yet — genuinely rare (it's tiny and loads early), but retrying
+    // rather than leaving a permanently-blank button is cheap insurance.
+    setTimeout(_showLoginScreen, 300);
+  }
+}
+
+function _enterApp(){
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appRoot').style.display = '';
+  const signedInEl = document.getElementById('signedInAs');
+  if (signedInEl) signedInEl.textContent = currentUser.email;
+  _applyDashboardVisibility();
+  _initAppAfterAuth();
+  // Keeps the "touched within 30 days" clock running for as long as this
+  // tab stays open, not just at the moment of sign-in — a tablet left on
+  // one job screen all shift is still "being used," not going idle.
+  setInterval(_touchAuthSession, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') _touchAuthSession();
+  });
+}
+
+function _initAuthGate(){
+  const session = _loadAuthSession();
+  if (session){
+    currentUser = { email: session.email, name: session.name, picture: session.picture };
+    _touchAuthSession();
+    _enterApp();
+  } else {
+    _showLoginScreen();
+  }
+}
+
 /* Wraps fetch() with a hard timeout via AbortController. Without this, a
    request that never resolves — a real risk on weak tablet WiFi, where a
    connection can get accepted but the response never completes — sits in
@@ -2177,7 +2357,12 @@ function enterLogScreen(){
   document.getElementById('landingScreen').style.display = 'none';
   document.getElementById('mainContainer').classList.add('open');
   document.getElementById('homeBtn').style.display = 'inline-flex';
-  document.getElementById('dashBtnTop').style.display = 'inline-flex';
+  // Only reveal the top bar's Dashboard button for an allowed account —
+  // without this check, it unconditionally showed for anyone the moment
+  // they entered the job screen, regardless of _applyDashboardVisibility()
+  // having already hidden it on the landing page a moment earlier.
+  document.getElementById('dashBtnTop').style.display =
+    (currentUser && isDashboardAllowedFor(currentUser.email)) ? 'inline-flex' : 'none';
   document.getElementById('globalSyncBar').style.display = 'flex';
 }
 
@@ -5117,6 +5302,10 @@ function scrollDashToTop(){
 }
 
 function openDashboard(){
+  // Defense in depth — _applyDashboardVisibility() already hides both
+  // entry points for anyone not on DASHBOARD_ALLOWED_EMAILS, but this
+  // stops the action itself too in case it's ever reachable another way.
+  if (!currentUser || !isDashboardAllowedFor(currentUser.email)) return;
   document.getElementById('dashOverlay').classList.add('open');
   if (!dashData) loadDashboardData();
   clearInterval(dashAutoRefreshTimer);
@@ -6780,44 +6969,55 @@ function closeNjPODropDelayed(){
   }, 200);
 }
 
-loadAll();
-refreshJobSelect();
-renderGlobalSyncStatus();
-applyThemeButtonUI();
-showLanding();
-_applyPrefillFromURL();
-_resumeNewJobFormIfNeeded();
-_initScheduleAutoPull();
+// Everything the app used to run unconditionally at load now waits behind
+// the login gate (see _initAuthGate/_enterApp at the top of this script) —
+// wrapped in one function so it can be called exactly once, right after a
+// session is confirmed valid (restored from localStorage, or a fresh
+// Google sign-in), instead of running for anyone who hasn't signed in yet.
+function _initAppAfterAuth(){
+  loadAll();
+  refreshJobSelect();
+  renderGlobalSyncStatus();
+  applyThemeButtonUI();
+  showLanding();
+  _applyPrefillFromURL();
+  _resumeNewJobFormIfNeeded();
+  _initScheduleAutoPull();
 
-// Automatic retry — weak tablet WiFi means a push routinely fails on the
-// first try. Retry whenever the browser regains connectivity, and on a
-// timer regardless (the 'online' event doesn't always fire reliably on
-// every device/browser), so nothing depends on someone remembering to tap
-// the Sync button. Cheap to run this often: retryPendingSyncs() makes ZERO
-// network calls whenever nothing is actually pending (the common case).
-window.addEventListener('online', function(){ retryPendingSyncs().then(renderGlobalSyncStatus); });
-setInterval(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 30000);
-retryPendingSyncs().then(renderGlobalSyncStatus);
+  // Automatic retry — weak tablet WiFi means a push routinely fails on the
+  // first try. Retry whenever the browser regains connectivity, and on a
+  // timer regardless (the 'online' event doesn't always fire reliably on
+  // every device/browser), so nothing depends on someone remembering to tap
+  // the Sync button. Cheap to run this often: retryPendingSyncs() makes ZERO
+  // network calls whenever nothing is actually pending (the common case).
+  window.addEventListener('online', function(){ retryPendingSyncs().then(renderGlobalSyncStatus); });
+  setInterval(function(){ retryPendingSyncs().then(renderGlobalSyncStatus); }, 30000);
+  retryPendingSyncs().then(renderGlobalSyncStatus);
 
-// Discovery pull (syncActiveEntries — see _discoverRemoteJobs) is a DIFFERENT
-// cost profile from the retry above: doGet on the Apps Script side reads
-// every row of Reports/ActiveEntries/Pallets/Notes/PalletPresets in full on
-// every single call, unconditionally, whether or not anything actually
-// changed (see sheetToObjects() in apps_script_backend.gs) — Cloudflare
-// Worker free-tier requests and Apps Script execution time are both real,
-// shared-account limits (see the QA Checklist app's own D1 quota incident
-// for what happens when a background poll like this is too aggressive).
-// A 3-minute interval still turns "a job on someone's phone never shows up
-// on the desktop without manually recreating it" into "shows up within 3
-// minutes on its own," at roughly 1/6th the request volume 30s would cost
-// across every open device, all day. Also fires once whenever anyone opens
-// the Active Job list (below) for on-demand, zero-ambient-cost freshness in
-// the moment someone's actually looking to check.
+  // Discovery pull (syncActiveEntries — see _discoverRemoteJobs) is a DIFFERENT
+  // cost profile from the retry above: doGet on the Apps Script side reads
+  // every row of Reports/ActiveEntries/Pallets/Notes/PalletPresets in full on
+  // every single call, unconditionally, whether or not anything actually
+  // changed (see sheetToObjects() in apps_script_backend.gs) — Cloudflare
+  // Worker free-tier requests and Apps Script execution time are both real,
+  // shared-account limits (see the QA Checklist app's own D1 quota incident
+  // for what happens when a background poll like this is too aggressive).
+  // A 3-minute interval still turns "a job on someone's phone never shows up
+  // on the desktop without manually recreating it" into "shows up within 3
+  // minutes on its own," at roughly 1/6th the request volume 30s would cost
+  // across every open device, all day. Also fires once whenever anyone opens
+  // the Active Job list (below) for on-demand, zero-ambient-cost freshness in
+  // the moment someone's actually looking to check.
+  window.addEventListener('online', _discoveryTick);
+  setInterval(_discoveryTick, 180000);
+  _discoveryTick();
+}
 function _discoveryTick(){ syncActiveEntries(false); }
-window.addEventListener('online', _discoveryTick);
-setInterval(_discoveryTick, 180000);
-_discoveryTick();
+
+_initAuthGate();
 </script>
+
+</div><!-- /#appRoot -->
 
 </body>
 </html>
