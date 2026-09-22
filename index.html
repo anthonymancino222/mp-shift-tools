@@ -958,7 +958,7 @@
   .pdash-main-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
   @media (max-width:900px){ .pdash-main-row{grid-template-columns:1fr;} }
   .pdash-fillrate-flex{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-  .pdash-fillrate-ring{position:relative;width:150px;height:150px;flex-shrink:0;}
+  .pdash-fillrate-ring{position:relative;width:150px;height:150px;flex-shrink:0;overflow:hidden;}
   .pdash-fillrate-ring canvas{width:150px !important;height:150px !important;}
   .pdash-fillrate-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;}
   .pdash-fillrate-center .pct{font-size:1.55rem;font-weight:800;color:var(--text);}
@@ -968,14 +968,15 @@
   .pdash-fillrate-stat-row:last-child{border-bottom:none;}
   .pdash-fillrate-stat-row span:first-child{color:var(--text-secondary);}
   .pdash-fillrate-stat-row span:last-child{font-weight:800;color:var(--text);}
-  .pdash-chartbox-major{position:relative;height:280px;}
-  .pdash-chartbox-secondary{position:relative;height:240px;}
+  .pdash-chartbox-major{position:relative;height:280px;width:100%;overflow:hidden;}
+  .pdash-chartbox-secondary{position:relative;height:240px;width:100%;overflow:hidden;}
   .pdash-secondary-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;}
   @media (max-width:1099px){ .pdash-secondary-row{grid-template-columns:1fr;} }
   .pdash-donut-legend{margin-top:8px;font-size:0.8rem;}
   .pdash-donut-legend-row{display:flex;justify-content:space-between;padding:3px 0;}
   .pdash-donut-legend-row .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;}
-  .pdash-topjobs-box{position:relative;height:300px;margin-bottom:12px;}
+  .pdash-topjobs-box{position:relative;height:300px;width:100%;overflow:hidden;margin-bottom:12px;}
+  .pdash-chartbox-major canvas, .pdash-chartbox-secondary canvas, .pdash-topjobs-box canvas, .pdash-fillrate-ring canvas{max-width:100%;max-height:100%;}
   .pdash-table-wrap{overflow-x:auto;margin-bottom:12px;}
   .pdash-table{width:100%;border-collapse:collapse;font-size:0.8rem;white-space:nowrap;}
   .pdash-table th{text-align:left;padding:8px 10px;background:#0A0A0A;color:#fff;position:sticky;top:0;}
@@ -6206,7 +6207,21 @@ function renderDashData(){
   summaryEl.innerHTML = summaryItems.map(it =>
     `<div class="pdash-summary-item"><div class="h">${escapeHtml(it.h)}</div><div class="v">${escapeHtml(it.v)}</div></div>`
   ).join('');
+
+  // Anthony: "no data chart should be visually cut off" — Chart.js sizes
+  // each canvas from its container's width AT THE MOMENT it's created;
+  // one extra explicit resize() a frame later (after the browser has
+  // actually finished laying out this tab's grid) is cheap insurance
+  // against a chart ever getting stuck at a stale/too-narrow measurement.
+  requestAnimationFrame(function(){ pdashCharts.forEach(c => c.resize()); });
 }
+
+// Same insurance on every window resize/orientation change while the Data
+// tab is open — Chart.js's own ResizeObserver normally handles this, but
+// costs nothing to force it explicitly too.
+window.addEventListener('resize', function(){
+  if (dashTab === 'data') pdashCharts.forEach(c => c.resize());
+});
 
 /* ══════════════════════════════════════════════════════════════════
    EXPORT — Excel (SheetJS) and PowerPoint (pptxgenjs), both entirely
