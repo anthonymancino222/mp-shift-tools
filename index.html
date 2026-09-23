@@ -4240,7 +4240,11 @@ function pendingCountForJob(job){
   return (job.entries||[]).filter(e => e.synced !== true).length
     + (job.pallets||[]).filter(p => p.synced !== true).length
     + (job.notes||[]).filter(note => note.synced !== true).length
-    + entryNotes;
+    + entryNotes
+    // An unconfirmed void/edit correction (see _resyncJobServerState) counts
+    // as pending too — otherwise a failed first attempt looked exactly like
+    // "all synced" until the background retry eventually got to it.
+    + (job.needsServerResync ? 1 : 0);
 }
 
 function pendingSyncCount(){
@@ -4370,7 +4374,20 @@ async function retryPendingSyncs(){
   retrySyncInProgress = true;
   try {
     for (const job of Object.values(jobs)){
-      await _pushJobSequentially(job);
+      // A job with an unconfirmed correction (see _resyncJobServerState)
+      // needs the clear-then-rebuild, not a plain re-push — a plain push
+      // alone can never remove the stale rows a void/edit needs gone.
+      // Covers the case where the very first attempt (fired directly from
+      // undoPallet/etc.) failed outright — offline, a dropped request, the
+      // tablet closed mid-sync — so this is the SAME 30s timer + reconnect
+      // loop that already retries ordinary entries now retrying THIS too,
+      // instead of leaving it stuck wrong until someone happens to notice
+      // and manually taps Force Resync.
+      if (job.needsServerResync) {
+        await _resyncJobServerState(job).catch(function(){});
+      } else {
+        await _pushJobSequentially(job);
+      }
     }
   } finally {
     retrySyncInProgress = false;
@@ -4415,9 +4432,23 @@ async function retryPendingSyncs(){
    was supposed to remove. Logged to the sync status line, not just
    swallowed, so a genuine future failure (offline, server down) is at
    least visible instead of repeating this same silent-no-op mistake. */
+// job.needsServerResync is the PERSISTED (survives a reload/offline period)
+// record that this job has a correction the server doesn't know about yet —
+// set the instant something is voided/edited, cleared only once
+// _resyncJobServerState has actually confirmed success end-to-end. Without
+// this, the original fix was still just a single best-effort attempt: if
+// that one attempt failed (offline, a dropped request, the tablet closed
+// mid-sync), the correction was silently stuck wrong forever, with nothing
+// to ever try again — exactly the class of bug this whole fix exists to
+// close. retryPendingSyncs() (the SAME 30s timer + reconnect-event loop
+// that already retries ordinary unsynced entries) now drains this too, so
+// a correction gets the identical retry guarantee as everything else in
+// this app, not a weaker one.
 function _resyncJobServerState(job){
   if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve();
   const isEs = document.body.classList.contains('es');
+  job.needsServerResync = true;
+  saveAll();
   return fetchWithTimeout(REPORT_ENDPOINT_URL, {
     method: 'POST',
     body: JSON.stringify({ action: 'clear_own_active', po: job.po, pass: job.pass || '', deviceId: DEVICE_ID, station: job.machine || 'admin' })
@@ -4425,8 +4456,8 @@ function _resyncJobServerState(job){
     if (clearRes.result !== 'success'){
       const statusEl = document.getElementById('globalSyncStatus');
       if (statusEl) statusEl.textContent = isEs
-        ? `⚠ No se pudo limpiar el servidor para "${job.po}" — Trabajos Activos puede mostrar números viejos.`
-        : `⚠ Couldn't clear server data for "${job.po}" — Live Jobs may show stale numbers.`;
+        ? `⚠ No se pudo limpiar el servidor para "${job.po}" — Trabajos Activos puede mostrar números viejos. Se reintentará automáticamente.`
+        : `⚠ Couldn't clear server data for "${job.po}" — Live Jobs may show stale numbers. Will retry automatically.`;
       throw new Error('clear_own_active failed: ' + (clearRes.message||''));
     }
     // Only non-voided items get re-added — a voided one getting marked
@@ -4442,7 +4473,14 @@ function _resyncJobServerState(job){
     saveAll();
     renderGlobalSyncStatus();
     return _pushJobSequentially(job);
-  }).then(() => { renderGlobalSyncStatus(); });
+  }).then(() => {
+    job.needsServerResync = false;
+    saveAll();
+    renderGlobalSyncStatus();
+  });
+  // Deliberately no .catch() here that clears needsServerResync — a
+  // rejection (thrown above, or a network failure elsewhere in the chain)
+  // must leave the flag set so the next retry pass picks it back up.
 }
 
 function forceResyncCurrentJob(){
