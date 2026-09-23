@@ -3069,7 +3069,17 @@ function startOver(){
   if (REPORT_ENDPOINT_URL && REPORT_ENDPOINT_URL !== 'PASTE_YOUR_APPS_SCRIPT_URL_HERE'){
     fetchWithTimeout(REPORT_ENDPOINT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'clear_own_active', po: job.po, pass: job.pass || '', deviceId: DEVICE_ID })
+      // station is REQUIRED by the Cloudflare Worker's own blanket
+      // validation on every POST (regardless of action) — found 2026-09-23:
+      // this call never included one, so the Worker had been silently
+      // rejecting every clear_own_active call with 400 "Missing required
+      // fields" since this feature was added on 2026-09-17. Every Start
+      // Over since then completed instantly (this call is fire-and-forget,
+      // its result was never checked) while actually leaving this
+      // device's already-pushed rows orphaned in Live Jobs/Dashboard the
+      // entire time. job.machine is always set on a real job; 'admin'
+      // only covers a discovered/malformed job missing it.
+      body: JSON.stringify({ action: 'clear_own_active', po: job.po, pass: job.pass || '', deviceId: DEVICE_ID, station: job.machine || 'admin' })
     }).catch(function(){});
   }
   delete jobs[currentJobId];
@@ -3964,7 +3974,7 @@ function undoPallet(){
   }
   saveAll();
   renderJob();
-  _resyncJobServerState(job);
+  _resyncJobServerState(job).catch(function(){}); // failure already surfaced on the sync status line
 }
 
 /* ── Machine Count — 1st Pass jobs only. Reuses the exact same `entries`
@@ -4045,7 +4055,7 @@ function undoMachineCount(){
   last.voided = true;
   saveAll();
   renderJob();
-  _resyncJobServerState(job);
+  _resyncJobServerState(job).catch(function(){}); // failure already surfaced on the sync status line
 }
 
 /* ── Saved Pallet Counts — a preset library shared globally across every
@@ -4393,13 +4403,32 @@ async function retryPendingSyncs(){
    parallel with the clear, a slower clear could finish AFTER some
    freshly-pushed rows land, deleting the ones this resync just re-added.
    Silent — callers needing UI feedback (see forceResyncCurrentJob) wrap
-   this themselves; the automatic callers (undoPallet, etc.) don't. */
+   this themselves; the automatic callers (undoPallet, etc.) don't.
+
+   The clear step actually checks its response now, not just .catch() —
+   found 2026-09-23: the Cloudflare Worker requires a `station` field on
+   EVERY POST regardless of action, which this call (and Start Over's own
+   identical call) never included. That's a 400 response, not a network
+   failure, so a bare .catch() never saw it — the clear silently failed
+   every single time, every job's "fix" (including Start Over's own
+   cleanup since 2026-09-17) rebuilt right back on top of the very rows it
+   was supposed to remove. Logged to the sync status line, not just
+   swallowed, so a genuine future failure (offline, server down) is at
+   least visible instead of repeating this same silent-no-op mistake. */
 function _resyncJobServerState(job){
   if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve();
+  const isEs = document.body.classList.contains('es');
   return fetchWithTimeout(REPORT_ENDPOINT_URL, {
     method: 'POST',
-    body: JSON.stringify({ action: 'clear_own_active', po: job.po, pass: job.pass || '', deviceId: DEVICE_ID })
-  }).catch(function(){}).then(function(){
+    body: JSON.stringify({ action: 'clear_own_active', po: job.po, pass: job.pass || '', deviceId: DEVICE_ID, station: job.machine || 'admin' })
+  }).then(res => res.json()).catch(function(){ return { result: 'error', message: 'network error' }; }).then(function(clearRes){
+    if (clearRes.result !== 'success'){
+      const statusEl = document.getElementById('globalSyncStatus');
+      if (statusEl) statusEl.textContent = isEs
+        ? `⚠ No se pudo limpiar el servidor para "${job.po}" — Trabajos Activos puede mostrar números viejos.`
+        : `⚠ Couldn't clear server data for "${job.po}" — Live Jobs may show stale numbers.`;
+      throw new Error('clear_own_active failed: ' + (clearRes.message||''));
+    }
     // Only non-voided items get re-added — a voided one getting marked
     // synced:false here would resurrect it right back onto the server,
     // exactly the bug this is fixing.
@@ -4431,6 +4460,8 @@ function forceResyncCurrentJob(){
   // own overlap guard would otherwise silently skip on an explicit tap.
   _resyncJobServerState(job).then(() => {
     alert(isEs ? '✅ Reenvío completo.' : '✅ Resend complete.');
+  }).catch(function(err){
+    alert((isEs ? '❌ No se pudo completar: ' : '❌ Could not complete: ') + err.message);
   });
 }
 
@@ -4965,7 +4996,7 @@ function saveEditEntry(jobId, entryId){
   // add-only and can't overwrite the OLD Good value already sitting on the
   // server under this same EntryId, so Live Jobs/Dashboard would otherwise
   // keep showing the pre-edit number indefinitely.
-  _resyncJobServerState(job);
+  _resyncJobServerState(job).catch(function(){}); // failure already surfaced on the sync status line
 }
 
 /* Job Target Progress bar + pallet grid visual (see .progress-card in the
