@@ -3937,12 +3937,20 @@ function _confirmPartialPallet(){
   pushLivePallet(job, pallet);
 }
 
-/* Undo never calls the backend (same as editing a good/reject count doesn't
-   re-push the corrected value) — it only flips a local `voided` flag so a
-   stray tap can't resurrect via the next sync pull, and the final report
-   totals from local non-voided pallets/entries, which is the authoritative
-   number. Voiding a pallet also voids the Good Count entry it auto-created
-   (if any), so undoing a pallet correctly reverses the count it added. */
+/* Voiding only ever flips a local `voided` flag — the final report's
+   totals always come from local non-voided pallets/entries, so THAT
+   number was never wrong. But Live Jobs/Dashboard reads the server's raw
+   ActiveEntries/Pallets rows directly, and a normal push can only ADD a
+   row, never retract one — so without _resyncJobServerState(), an undone
+   pallet/entry kept counting there forever, showing a stale, already-
+   corrected-away total to anyone checking Live Jobs on another device or
+   the desktop (found 2026-09-23). Fire-and-forget: the LOCAL state (what
+   this screen shows, and what the eventual report will use) is already
+   correct the instant voided is set — this just catches the server's raw
+   view up, same as any other background sync, not something this tap
+   needs to wait on. Voiding a pallet also voids the Good Count entry it
+   auto-created (if any), so undoing a pallet correctly reverses the count
+   it added. */
 function undoPallet(){
   if(!currentJobId) return;
   const job = jobs[currentJobId];
@@ -3956,6 +3964,7 @@ function undoPallet(){
   }
   saveAll();
   renderJob();
+  _resyncJobServerState(job);
 }
 
 /* ── Machine Count — 1st Pass jobs only. Reuses the exact same `entries`
@@ -4023,7 +4032,10 @@ function _confirmMachineCount(){
 }
 
 /* Voids the latest reading only — computeTotalGood() then falls back to
-   whichever reading was logged before it, same "latest wins" rule as normal. */
+   whichever reading was logged before it, same "latest wins" rule as
+   normal. Same server-catch-up as undoPallet() — see its own comment on
+   why this is needed for Live Jobs/Dashboard to stop showing a voided
+   reading. */
 function undoMachineCount(){
   if(!currentJobId) return;
   const job = jobs[currentJobId];
@@ -4033,6 +4045,7 @@ function undoMachineCount(){
   last.voided = true;
   saveAll();
   renderJob();
+  _resyncJobServerState(job);
 }
 
 /* ── Saved Pallet Counts — a preset library shared globally across every
@@ -4364,30 +4377,59 @@ async function retryPendingSyncs(){
    when nothing's actually missing — the backend is idempotent on entryId,
    so anything that DID land just gets skipped server-side, nothing
    duplicates. */
+/* Clears THIS device's own rows on the server for `job`'s PO+Pass FIRST,
+   then rebuilds them from current local state — not just a re-push. Undo
+   Last Pallet/Undo Last Machine Count/editing a Good count all only ever
+   flip a local `voided` flag or change a value in place (see their own
+   comments) — none of them have ever told the server, since a normal push
+   is add-only/idempotent by EntryId and can't retract or overwrite a row
+   already there. That's invisible in the FINAL report (its totals only
+   ever come from local non-voided data), but it left Live Jobs/Dashboard
+   — which reads the server's raw rows directly — showing stale, already-
+   corrected-away numbers indefinitely (found 2026-09-23: a job undone down
+   to 2 real pallets/56,000 still showed 8/229,600 in Live Jobs and on the
+   desktop, from pallets/entries that had been undone hours earlier).
+   Awaited in sequence (clear, THEN rebuild): if the rebuild fired in
+   parallel with the clear, a slower clear could finish AFTER some
+   freshly-pushed rows land, deleting the ones this resync just re-added.
+   Silent — callers needing UI feedback (see forceResyncCurrentJob) wrap
+   this themselves; the automatic callers (undoPallet, etc.) don't. */
+function _resyncJobServerState(job){
+  if (!REPORT_ENDPOINT_URL || REPORT_ENDPOINT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') return Promise.resolve();
+  return fetchWithTimeout(REPORT_ENDPOINT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'clear_own_active', po: job.po, pass: job.pass || '', deviceId: DEVICE_ID })
+  }).catch(function(){}).then(function(){
+    // Only non-voided items get re-added — a voided one getting marked
+    // synced:false here would resurrect it right back onto the server,
+    // exactly the bug this is fixing.
+    (job.entries||[]).forEach(e => {
+      if (e.voided) return;
+      e.synced = false;
+      (e.notes||[]).forEach(n => { n.synced = false; });
+    });
+    (job.pallets||[]).forEach(p => { if (!p.voided) p.synced = false; });
+    (job.notes||[]).forEach(n => { n.synced = false; });
+    saveAll();
+    renderGlobalSyncStatus();
+    return _pushJobSequentially(job);
+  }).then(() => { renderGlobalSyncStatus(); });
+}
+
 function forceResyncCurrentJob(){
   if (!currentJobId) return;
   const isEs = document.body.classList.contains('es');
   const job = jobs[currentJobId];
   const confirmMsg = isEs
-    ? `¿Volver a enviar TODOS los registros de "${job.po}" al servidor, aunque ya digan "sincronizado"? Use esto solo si sospecha que algo no llegó realmente al servidor.`
-    : `Re-send EVERYTHING for "${job.po}" to the server, even items already marked synced? Only use this if you suspect something didn't actually reach the server.`;
+    ? `¿Volver a enviar TODOS los registros de "${job.po}" al servidor? Esto borra primero las filas de este dispositivo en el servidor y las reconstruye desde lo que se ve aquí ahora — corrige un "Deshacer" o edición que nunca se reflejó en Trabajos Activos/Panel. Use esto si Trabajos Activos muestra números distintos a los de este dispositivo.`
+    : `Re-send EVERYTHING for "${job.po}" to the server? This first clears this device's own rows on the server, then rebuilds them from what's shown here right now — fixes an Undo/edit that never showed up in Live Jobs/Dashboard. Use this if Live Jobs is showing different numbers than this device.`;
   if (!confirm(confirmMsg)) return;
-  (job.entries||[]).forEach(e => {
-    e.synced = false;
-    (e.notes||[]).forEach(n => { n.synced = false; });
-  });
-  (job.pallets||[]).forEach(p => { p.synced = false; });
-  (job.notes||[]).forEach(n => { n.synced = false; });
-  saveAll();
-  renderGlobalSyncStatus();
   const statusEl = document.getElementById('globalSyncStatus');
   if (statusEl) statusEl.textContent = isEs ? '⏳ Reenviando…' : '⏳ Resending…';
-  // _pushJobSequentially directly, NOT retryPendingSyncs() — that has its
-  // own overlap guard (skips itself if a background sweep is already mid-
-  // drain), which would make an explicit tap of this button silently do
-  // nothing if the timing was unlucky. This bypasses that on purpose.
-  _pushJobSequentially(job).then(() => {
-    renderGlobalSyncStatus();
+  // _resyncJobServerState (not retryPendingSyncs) — this needs to run even
+  // when a background sweep is already mid-drain, which retryPendingSyncs'
+  // own overlap guard would otherwise silently skip on an explicit tap.
+  _resyncJobServerState(job).then(() => {
     alert(isEs ? '✅ Reenvío completo.' : '✅ Resend complete.');
   });
 }
@@ -4919,6 +4961,11 @@ function saveEditEntry(jobId, entryId){
   saveAll();
   editingEntryId = null;
   renderJob();
+  // Same reasoning as undoPallet()/undoMachineCount() — a normal push is
+  // add-only and can't overwrite the OLD Good value already sitting on the
+  // server under this same EntryId, so Live Jobs/Dashboard would otherwise
+  // keep showing the pre-edit number indefinitely.
+  _resyncJobServerState(job);
 }
 
 /* Job Target Progress bar + pallet grid visual (see .progress-card in the
