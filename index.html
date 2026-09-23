@@ -880,6 +880,8 @@
   .dash-job-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
   .dash-job-top{display:flex;justify-content:space-between;font-weight:800;color:var(--navy);margin-bottom:6px;}
   .dash-job-meta{font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;}
+  .dash-job-last-synced{font-size:0.82rem;font-weight:700;color:var(--good);margin-bottom:8px;}
+  .dash-job-last-synced.stale{color:var(--warn);}
   .dash-job-counts{display:flex;gap:18px;font-size:0.9rem;}
   .dash-job-counts b{display:block;font-size:1.3rem;}
   .dash-log-toggle{background:transparent;border:none;color:var(--navy);font-weight:700;font-size:0.85rem;margin-top:6px;padding:0;cursor:pointer;}
@@ -5958,6 +5960,19 @@ function renderHistoryExtraDetails(r, isEs){
   ).join('')}</div>`;
 }
 
+// "5 min ago"/"2h 10m ago" — relative phrasing reads faster than a bare
+// clock time when the whole point is "how STALE is this," which is
+// exactly what Last Synced needs to answer at a glance (Anthony,
+// 2026-09-23, after the sync-gap incident on PO 48062).
+function _formatRelativeAgo(date, isEs){
+  if (!date) return null;
+  const mins = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+  if (mins < 1) return isEs ? 'ahora mismo' : 'just now';
+  if (mins < 60) return (isEs ? `hace ${mins} min` : `${mins} min ago`);
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return isEs ? `hace ${h}h ${m}m` : `${h}h ${m}m ago`;
+}
+
 function renderDashLive(){
   const isEs = document.body.classList.contains('es');
   const el = document.getElementById('dashTabLive');
@@ -6020,9 +6035,23 @@ function renderDashLive(){
     const jobNoteCount = (dashData.notes||[]).filter(n =>
       n.Scope === 'job' && normalizePO(n.PO) === jTarget && (!j.pass || String(n.Pass||'') === String(j.pass))
     ).length;
+    // Last Synced = the most recent Timestamp the SERVER actually received
+    // for this job, across every device — the one number that answers "is
+    // this card caught up, or could it be showing stale data right now"
+    // (see the PO 48062 incident: the server's own numbers were correct
+    // and fresh once synced, the problem was never knowing they weren't).
+    // >15 min old while a job is still active-enough to appear in Live
+    // Jobs at all is unusual — flagged amber rather than presented as
+    // routine, same threshold logic as pendingCountForJob's own "not yet
+    // synced" warning elsewhere in the app.
+    const lastSyncedStale = j.lastTs && (Date.now() - j.lastTs.getTime()) > 15*60*1000;
+    const lastSyncedHtml = j.lastTs
+      ? `${j.lastTs.toLocaleString()} (${_formatRelativeAgo(j.lastTs, isEs)})`
+      : (isEs ? 'Nunca' : 'Never');
     return `<div class="dash-job-card">
       <div class="dash-job-top"><span>${escapeHtml(j.po)}</span><span>${escapeHtml(j.station||'')}${j.pass ? ' · '+escapeHtml(passLabel(String(j.pass), isEs)) : ''}</span></div>
-      <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'}<br><span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)} · ${isEs?'última':'last'}: ${j.lastTs?j.lastTs.toLocaleString():'—'}</div>
+      <div class="dash-job-meta">${escapeHtml(j.product||'')} · ${j.count} ${isEs?'registros':'entries'}<br><span data-en>Started</span><span data-es>Iniciado</span>: ${escapeHtml(startedLabel)}</div>
+      <div class="dash-job-last-synced${lastSyncedStale?' stale':''}">🕐 <span data-en>Last Synced</span><span data-es>Última Sincronización</span>: ${escapeHtml(lastSyncedHtml)}</div>
       <div class="dash-job-counts">
         <div><b style="color:var(--good)">${j.good.toLocaleString()}</b>${isEs?'Bueno':'Good'}</div>
         <div><b>${Number(j.target||0).toLocaleString()}</b>${isEs?'Meta':'Target'}</div>
